@@ -1,4 +1,4 @@
-#include "eosio.system.hpp"
+#include <eosio.system/eosio.system.hpp>
 #include <eosiolib/dispatcher.hpp>
 #include <eosiolib/crypto.h>
 
@@ -46,16 +46,6 @@ namespace eosiosystem {
       eosio_global_state dp;
       get_blockchain_parameters(dp);
       return dp;
-   }
-
-   time_point system_contract::current_time_point() {
-      const static time_point ct{ microseconds{ static_cast<int64_t>( current_time() ) } };
-      return ct;
-   }
-
-   block_timestamp system_contract::current_block_time() {
-      const static block_timestamp cbt{ current_time_point() };
-      return cbt;
    }
 
    system_contract::~system_contract() {

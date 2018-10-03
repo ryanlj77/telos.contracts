@@ -1,13 +1,18 @@
 #include <eosio.system/eosio.system.hpp>
 
 #include <eosio.token/eosio.token.hpp>
+#include <eosiolib/print.hpp>
+#include <eosiolib/producer_schedule.hpp>
+#include <eosiolib/chain.h>
+#include <algorithm>
+#include <cmath>
 
 #define RESET_BLOCKS_PRODUCED 0
 #define MAX_BLOCK_PER_CYCLE 12
 
 namespace eosiosystem
 {
-
+using namespace eosio;
 const int64_t min_activated_stake = 150'000'000'0000;
 const double continuous_rate = 0.025;                    // 2.5% annual inflation rate
 const uint32_t blocks_per_year = 52 * 7 * 24 * 2 * 3600; // half seconds per year
@@ -166,8 +171,6 @@ void system_contract::check_missed_blocks(block_timestamp timestamp, account_nam
 
 void system_contract::onblock(block_timestamp timestamp, account_name producer)
 {
-      using namespace eosio;
-
       require_auth(N(eosio));
 
       recalculate_votes();
@@ -176,8 +179,8 @@ void system_contract::onblock(block_timestamp timestamp, account_name producer)
       if (_gstate.total_activated_stake < min_activated_stake)
             return;
 
-      if (_gstate.last_pervote_bucket_fill == time_point()) /// start the presses
-            _gstate.last_pervote_bucket_fill = current_time_point();
+      if (_gstate.last_pervote_bucket_fill == 0) /// start the presses
+            _gstate.last_pervote_bucket_fill = current_time();
 
       /**
        * At startup the initial producer may not be one that is registered / elected
@@ -203,12 +206,13 @@ void system_contract::onblock(block_timestamp timestamp, account_name producer)
             {
                   name_bid_table bids(_self, _self);
                   auto idx = bids.get_index<N(highbid)>();
-                  auto highest = idx.lower_bound(std::numeric_limits<uint64_t>::max() / 2);
+                  auto highest = idx.begin();
+
                   if (highest != idx.end() &&
-                      highest->high_bid > 0 &&
-                      (current_time_point() - highest->last_bid_time) > microseconds(useconds_per_day) &&
-                      _gstate.thresh_activated_stake_time > time_point() &&
-                      (current_time_point() - _gstate.thresh_activated_stake_time) > microseconds(14 * useconds_per_day))
+                        highest->high_bid > 0 &&
+                        highest->last_bid_time < (current_time() - useconds_per_day) &&
+                        _gstate.thresh_activated_stake_time > 0 &&
+                        (current_time() - _gstate.thresh_activated_stake_time) > 14 * useconds_per_day)
                   {
                         _gstate.last_name_close = timestamp;
                         idx.modify(highest, 0, [&](auto &b) {
@@ -218,8 +222,51 @@ void system_contract::onblock(block_timestamp timestamp, account_name producer)
             }
       }
 }
+void system_contract::recalculate_votes(){
+   // fix type 1 : fixes just total vote weight
+   // iterate and fix the total_producer_vote_weight = _producers(sum) if < 0
+   // for the current issue on the testnet : this should be removed once the fix is applied
+   // if (_gstate.total_producer_vote_weight <= -0.1){ // -0.1 threshold for floating point calc ?
+   //     print("\n Negative total_weight_vote fix applied !");
+   //     _gstate.total_producer_vote_weight = 0;
+   //     for (const auto &prod : _producers) {
+   //         _gstate.total_producer_vote_weight += prod.total_votes;
+   //     }
+   // }
 
-using namespace eosio;
+   // fix type 2 : fixes proxied weights too
+   if (_gstate.total_producer_vote_weight <= -0.1){ // -0.1 threshold for floating point calc ?
+       _gstate.total_producer_vote_weight = 0;
+       _gstate.total_activated_stake = 0;
+       for(auto producer = _producers.begin(); producer != _producers.end(); ++producer){
+           _producers.modify(producer, 0, [&](auto &p) {
+               p.total_votes = 0;
+           });
+       }
+       boost::container::flat_map<account_name, bool> processed_proxies;
+       for (auto voter = _voters.begin(); voter != _voters.end(); ++voter) {
+           if(voter->proxy && !processed_proxies[voter->proxy]){
+               auto proxy = _voters.find(voter->proxy);
+               _voters.modify( proxy, 0, [&]( auto& av ) {
+                   av.last_vote_weight = 0;
+                   av.last_stake = 0;
+                   av.proxied_vote_weight = 0;
+               });
+               processed_proxies[voter->proxy] = true;
+           }
+           if(!voter->is_proxy || !processed_proxies[voter->owner]){
+               _voters.modify( voter, 0, [&]( auto& av ) {
+                   av.last_vote_weight = 0;
+                   av.last_stake = 0;
+                   av.proxied_vote_weight = 0;
+               });
+               processed_proxies[voter->owner] = true;
+           }
+           update_votes(voter->owner, voter->proxy, voter->producers, true);
+       }
+   }
+}
+
 void system_contract::claimrewards(const account_name &owner)
 {
      // TODO: Implement

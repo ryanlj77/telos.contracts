@@ -2,7 +2,7 @@
  *  @file
  *  @copyright defined in eos/LICENSE.txt
  */
-#include "eosio.system.hpp"
+#include <eosio.system/eosio.system.hpp>
 
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/print.hpp>
@@ -107,7 +107,6 @@ namespace eosiosystem {
    void system_contract::buyram( account_name payer, account_name receiver, asset quant )
    {
       require_auth( payer );
-      update_ram_supply();
 
       eosio_assert( quant.amount > 0, "must purchase a positive amount" );
 
@@ -165,7 +164,6 @@ namespace eosiosystem {
     */
    void system_contract::sellram( account_name account, int64_t bytes ) {
       require_auth( account );
-      update_ram_supply();
 
       eosio_assert( bytes > 0, "cannot sell negative byte" );
 
