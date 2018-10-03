@@ -26,7 +26,7 @@ namespace eosiosystem {
      account_name            newname;
      account_name            high_bidder;
      int64_t                 high_bid = 0; ///< negative high_bid == closed auction waiting to be claimed
-     time_point              last_bid_time;
+     uint64_t                last_bid_time = 0;
 
      auto     primary_key()const { return newname;                          }
      uint64_t by_high_bid()const { return static_cast<uint64_t>(-high_bid); }
@@ -53,12 +53,12 @@ namespace eosiosystem {
       int64_t              total_ram_stake = 0;
 
       block_timestamp      last_producer_schedule_update;
-      time_point           last_pervote_bucket_fill;
+      uint64_t             last_pervote_bucket_fill = 0;
       int64_t              pervote_bucket = 0;
       int64_t              perblock_bucket = 0;
       uint32_t             total_unpaid_blocks = 0; /// all blocks which have been produced but not paid
       int64_t              total_activated_stake = 0;
-      time_point           thresh_activated_stake_time;
+      uint64_t             thresh_activated_stake_time = 0;
       uint16_t             last_producer_schedule_size = 0;
       double               total_producer_vote_weight = 0; /// the sum of all producer votes
       block_timestamp      last_name_close;
@@ -72,29 +72,11 @@ namespace eosiosystem {
    };
 
    /**
-    * Defines new global state parameters added after version 1.0
+    * TELOS CHANGES:
+    * 
+    * 1. Added missed_blocks field, used for counting missed blocks and
+    *    adjusting producer payout accordingly.
     */
-   struct eosio_global_state2 {
-      eosio_global_state2(){}
-
-      uint16_t          new_ram_per_block = 0;
-      block_timestamp   last_ram_increase;
-      block_timestamp   last_block_num; /* deprecated */
-      double            total_producer_votepay_share = 0;
-      uint8_t           revision = 0; ///< used to track version updates in the future.
-
-      EOSLIB_SERIALIZE( eosio_global_state2, (new_ram_per_block)(last_ram_increase)(last_block_num)
-                        (total_producer_votepay_share)(revision) )
-   };
-
-   struct eosio_global_state3 {
-      eosio_global_state3() { }
-      time_point        last_vpay_state_update;
-      double            total_vpay_share_change_rate = 0;
-
-      EOSLIB_SERIALIZE( eosio_global_state3, (last_vpay_state_update)(total_vpay_share_change_rate) )
-   };
-
    struct producer_info {
       account_name          owner;
       double                total_votes = 0;
@@ -102,7 +84,9 @@ namespace eosiosystem {
       bool                  is_active = true;
       std::string           url;
       uint32_t              unpaid_blocks = 0;
-      time_point            last_claim_time;
+      uint32_t              missed_blocks = 0;
+      uint32_t              blocks_per_cycle = 0;
+      uint64_t              last_claim_time = 0;
       uint16_t              location = 0;
 
       uint64_t primary_key()const { return owner;                                   }
@@ -112,18 +96,21 @@ namespace eosiosystem {
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
       EOSLIB_SERIALIZE( producer_info, (owner)(total_votes)(producer_key)(is_active)(url)
-                        (unpaid_blocks)(last_claim_time)(location) )
+                        (unpaid_blocks)(missed_blocks)(blocks_per_cycle)(last_claim_time)(location) )
    };
 
-   struct producer_info2 {
-      account_name    owner;
-      double          votepay_share = 0;
-      time_point      last_votepay_share_update;
+   struct rotation_info {
+      account_name           bp_currently_out;
+      account_name           sbp_currently_in;
+      uint32_t               bp_out_index;
+      uint32_t               sbp_in_index;
+      block_timestamp        next_rotation_time;
+      block_timestamp        last_rotation_time;
+      account_name           current_bp; 
+      block_timestamp        last_time_block_produced;
 
-      uint64_t primary_key()const { return owner; }
-
-      // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( producer_info2, (owner)(votepay_share)(last_votepay_share_update) )
+      EOSLIB_SERIALIZE( rotation_info, (bp_currently_out)(sbp_currently_in)(bp_out_index)(sbp_in_index)(next_rotation_time)
+                        (last_rotation_time)(current_bp)(last_time_block_produced) )
    };
 
    struct voter_info {
@@ -131,6 +118,7 @@ namespace eosiosystem {
       account_name                proxy = 0; /// the proxy set by the voter, if any
       std::vector<account_name>   producers; /// the producers approved by this voter if no proxy set
       int64_t                     staked = 0;
+      int64_t                 last_stake = 0;
 
       /**
        *  Every time a vote is cast we must first "undo" the last vote weight, before casting the
@@ -154,20 +142,18 @@ namespace eosiosystem {
       uint64_t primary_key()const { return owner; }
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( voter_info, (owner)(proxy)(producers)(staked)(last_vote_weight)(proxied_vote_weight)(is_proxy)(reserved1)(reserved2)(reserved3) )
+      EOSLIB_SERIALIZE( voter_info, (owner)(proxy)(producers)(staked)(last_stake)(last_vote_weight)(proxied_vote_weight)(is_proxy)(reserved1)(reserved2)(reserved3) )
    };
 
    typedef eosio::multi_index< N(voters), voter_info>  voters_table;
 
+   typedef eosio::singleton<N(rotations), rotation_info> rotation_info_singleton;
 
    typedef eosio::multi_index< N(producers), producer_info,
                                indexed_by<N(prototalvote), const_mem_fun<producer_info, double, &producer_info::by_votes>  >
                                >  producers_table;
-   typedef eosio::multi_index< N(producers2), producer_info2 > producers_table2;
 
    typedef eosio::singleton<N(global), eosio_global_state> global_state_singleton;
-   typedef eosio::singleton<N(global2), eosio_global_state2> global_state2_singleton;
-   typedef eosio::singleton<N(global3), eosio_global_state3> global_state3_singleton;
 
    //   static constexpr uint32_t     max_inflation_rate = 5;  // 5% annual inflation
    static constexpr uint32_t     seconds_per_day = 24 * 3600;
@@ -175,16 +161,14 @@ namespace eosiosystem {
 
    class system_contract : public native {
       private:
-         voters_table            _voters;
-         producers_table         _producers;
-         producers_table2        _producers2;
-         global_state_singleton  _global;
-         global_state2_singleton _global2;
-         global_state3_singleton _global3;
-         eosio_global_state      _gstate;
-         eosio_global_state2     _gstate2;
-         eosio_global_state3     _gstate3;
-         rammarket               _rammarket;
+         voters_table           _voters;
+         producers_table        _producers;
+         global_state_singleton _global;
+         rotation_info_singleton _rotations;
+
+         eosio_global_state     _gstate;
+         rotation_info          _grotations;
+         rammarket              _rammarket;
 
       public:
          system_contract( account_name s );
@@ -253,7 +237,6 @@ namespace eosiosystem {
          void unregprod( const account_name producer );
 
          void setram( uint64_t max_ram_size );
-         void setramrate( uint16_t bytes_per_block );
 
          void voteproducer( const account_name voter, const account_name proxy, const std::vector<account_name>& producers );
 
@@ -268,37 +251,53 @@ namespace eosiosystem {
 
          void rmvproducer( account_name producer );
 
-         void updtrevision( uint8_t revision );
 
          void bidname( account_name bidder, account_name newname, asset bid );
-
+        
          void bidrefund( account_name bidder, account_name newname );
 
       private:
+         
+         void recalculate_votes();
+
+         void updateRotationTime(block_timestamp block_time);
+
+         void setBPsRotation(account_name bpOut, account_name sbpIn);
+
+         void update_elected_producers( block_timestamp timestamp );
+
          // Implementation details:
 
-         //defined in eosio.system.cpp
-         static eosio_global_state get_default_parameters();
-         static time_point current_time_point();
-         static block_timestamp current_block_time();
-         void update_ram_supply();
-
-         //defined in delegate_bandwidth.cpp
+         //defind in delegate_bandwidth.cpp
          void changebw( account_name from, account_name receiver,
                         asset stake_net_quantity, asset stake_cpu_quantity, bool transfer );
 
          //defined in voting.hpp
-         void update_elected_producers( block_timestamp timestamp );
+         static eosio_global_state get_default_parameters();
+
          void update_votes( const account_name voter, const account_name proxy, const std::vector<account_name>& producers, bool voting );
 
          // defined in voting.cpp
          void propagate_weight_change( const voter_info& voter );
 
-         double update_producer_votepay_share( const producers_table2::const_iterator& prod_itr,
-                                               time_point ct,
-                                               double shares_rate, bool reset_to_zero = false );
-         double update_total_votepay_share( time_point ct,
-                                            double additional_shares_delta = 0.0, double shares_rate_delta = 0.0 );
+         //calculate the inverse vote weight
+         double inverseVoteWeight(double staked, double amountVotedProducers);
+
+         //verify if the network is activated
+         void checkNetworkActivation();
+
+         bool is_in_range(int32_t index, int32_t low_bound, int32_t up_bound);
+
+         void check_missed_blocks(block_timestamp timestamp, account_name producer);
+
+         void set_producer_block_produced(account_name producer, uint32_t amount);
+
+         void set_producer_block_missed(account_name producer, uint32_t amount);
+
+         void update_producer_blocks(account_name producer, uint32_t amountBlocksProduced, uint32_t amountBlocksMissed);
+
+         bool crossed_missed_blocks_threshold(uint32_t amountBlocksMissed);
+         
    };
 
 } /// eosiosystem

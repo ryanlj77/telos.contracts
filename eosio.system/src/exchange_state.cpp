@@ -10,6 +10,7 @@ namespace eosiosystem {
       real_type ONE(1.0);
 
       real_type E = -R * (ONE - std::pow( ONE + T / C, F) );
+      //print( "E: ", E, "\n");
       int64_t issued = int64_t(E);
 
       supply.amount += issued;
@@ -35,6 +36,7 @@ namespace eosiosystem {
      // real_type T = C * std::expm1( F * std::log1p(E/R) );
       
       real_type T = C * (std::pow( ONE + E/R, F) - ONE);
+      //print( "T: ", T, "\n");
       int64_t out = int64_t(T);
 
       supply.amount -= in.amount;

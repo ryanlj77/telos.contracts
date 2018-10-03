@@ -1,4 +1,4 @@
-#include <eosio.system/eosio.system.hpp>
+#include "eosio.system.hpp"
 #include <eosiolib/dispatcher.hpp>
 #include <eosiolib/crypto.h>
 
@@ -14,17 +14,15 @@ namespace eosiosystem {
    :native(s),
     _voters(_self,_self),
     _producers(_self,_self),
-    _producers2(_self,_self),
     _global(_self,_self),
-    _global2(_self,_self),
-    _global3(_self,_self),
+    _rotations(_self,_self),
     _rammarket(_self,_self)
    {
       //print( "construct system\n" );
-      _gstate  = _global.exists() ? _global.get() : get_default_parameters();
-      _gstate2 = _global2.exists() ? _global2.get() : eosio_global_state2{};
-      _gstate3 = _global3.exists() ? _global3.get() : eosio_global_state3{};
-
+      _gstate = _global.exists() ? _global.get() : get_default_parameters();
+      _grotations = _rotations.get_or_create(_self, rotation_info{
+        0, 0, 21, 75, block_timestamp(), block_timestamp(), 0, block_timestamp()
+      });
       auto itr = _rammarket.find(S(4,RAMCORE));
 
       if( itr == _rammarket.end() ) {
@@ -61,9 +59,10 @@ namespace eosiosystem {
    }
 
    system_contract::~system_contract() {
+      //print( "destruct system\n" );
       _global.set( _gstate, _self );
-      _global2.set( _gstate2, _self );
-      _global3.set( _gstate3, _self );
+      _rotations.set( _grotations, _self );
+      //eosio_exit(0);
    }
 
    void system_contract::setram( uint64_t max_ram_size ) {
@@ -77,46 +76,17 @@ namespace eosiosystem {
       auto itr = _rammarket.find(S(4,RAMCORE));
 
       /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
+       *  Increase or decrease the amount of ram for sale based upon the change in max
+       *  ram size.
        */
       _rammarket.modify( itr, 0, [&]( auto& m ) {
          m.base.balance.amount += delta;
       });
 
       _gstate.max_ram_size = max_ram_size;
+      _global.set( _gstate, _self );
    }
 
-   void system_contract::update_ram_supply() {
-      auto cbt = current_block_time();
-
-      if( cbt <= _gstate2.last_ram_increase ) return;
-
-      auto itr = _rammarket.find(S(4,RAMCORE));
-      auto new_ram = (cbt.slot - _gstate2.last_ram_increase.slot)*_gstate2.new_ram_per_block;
-      _gstate.max_ram_size += new_ram;
-
-      /**
-       *  Increase the amount of ram for sale based upon the change in max ram size.
-       */
-      _rammarket.modify( itr, 0, [&]( auto& m ) {
-         m.base.balance.amount += new_ram;
-      });
-      _gstate2.last_ram_increase = cbt;
-   }
-
-   /**
-    *  Sets the rate of increase of RAM in bytes per block. It is capped by the uint16_t to
-    *  a maximum rate of 3 TB per year.
-    *
-    *  If update_ram_supply hasn't been called for the most recent block, then new ram will
-    *  be allocated at the old rate up to the present block before switching the rate.
-    */
-   void system_contract::setramrate( uint16_t bytes_per_block ) {
-      require_auth( _self );
-
-      update_ram_supply();
-      _gstate2.new_ram_per_block = bytes_per_block;
-   }
 
    void system_contract::setparams( const eosio::blockchain_parameters& params ) {
       require_auth( N(eosio) );
@@ -147,15 +117,6 @@ namespace eosiosystem {
          });
    }
 
-   void system_contract::updtrevision( uint8_t revision ) {
-      require_auth( _self );
-      eosio_assert( _gstate2.revision < 255, "can not increment revision" ); // prevent wrap around
-      eosio_assert( revision == _gstate2.revision + 1, "can only increment revision by one" );
-      eosio_assert( revision <= 1, // set upper bound to greatest revision supported in the code
-                    "specified revision is not yet supported by the code" );
-      _gstate2.revision = revision;
-   }
-
    void system_contract::bidname( account_name bidder, account_name newname, asset bid ) {
       require_auth( bidder );
       eosio_assert( eosio::name_suffix(newname) == newname, "you can only bid on top-level suffix" );
@@ -178,7 +139,7 @@ namespace eosiosystem {
             b.newname = newname;
             b.high_bidder = bidder;
             b.high_bid = bid.amount;
-            b.last_bid_time = current_time_point();
+            b.last_bid_time = current_time();
          });
       } else {
          eosio_assert( current->high_bid > 0, "this auction has already closed" );
@@ -210,7 +171,7 @@ namespace eosiosystem {
          bids.modify( current, bidder, [&]( auto& b ) {
             b.high_bidder = bidder;
             b.high_bid = bid.amount;
-            b.last_bid_time = current_time_point();
+            b.last_bid_time = current_time();
          });
       }
    }
@@ -236,7 +197,7 @@ namespace eosiosystem {
     */
    void native::newaccount( account_name     creator,
                             account_name     newact
-                            /*  no need to parse authorites
+                            /*  no need to parse authorities
                             const authority& owner,
                             const authority& active*/ ) {
 
@@ -292,9 +253,9 @@ namespace eosiosystem {
 
 EOSIO_ABI( eosiosystem::system_contract,
      // native.hpp (newaccount definition is actually in eosio.system.cpp)
-     (newaccount)(updateauth)(deleteauth)(linkauth)(unlinkauth)(canceldelay)(onerror)(setabi)
+     (newaccount)(updateauth)(deleteauth)(linkauth)(unlinkauth)(canceldelay)(onerror)
      // eosio.system.cpp
-     (setram)(setramrate)(setparams)(setpriv)(setalimits)(rmvproducer)(updtrevision)(bidname)(bidrefund)
+     (setram)(setparams)(setpriv)(rmvproducer)(bidname)
      // delegate_bandwidth.cpp
      (buyrambytes)(buyram)(sellram)(delegatebw)(undelegatebw)(refund)
      // voting.cpp

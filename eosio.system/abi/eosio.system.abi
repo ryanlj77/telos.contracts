@@ -1,4 +1,5 @@
 {
+   "TELOS-NOTE": "THIS WAS NOT GENERATED WITH EOSIOCPP",
    "version": "eosio::abi/1.0",
    "types": [{
       "new_type_name": "account_name",
@@ -18,11 +19,17 @@
    }],
    "____comment": "eosio.bios structs: set_account_limits, setpriv, set_global_limits, producer_key, set_producers, require_auth are provided so abi available for deserialization in future.",
    "structs": [{
-      "name": "permission_level",
+      "name": "rotation_info",
       "base": "",
       "fields": [
-        {"name":"actor",      "type":"account_name"},
-        {"name":"permission", "type":"permission_name"}
+        {"name":"bp_currently_out",     "type":"account_name"},
+        {"name":"sbp_currently_in",     "type":"account_name"},
+        {"name":"bp_out_index",         "type":"uint32"},
+        {"name":"sbp_in_index",         "type":"uint32"},
+        {"name":"next_rotation_time",   "type":"block_timestamp_type"},
+        {"name":"last_rotation_time",   "type":"block_timestamp_type"},
+        {"name":"current_bp",                 "type":"account_name"},
+        {"name":"last_time_block_produced",   "type":"block_timestamp_type"}
       ]
     },{
       "name": "abi_hash",
@@ -254,21 +261,7 @@
          {"name":"max_inline_action_size",              "type":"uint32"},
          {"name":"max_inline_action_depth",             "type":"uint16"},
          {"name":"max_authority_depth",                 "type":"uint16"}
-      ]
-    },{
-      "name": "eosio_global_state2",
-      "fields": [
-         {"name":"new_ram_per_block",            "type":"uint16"},
-         {"name":"last_ram_increase",            "type":"block_timestamp_type"},
-         {"name":"last_block_num",               "type":"block_timestamp_type"},
-         {"name":"total_producer_votepay_share", "type":"float64"},
-         {"name":"revision",                     "type":"uint8"}
-      ]
-    },{
-      "name": "eosio_global_state3",
-      "fields": [
-         {"name":"last_vpay_state_update",       "type":"time_point"},
-         {"name":"total_vpay_share_change_rate", "type":"float64"}
+
       ]
     },{
       "name": "eosio_global_state",
@@ -278,12 +271,12 @@
          {"name":"total_ram_bytes_reserved",      "type":"uint64"},
          {"name":"total_ram_stake",               "type":"int64"},
          {"name":"last_producer_schedule_update", "type":"block_timestamp_type"},
-         {"name":"last_pervote_bucket_fill",      "type":"time_point"},
+         {"name":"last_pervote_bucket_fill",      "type":"uint64"},
          {"name":"pervote_bucket",                "type":"int64"},
          {"name":"perblock_bucket",               "type":"int64"},
          {"name":"total_unpaid_blocks",           "type":"uint32"},
          {"name":"total_activated_stake",         "type":"int64"},
-         {"name":"thresh_activated_stake_time",   "type":"time_point"},
+         {"name":"thresh_activated_stake_time",   "type":"uint64"},
          {"name":"last_producer_schedule_size",   "type":"uint16"},
          {"name":"total_producer_vote_weight",    "type":"float64"},
          {"name":"last_name_close",               "type":"block_timestamp_type"}
@@ -298,16 +291,10 @@
          {"name":"is_active",       "type":"bool"},
          {"name":"url",             "type":"string"},
          {"name":"unpaid_blocks",   "type":"uint32"},
-         {"name":"last_claim_time", "type":"time_point"},
+         {"name":"missed_blocks",   "type":"uint32"},
+         {"name":"blocks_per_cycle",   "type":"uint32"},
+         {"name":"last_claim_time", "type":"uint64"},
          {"name":"location",        "type":"uint16"}
-      ]
-    },{
-      "name": "producer_info2",
-      "base": "",
-      "fields": [
-         {"name":"owner",                     "type":"account_name"},
-         {"name":"votepay_share",             "type":"float64"},
-         {"name":"last_votepay_share_update", "type":"time_point"}
       ]
     },{
       "name": "regproducer",
@@ -329,12 +316,6 @@
       "base": "",
       "fields": [
         {"name":"max_ram_size",     "type":"uint64"}
-      ]
-    },{
-      "name": "setramrate",
-      "base": "",
-      "fields": [
-        {"name":"bytes_per_block",   "type":"uint16"}
       ]
     },{
       "name": "regproxy",
@@ -359,6 +340,7 @@
         {"name":"proxy",                "type":"account_name"},
         {"name":"producers",            "type":"account_name[]"},
         {"name":"staked",               "type":"int64"},
+        {"name":"last_stake",           "type":"int64"},
         {"name":"last_vote_weight",     "type":"float64"},
         {"name":"proxied_vote_weight",  "type":"float64"},
         {"name":"is_proxy",             "type":"bool"}
@@ -381,12 +363,6 @@
       "base": "",
       "fields": [
         {"name":"producer", "type":"account_name"}
-      ]
-    },{
-      "name": "updtrevision",
-      "base": "",
-      "fields": [
-        {"name":"revision", "type":"uint8"}
       ]
     },{
       "name": "set_account_limits",
@@ -530,10 +506,6 @@
       "type": "setram",
       "ricardian_contract": ""
    },{
-      "name": "setramrate",
-      "type": "setramrate",
-      "ricardian_contract": "Sets the number of new bytes of ram to create per block and resyncs bancor base connector balance"
-   },{
       "name": "bidname",
       "type": "bidname",
       "ricardian_contract": ""
@@ -566,10 +538,6 @@
       "type": "rmvproducer",
       "ricardian_contract": ""
    },{
-      "name": "updtrevision",
-      "type": "updtrevision",
-      "ricardian_contract": ""
-   },{
       "name": "setalimits",
       "type": "set_account_limits",
       "ricardian_contract": ""
@@ -591,32 +559,20 @@
       "ricardian_contract": ""
     }],
    "tables": [{
+      "name": "rotations",
+      "type": "rotation_info",
+      "index_type": "i64",
+      "key_names" : ["bp_currently_out"],
+      "key_types" : ["uint64"]
+    },{
       "name": "producers",
       "type": "producer_info",
       "index_type": "i64",
       "key_names" : ["owner"],
       "key_types" : ["uint64"]
     },{
-      "name": "producers2",
-      "type": "producer_info2",
-      "index_type": "i64",
-      "key_names" : ["owner"],
-      "key_types" : ["uint64"]
-    },{
       "name": "global",
       "type": "eosio_global_state",
-      "index_type": "i64",
-      "key_names" : [],
-      "key_types" : []
-    },{
-      "name": "global2",
-      "type": "eosio_global_state2",
-      "index_type": "i64",
-      "key_names" : [],
-      "key_types" : []
-    },{
-      "name": "global3",
-      "type": "eosio_global_state3",
       "index_type": "i64",
       "key_names" : [],
       "key_types" : []
@@ -652,7 +608,7 @@
       "key_types" : ["uint64"]
     },{
        "name": "namebids",
-       "type": "name_bid",
+       "type": "namebid_info",
        "index_type": "i64",
        "key_names" : ["newname"],
        "key_types" : ["account_name"]

@@ -2,186 +2,227 @@
 
 #include <eosio.token/eosio.token.hpp>
 
-namespace eosiosystem {
+#define RESET_BLOCKS_PRODUCED 0
+#define MAX_BLOCK_PER_CYCLE 12
 
-   const int64_t  min_pervote_daily_pay = 100'0000;
-   const int64_t  min_activated_stake   = 150'000'000'0000;
-   const double   continuous_rate       = 0.04879;          // 5% annual rate
-   const double   perblock_rate         = 0.0025;           // 0.25%
-   const double   standby_rate          = 0.0075;           // 0.75%
-   const uint32_t blocks_per_year       = 52*7*24*2*3600;   // half seconds per year
-   const uint32_t seconds_per_year      = 52*7*24*3600;
-   const uint32_t blocks_per_day        = 2 * 24 * 3600;
-   const uint32_t blocks_per_hour       = 2 * 3600;
-   const int64_t  useconds_per_day      = 24 * 3600 * int64_t(1000000);
-   const int64_t  useconds_per_year     = seconds_per_year*1000000ll;
+namespace eosiosystem
+{
 
+const int64_t min_activated_stake = 150'000'000'0000;
+const double continuous_rate = 0.025;                    // 2.5% annual inflation rate
+const uint32_t blocks_per_year = 52 * 7 * 24 * 2 * 3600; // half seconds per year
+const uint32_t seconds_per_year = 52 * 7 * 24 * 3600;
+const uint32_t blocks_per_day = 2 * 24 * 3600;
+const uint32_t blocks_per_hour = 2 * 3600;
+const int64_t useconds_per_day = 24 * 3600 * int64_t(1000000);
+const int64_t useconds_per_year = seconds_per_year * 1000000ll;
 
-   void system_contract::onblock( block_timestamp timestamp, account_name producer ) {
+bool system_contract::crossed_missed_blocks_threshold(uint32_t amountBlocksMissed)
+{
+      //6hrs
+      auto timeframe = (_grotations.next_rotation_time.to_time_point() - _grotations.last_rotation_time.to_time_point()).to_seconds();
+
+      //get_active_producers returns the number of bytes populated
+      account_name prods[21];
+      uint32_t totalProds = get_active_producers(prods, sizeof(account_name) * 21) / 8;
+      //Total blocks that can be produced in a cycle
+      auto maxBlocksPerCycle = (totalProds - 1) * MAX_BLOCK_PER_CYCLE;
+      //total block that can be produced in the current timeframe
+      auto totalBlocksPerTimeframe = (maxBlocksPerCycle * timeframe) / (maxBlocksPerCycle / 2);
+      //max blocks that can be produced by a single producer in a timeframe
+      auto maxBlocksPerProducer = (totalBlocksPerTimeframe * MAX_BLOCK_PER_CYCLE) / maxBlocksPerCycle;
+      //15% is the max allowed missed blocks per single producer
+      auto thresholdMissedBlocks = maxBlocksPerProducer * 0.15;
+
+      return amountBlocksMissed > thresholdMissedBlocks;
+}
+
+void system_contract::set_producer_block_produced(account_name producer, uint32_t amount)
+{
+      auto pitr = _producers.find(producer);
+      if (pitr != _producers.end())
+      {
+            if (amount == 0)
+                  _producers.modify(pitr, 0, [&](auto &p) { p.blocks_per_cycle = amount; });
+            else
+                  _producers.modify(pitr, 0, [&](auto &p) { p.blocks_per_cycle += amount; });
+      }
+}
+
+void system_contract::set_producer_block_missed(account_name producer, uint32_t amount)
+{
+      auto pitr = _producers.find(producer);
+      if (pitr != _producers.end() && pitr->active())
+      {
+            _producers.modify(pitr, 0, [&](auto &p) {
+                  p.missed_blocks += amount;
+                  if (crossed_missed_blocks_threshold(p.missed_blocks))
+                        p.deactivate();
+            });
+      }
+}
+
+void system_contract::update_producer_blocks(account_name producer, uint32_t amountBlocksProduced, uint32_t amountBlocksMissed)
+{
+      auto pitr = _producers.find(producer);
+      if (pitr != _producers.end() && pitr->active())
+      {
+            _producers.modify(pitr, 0, [&](auto &p) {
+                  p.blocks_per_cycle += amountBlocksProduced;
+                  p.missed_blocks += amountBlocksMissed;
+                  if (crossed_missed_blocks_threshold(p.missed_blocks))
+                        p.deactivate();
+            });
+      }
+}
+
+void system_contract::check_missed_blocks(block_timestamp timestamp, account_name producer)
+{
+      if (_grotations.current_bp == 0)
+      {
+            _grotations.last_time_block_produced = timestamp;
+            _grotations.current_bp = producer;
+            set_producer_block_produced(producer, 1);
+            return;
+      }
+
+      //12 == 6s
+      auto producedTimeDiff = timestamp.slot - _grotations.last_time_block_produced.slot;
+      if (producedTimeDiff == 1 && producer == _grotations.current_bp)
+            set_producer_block_produced(producer, producedTimeDiff);
+      else if (producedTimeDiff == 1 && producer != _grotations.current_bp)
+      {
+            //set zero to last producer blocks_per_cycle
+            set_producer_block_produced(_grotations.current_bp, RESET_BLOCKS_PRODUCED);
+            //update current producer blocks_per_cycle
+            set_producer_block_produced(producer, producedTimeDiff);
+      }
+      else if (producedTimeDiff > 1 && producer == _grotations.current_bp)
+            update_producer_blocks(producer, 1, producedTimeDiff - 1);
+      else
+      {
+            auto lastPitr = _producers.find(_grotations.current_bp);
+            if (lastPitr == _producers.end())
+                  return;
+
+            account_name producers_schedule[21];
+            uint32_t bytes_populated = get_active_producers(producers_schedule, sizeof(account_name) * 21);
+
+            auto currentProducerIndex = std::distance(producers_schedule, std::find(producers_schedule, producers_schedule + 21, producer));
+
+            auto totalMissedSlots = std::fabs(producedTimeDiff - 1 - lastPitr->blocks_per_cycle);
+
+            //last producer didn't miss blocks
+            if (totalMissedSlots == 0)
+            {
+                  //set zero to last producer blocks_per_cycle
+                  set_producer_block_produced(_grotations.current_bp, RESET_BLOCKS_PRODUCED);
+
+                  update_producer_blocks(producers_schedule[currentProducerIndex - 1], RESET_BLOCKS_PRODUCED, producedTimeDiff - 1);
+
+                  set_producer_block_produced(producer, 1);
+            }
+            else
+            { //more than one producer missed blocks
+                  if (totalMissedSlots / MAX_BLOCK_PER_CYCLE > 0)
+                  {
+                        auto totalProdsMissedSlots = totalMissedSlots / 12;
+                        auto totalCurrentProdMissedBlocks = std::fmod(totalMissedSlots, 12);
+
+                        //Check if the last or the current bp missed blocks
+                        if (totalCurrentProdMissedBlocks > 0)
+                        {
+                              auto lastProdTotalMissedBlocks = MAX_BLOCK_PER_CYCLE - lastPitr->blocks_per_cycle;
+                              if (lastProdTotalMissedBlocks > 0)
+                                    set_producer_block_missed(producers_schedule[currentProducerIndex - 1], lastProdTotalMissedBlocks);
+
+                              update_producer_blocks(producer, 1, totalCurrentProdMissedBlocks - lastProdTotalMissedBlocks);
+                        }
+                        else
+                              set_producer_block_produced(producer, 1);
+
+                        for (int i = 0; i <= totalProdsMissedSlots; i++)
+                        {
+                              auto lastProdIndex = currentProducerIndex - (i + 1);
+                              lastProdIndex = lastProdIndex < 0 ? 21 + lastProdIndex : lastProdIndex;
+
+                              auto prod = producers_schedule[lastProdIndex];
+                              set_producer_block_missed(prod, MAX_BLOCK_PER_CYCLE);
+                        }
+
+                        set_producer_block_produced(_grotations.current_bp, RESET_BLOCKS_PRODUCED);
+                  }
+                  else
+                  {
+                        set_producer_block_produced(_grotations.current_bp, RESET_BLOCKS_PRODUCED);
+                        update_producer_blocks(producer, 1, totalMissedSlots);
+                  }
+            }
+      }
+
+      _grotations.last_time_block_produced = timestamp;
+      _grotations.current_bp = producer;
+}
+
+void system_contract::onblock(block_timestamp timestamp, account_name producer)
+{
       using namespace eosio;
 
       require_auth(N(eosio));
 
-      // _gstate2.last_block_num is not used anywhere in the system contract code anymore.
-      // Although this field is deprecated, we will continue updating it for now until the last_block_num field
-      // is eventually completely removed, at which point this line can be removed.
-      _gstate2.last_block_num = timestamp;
+      recalculate_votes();
 
       /** until activated stake crosses this threshold no new rewards are paid */
-      if( _gstate.total_activated_stake < min_activated_stake )
-         return;
+      if (_gstate.total_activated_stake < min_activated_stake)
+            return;
 
-      if( _gstate.last_pervote_bucket_fill == time_point() )  /// start the presses
-         _gstate.last_pervote_bucket_fill = current_time_point();
-
+      if (_gstate.last_pervote_bucket_fill == time_point()) /// start the presses
+            _gstate.last_pervote_bucket_fill = current_time_point();
 
       /**
        * At startup the initial producer may not be one that is registered / elected
        * and therefore there may be no producer object for them.
        */
       auto prod = _producers.find(producer);
-      if ( prod != _producers.end() ) {
-         _gstate.total_unpaid_blocks++;
-         _producers.modify( prod, 0, [&](auto& p ) {
-               p.unpaid_blocks++;
-         });
+      if (prod != _producers.end())
+      {
+            _gstate.total_unpaid_blocks++;
+            _producers.modify(prod, 0, [&](auto &p) {
+                  p.unpaid_blocks++;
+            });
       }
+
+      check_missed_blocks(timestamp, producer);
 
       /// only update block producers once every minute, block_timestamp is in half seconds
-      if( timestamp.slot - _gstate.last_producer_schedule_update.slot > 120 ) {
-         update_elected_producers( timestamp );
+      if (timestamp.slot - _gstate.last_producer_schedule_update.slot > 120)
+      {
+            update_elected_producers(timestamp);
 
-         if( (timestamp.slot - _gstate.last_name_close.slot) > blocks_per_day ) {
-            name_bid_table bids(_self,_self);
-            auto idx = bids.get_index<N(highbid)>();
-            auto highest = idx.lower_bound( std::numeric_limits<uint64_t>::max()/2 );
-            if( highest != idx.end() &&
-                highest->high_bid > 0 &&
-                (current_time_point() - highest->last_bid_time) > microseconds(useconds_per_day) &&
-                _gstate.thresh_activated_stake_time > time_point() &&
-                (current_time_point() - _gstate.thresh_activated_stake_time) > microseconds(14 * useconds_per_day)
-            ) {
-               _gstate.last_name_close = timestamp;
-               idx.modify( highest, 0, [&]( auto& b ){
-                  b.high_bid = -b.high_bid;
-               });
+            if ((timestamp.slot - _gstate.last_name_close.slot) > blocks_per_day)
+            {
+                  name_bid_table bids(_self, _self);
+                  auto idx = bids.get_index<N(highbid)>();
+                  auto highest = idx.lower_bound(std::numeric_limits<uint64_t>::max() / 2);
+                  if (highest != idx.end() &&
+                      highest->high_bid > 0 &&
+                      (current_time_point() - highest->last_bid_time) > microseconds(useconds_per_day) &&
+                      _gstate.thresh_activated_stake_time > time_point() &&
+                      (current_time_point() - _gstate.thresh_activated_stake_time) > microseconds(14 * useconds_per_day))
+                  {
+                        _gstate.last_name_close = timestamp;
+                        idx.modify(highest, 0, [&](auto &b) {
+                              b.high_bid = -b.high_bid;
+                        });
+                  }
             }
-         }
       }
-   }
+}
 
-   using namespace eosio;
-   void system_contract::claimrewards( const account_name& owner ) {
-      require_auth( owner );
-
-      const auto& prod = _producers.get( owner );
-      eosio_assert( prod.active(), "producer does not have an active key" );
-
-      eosio_assert( _gstate.total_activated_stake >= min_activated_stake,
-                    "cannot claim rewards until the chain is activated (at least 15% of all tokens participate in voting)" );
-
-      const auto ct = current_time_point();
-
-      eosio_assert( ct - prod.last_claim_time > microseconds(useconds_per_day), "already claimed rewards within past day" );
-
-      const asset token_supply   = token( N(eosio.token)).get_supply(symbol_type(system_token_symbol).name() );
-      const auto usecs_since_last_fill = (ct - _gstate.last_pervote_bucket_fill).count();
-
-      if( usecs_since_last_fill > 0 && _gstate.last_pervote_bucket_fill > time_point() ) {
-         auto new_tokens = static_cast<int64_t>( (continuous_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year) );
-
-         auto to_producers     = new_tokens / 5;
-         auto to_savings       = new_tokens - to_producers;
-         auto to_per_block_pay = to_producers / 4;
-         auto to_per_vote_pay  = to_producers - to_per_block_pay;
-
-         INLINE_ACTION_SENDER(eosio::token, issue)( N(eosio.token), {{N(eosio),N(active)}},
-                                                    { N(eosio), asset(new_tokens), std::string("issue tokens for producer pay and savings") } );
-
-         INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {N(eosio),N(active)},
-                                                       { N(eosio), N(eosio.saving), asset(to_savings), "unallocated inflation" } );
-
-         INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {N(eosio),N(active)},
-                                                       { N(eosio), N(eosio.bpay), asset(to_per_block_pay), "fund per-block bucket" } );
-
-         INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {N(eosio),N(active)},
-                                                       { N(eosio), N(eosio.vpay), asset(to_per_vote_pay), "fund per-vote bucket" } );
-
-         _gstate.pervote_bucket          += to_per_vote_pay;
-         _gstate.perblock_bucket         += to_per_block_pay;
-         _gstate.last_pervote_bucket_fill = ct;
-      }
-
-      auto prod2 = _producers2.find( owner );
-
-      /// New metric to be used in pervote pay calculation. Instead of vote weight ratio, we combine vote weight and
-      /// time duration the vote weight has been held into one metric.
-      const auto last_claim_plus_3days = prod.last_claim_time + microseconds(3 * useconds_per_day);
-
-      bool crossed_threshold       = (last_claim_plus_3days <= ct);
-      bool updated_after_threshold = true;
-      if ( prod2 != _producers2.end() ) {
-         updated_after_threshold = (last_claim_plus_3days <= prod2->last_votepay_share_update);
-      } else {
-         prod2 = _producers2.emplace( owner, [&]( producer_info2& info  ) {
-            info.owner                     = owner;
-            info.last_votepay_share_update = ct;
-         });
-      }
-
-      // Note: updated_after_threshold implies cross_threshold (except if claiming rewards when the producers2 table row did not exist).
-      // The exception leads to updated_after_threshold to be treated as true regardless of whether the threshold was crossed.
-      // This is okay because in this case the producer will not get paid anything either way.
-      // In fact it is desired behavior because the producers votes need to be counted in the global total_producer_votepay_share for the first time.
-
-      int64_t producer_per_block_pay = 0;
-      if( _gstate.total_unpaid_blocks > 0 ) {
-         producer_per_block_pay = (_gstate.perblock_bucket * prod.unpaid_blocks) / _gstate.total_unpaid_blocks;
-      }
-
-      double new_votepay_share = update_producer_votepay_share( prod2,
-                                    ct,
-                                    updated_after_threshold ? 0.0 : prod.total_votes,
-                                    true // reset votepay_share to zero after updating
-                                 );
-
-      int64_t producer_per_vote_pay = 0;
-      if( _gstate2.revision > 0 ) {
-         double total_votepay_share = update_total_votepay_share( ct );
-         if( total_votepay_share > 0 && !crossed_threshold ) {
-            producer_per_vote_pay = int64_t((new_votepay_share * _gstate.pervote_bucket) / total_votepay_share);
-            if( producer_per_vote_pay > _gstate.pervote_bucket )
-               producer_per_vote_pay = _gstate.pervote_bucket;
-         }
-      } else {
-         if( _gstate.total_producer_vote_weight > 0 ) {
-            producer_per_vote_pay = int64_t((_gstate.pervote_bucket * prod.total_votes) / _gstate.total_producer_vote_weight);
-         }
-      }
-
-      if( producer_per_vote_pay < min_pervote_daily_pay ) {
-         producer_per_vote_pay = 0;
-      }
-
-      _gstate.pervote_bucket      -= producer_per_vote_pay;
-      _gstate.perblock_bucket     -= producer_per_block_pay;
-      _gstate.total_unpaid_blocks -= prod.unpaid_blocks;
-
-      update_total_votepay_share( ct, -new_votepay_share, (updated_after_threshold ? prod.total_votes : 0.0) );
-
-      _producers.modify( prod, 0, [&](auto& p) {
-         p.last_claim_time = ct;
-         p.unpaid_blocks   = 0;
-      });
-
-      if( producer_per_block_pay > 0 ) {
-         INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {{N(eosio.bpay),N(active)},{owner,N(active)}},
-                                                       { N(eosio.bpay), owner, asset(producer_per_block_pay), std::string("producer block pay") } );
-      }
-      if( producer_per_vote_pay > 0 ) {
-         INLINE_ACTION_SENDER(eosio::token, transfer)( N(eosio.token), {{N(eosio.vpay),N(active)},{owner,N(active)}},
-                                                       { N(eosio.vpay), owner, asset(producer_per_vote_pay), std::string("producer vote pay") } );
-      }
-   }
+using namespace eosio;
+void system_contract::claimrewards(const account_name &owner)
+{
+     // TODO: Implement
+}
 
 } //namespace eosiosystem
