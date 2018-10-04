@@ -62,13 +62,15 @@ namespace eosiosystem {
       uint16_t             last_producer_schedule_size = 0;
       double               total_producer_vote_weight = 0; /// the sum of all producer votes
       block_timestamp      last_name_close;
+      uint32_t             last_claimrewards = 0;
+      uint32_t             next_payment = 0;
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
       EOSLIB_SERIALIZE_DERIVED( eosio_global_state, eosio::blockchain_parameters,
                                 (max_ram_size)(total_ram_bytes_reserved)(total_ram_stake)
                                 (last_producer_schedule_update)(last_pervote_bucket_fill)
                                 (pervote_bucket)(perblock_bucket)(total_unpaid_blocks)(total_activated_stake)(thresh_activated_stake_time)
-                                (last_producer_schedule_size)(total_producer_vote_weight)(last_name_close) )
+                                (last_producer_schedule_size)(total_producer_vote_weight)(last_name_close)(last_claimrewards)(next_payment) )
    };
 
    /**
@@ -99,18 +101,25 @@ namespace eosiosystem {
                         (unpaid_blocks)(missed_blocks)(blocks_per_cycle)(last_claim_time)(location) )
    };
 
-   struct rotation_info {
-      account_name           bp_currently_out;
-      account_name           sbp_currently_in;
-      uint32_t               bp_out_index;
-      uint32_t               sbp_in_index;
-      block_timestamp        next_rotation_time;
-      block_timestamp        last_rotation_time;
-      account_name           current_bp; 
-      block_timestamp        last_time_block_produced;
+    struct rotation_info {
+      bool                            is_rotation_active = true;
+      account_name                    bp_currently_out;
+      account_name                    sbp_currently_in;
+      uint32_t                        bp_out_index;
+      uint32_t                        sbp_in_index;
+      block_timestamp                 next_rotation_time;
+      block_timestamp                 last_rotation_time;
 
-      EOSLIB_SERIALIZE( rotation_info, (bp_currently_out)(sbp_currently_in)(bp_out_index)(sbp_in_index)(next_rotation_time)
-                        (last_rotation_time)(current_bp)(last_time_block_produced) )
+      //NOTE: This might not be the best place for this information
+
+      bool                            is_kick_active = true;
+      account_name                    last_onblock_caller;
+      block_timestamp                 last_time_block_produced;
+      std::vector<offline_producer>   offline_bps;
+
+      // explicit serialization macro is not necessary, used here only to improve compilation time
+      EOSLIB_SERIALIZE( rotation_info, (is_rotation_active)(bp_currently_out)(sbp_currently_in)(bp_out_index)(sbp_in_index)(next_rotation_time)
+                        (last_rotation_time)(is_kick_active)(last_onblock_caller)(last_time_block_produced)(offline_bps) )
    };
 
    struct voter_info {
@@ -134,16 +143,24 @@ namespace eosiosystem {
       double                      proxied_vote_weight= 0; /// the total vote weight delegated to this voter as a proxy
       bool                        is_proxy = 0; /// whether the voter is a proxy for others
 
-
-      uint32_t                    reserved1 = 0;
-      time                        reserved2 = 0;
-      eosio::asset                reserved3;
-
       uint64_t primary_key()const { return owner; }
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
-      EOSLIB_SERIALIZE( voter_info, (owner)(proxy)(producers)(staked)(last_stake)(last_vote_weight)(proxied_vote_weight)(is_proxy)(reserved1)(reserved2)(reserved3) )
+      EOSLIB_SERIALIZE( voter_info, (owner)(proxy)(producers)(staked)(last_stake)(last_vote_weight)(proxied_vote_weight)(is_proxy) )
    };
+
+   //tracks automated claimreward payments
+   struct payment {
+     account_name bp;
+     asset pay;
+
+     uint64_t primary_key() const { return bp; }
+     
+     // explicit serialization macro is not necessary, used here only to improve compilation time
+     EOSLIB_SERIALIZE(payment, (bp)(pay))
+   };
+
+   typedef eosio::multi_index<N(payments), payment> payments_table;
 
    typedef eosio::multi_index< N(voters), voter_info>  voters_table;
 
@@ -169,6 +186,7 @@ namespace eosiosystem {
          eosio_global_state     _gstate;
          rotation_info          _grotations;
          rammarket              _rammarket;
+         payments_table         payments;
 
       public:
          system_contract( account_name s );
@@ -247,10 +265,15 @@ namespace eosiosystem {
          // functions defined in producer_pay.cpp
          void claimrewards( const account_name& owner );
 
+        void claimrewards_snapshot();
+
          void setpriv( account_name account, uint8_t ispriv );
 
          void rmvproducer( account_name producer );
 
+         void setkick(bool state);
+
+         void setrotate(bool state);
 
          void bidname( account_name bidder, account_name newname, asset bid );
         
@@ -297,6 +320,14 @@ namespace eosiosystem {
          void update_producer_blocks(account_name producer, uint32_t amountBlocksProduced, uint32_t amountBlocksMissed);
 
          bool crossed_missed_blocks_threshold(uint32_t amountBlocksMissed);
+
+         void add_producer_to_kick_list(offline_producer producer);
+
+         void remove_producer_to_kick_list(offline_producer producer);
+
+         bool reach_consensus();
+
+         void kick_bp();
          
    };
 

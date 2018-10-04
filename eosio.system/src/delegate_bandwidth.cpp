@@ -30,7 +30,8 @@ namespace eosiosystem {
 
    static constexpr time refund_delay = 3*24*3600;
    static constexpr time refund_expiration_time = 3600;
-   static constexpr int64_t ram_gift_bytes = 1400;
+// b1 update. isn't being used in any conctracts, but can be used on unit test
+//    static constexpr int64_t ram_gift_bytes = 1400;
 
    struct user_resources {
       account_name  owner;
@@ -269,9 +270,9 @@ namespace eosiosystem {
          }
          eosio_assert( asset(0) <= tot_itr->net_weight, "insufficient staked total net bandwidth" );
          eosio_assert( asset(0) <= tot_itr->cpu_weight, "insufficient staked total cpu bandwidth" );
-
-         int64_t ram_bytes, net, cpu;
-         get_resource_limits( receiver, &ram_bytes, &net, &cpu );
+      // b1 update. ram_bytes, net, cpu aren't being used anywhere.
+      //    int64_t ram_bytes, net, cpu;
+      //    get_resource_limits( receiver, &ram_bytes, &net, &cpu );
 
          set_resource_limits( receiver, tot_itr->ram_bytes, tot_itr->net_weight.amount, tot_itr->cpu_weight.amount );
 
@@ -377,9 +378,10 @@ namespace eosiosystem {
                });
          }
          eosio_assert( 0 <= from_voter->staked, "stake for voting cannot be negative");
-         if( from == N(b1) ) {
-            validate_b1_vesting( from_voter->staked );
-         }
+      // update to telosfoundation account
+      //    if( from == N(b1) ) {
+      //       validate_b1_vesting( from_voter->staked );
+      //    }
 
          if( from_voter->producers.size() || from_voter->proxy ) {
             update_votes( from, from_voter->proxy, from_voter->producers, false );
