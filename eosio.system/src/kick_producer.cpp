@@ -3,7 +3,6 @@
 #include <eosio.system/eosio.system.hpp>
 #include <eosiolib/print.hpp>
 #include <eosiolib/producer_schedule.hpp>
-#include <eosio.token/eosio.token.hpp>
 #include <eosiolib/chain.h>
 #include <algorithm>
 #include <cmath>  
