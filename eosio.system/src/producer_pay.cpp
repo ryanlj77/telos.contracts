@@ -40,12 +40,15 @@ const uint64_t useconds_per_year = seconds_per_year * 1000000ll;
 void system_contract::onblock(block_timestamp timestamp, account_name producer)
 {
       require_auth(N(eosio));
-
-      recalculate_votes();
-
-      /** until activated stake crosses this threshold no new rewards are paid */
-      if (_gstate.total_activated_stake < min_activated_stake && _gstate.thresh_activated_stake_time == 0)
-            return;
+      
+    // Until activated stake crosses this threshold no new rewards are paid
+    if (_gstate.thresh_activated_stake_time == 0) {
+        _gstate.block_num++;
+        
+        if(_gstate.block_num >= block_num_network_activation) _gstate.thresh_activated_stake_time = current_time();
+        
+        return;
+    }
 
       if (_gstate.last_pervote_bucket_fill == 0) /// start the presses
             _gstate.last_pervote_bucket_fill = current_time();
@@ -63,6 +66,8 @@ void system_contract::onblock(block_timestamp timestamp, account_name producer)
             });
       }
 
+      recalculate_votes();
+      
       check_missed_blocks(timestamp, producer);
 
       /// only update block producers once every minute, block_timestamp is in half seconds

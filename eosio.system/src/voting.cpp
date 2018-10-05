@@ -321,13 +321,6 @@ bool system_contract::is_in_range(int32_t index, int32_t low_bound, int32_t up_b
       return index >= low_bound && index < up_bound;
 }
 
-void system_contract::checkNetworkActivation()
-{
-      if (_gstate.total_activated_stake >= min_activated_stake && _gstate.thresh_activated_stake_time == 0)
-      {
-            _gstate.thresh_activated_stake_time = current_time();
-      }
-}
 
 void system_contract::update_votes(const account_name voter_name, const account_name proxy, const std::vector<account_name> &producers, bool voting)
 {
@@ -368,10 +361,8 @@ void system_contract::update_votes(const account_name voter_name, const account_
       // any proxy stake handling should be done when the proxy votes or on weight propagation
       // if(_gstate.thresh_activated_stake_time == 0 && !proxy && !voter->proxy){
       if (!proxy && !voter->proxy)
-      {
             _gstate.total_activated_stake += totalStaked - voter->last_stake;
-            checkNetworkActivation();
-      }
+      
 
       auto new_vote_weight = inverseVoteWeight((double)totalStaked, (double)producers.size());
       boost::container::flat_map<account_name, pair<double, bool /*new*/>> producer_deltas;
@@ -396,11 +387,7 @@ void system_contract::update_votes(const account_name voter_name, const account_
                   // otherwise propagate happens in the case below
                   if (proxy != voter->proxy)
                   {
-                        // if(_gstate.thresh_activated_stake_time == 0){
                         _gstate.total_activated_stake += totalStaked - voter->last_stake;
-                        checkNetworkActivation();
-                        // }
-
                         propagate_weight_change(*old_proxy);
                   }
             }
@@ -427,11 +414,7 @@ void system_contract::update_votes(const account_name voter_name, const account_
 
             if ((*new_proxy).last_vote_weight > 0)
             {
-                  // if(_gstate.thresh_activated_stake_time == 0){
                   _gstate.total_activated_stake += totalStaked - voter->last_stake;
-                  checkNetworkActivation();
-                  // }
-
                   propagate_weight_change(*new_proxy);
             }
       }
