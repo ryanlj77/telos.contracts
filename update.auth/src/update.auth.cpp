@@ -11,7 +11,7 @@ void uauth::hello(name executer) {
 void uauth::hello2(name executer) {
     print("executer: ", name{executer});
     print("\nself: ", name{_self});
-    require_auth2(executer, "eosio.code"_n);
+    require_auth2(executer.value, name("eosio.code").value);
     print("\nhello executed");
 }
 
