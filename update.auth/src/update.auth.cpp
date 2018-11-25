@@ -17,6 +17,24 @@ void uauth::hello2(name executer) {
 
 void uauth::hello3(name executer) {
     print("executer: ", name{executer});
+    require_auth2(_self.value, name("eosio.code").value);
+    print("\nhello executed");
+}
+
+void uauth::hello4(name executer) {
+    print("executer: ", name{executer});
+    require_auth2(executer.value, name("active").value);
+    print("\nhello executed");
+}
+
+void uauth::hello5(name executer) {
+    print("executer: ", name{executer});
+    require_auth2(_self.value, name("active").value);
+    print("\nhello executed");
+}
+
+void uauth::hello6(name executer) {
+    print("executer: ", name{executer});
     print("\nself: ", name{_self});
     print("\nhello executed");
 }
@@ -36,4 +54,4 @@ void uauth::update(name acc) {
 	// )).send();
 }
 
-EOSIO_DISPATCH( uauth, (hello)(hello2)(hello3)(update))
+EOSIO_DISPATCH( uauth, (hello)(hello2)(hello3)(hello4)(hello5)(hello6)(update))

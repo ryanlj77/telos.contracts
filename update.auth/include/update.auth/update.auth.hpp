@@ -20,5 +20,14 @@ class [[eosio::contract("update.auth")]] uauth : public contract {
      void hello3(name executer);
 
      [[eosio::action]]
+     void hello4(name executer);
+
+     [[eosio::action]]
+     void hello5(name executer);
+
+     [[eosio::action]]
+     void hello6(name executer);
+
+     [[eosio::action]]
      void update(name account);
 };
