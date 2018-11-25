@@ -1,0 +1,18 @@
+{
+    "threshold": 1,
+    "keys": [
+        {
+            "key": "EOS7fTwYmYutws6D7uDSZqXJJRTmhA4PzJFrpnFahyR8SeeAj1Nmx",
+            "weight": 1
+        }
+    ],
+    "accounts": [
+        {
+            "permission": {
+                "actor": "prodnamegumh",
+                "permission": "eosio.code"
+            },
+            "weight": 1
+        }
+    ]
+}

@@ -12,4 +12,10 @@ class [[eosio::contract("update.auth")]] uauth : public contract {
 
      [[eosio::action]]
      void hello(name executer);
+     
+     [[eosio::action]]
+     void hello2(name executer);
+
+     [[eosio::action]]
+     void update(name account);
 };
