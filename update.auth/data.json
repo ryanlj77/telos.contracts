@@ -10,8 +10,14 @@
         {
             "permission": {
                 "actor": "prodnamegumh",
-                "permission": "eosio.code"
+                "permission": "active"
             },
+            "weight": 1
+        }
+    ],
+    "waits": [
+        {
+            "wait_sec": 1,
             "weight": 1
         }
     ]
