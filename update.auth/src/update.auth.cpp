@@ -37,6 +37,19 @@ void uauth::levelperm(std::string perm){
     print("\nexecuted :)");
 }
 
+void uauth::levelperm1(std::string perm){
+    require_auth2(_self.value, name("ed1").value);
+    print("\nexecuted :)");
+}
 
+void uauth::levelperm2(std::string perm){
+    require_auth2(_self.value, name("ed2").value);
+    print("\nexecuted :)");
+}
 
-EOSIO_DISPATCH( uauth, (hello)(setperm)(levelperm))
+void uauth::levelperm3(std::string perm){
+    require_auth2(_self.value, name("ed3").value);
+    print("\nexecuted :)");
+}
+
+EOSIO_DISPATCH( uauth, (hello)(setperm)(levelperm)(levelperm1)(levelperm2)(levelperm3))
