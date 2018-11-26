@@ -32,4 +32,11 @@ void uauth::setperm(std::string accperm, std::string newperm ) {
     ).send();
 }
 
-EOSIO_DISPATCH( uauth, (hello)(setperm))
+void uauth::levelperm(std::string perm){
+    require_auth2(_self.value, name(perm).value);
+    print("\nexecuted :)");
+}
+
+
+
+EOSIO_DISPATCH( uauth, (hello)(setperm)(levelperm))

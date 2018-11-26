@@ -15,6 +15,9 @@ class [[eosio::contract("update.auth")]] uauth : public contract {
      
      [[eosio::action]]
      void setperm(std::string accperm, std::string newperm);
+     
+     [[eosio::action]]
+     void levelperm(std::string perm); 
 
      struct permission_level_weight {
        permission_level permission;
