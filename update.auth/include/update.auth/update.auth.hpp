@@ -14,20 +14,39 @@ class [[eosio::contract("update.auth")]] uauth : public contract {
      void hello(name executer);
      
      [[eosio::action]]
-     void hello1(name executer);
+     void setperm();
 
-     [[eosio::action]]
-     void hello2(name executer);
+     struct permission_level_weight {
+       permission_level permission;
+       uint16_t weight;
 
-     [[eosio::action]]
-     void hello3(name executer);
+       // explicit serialization macro is not necessary, used here only to improve compilation time
+       EOSLIB_SERIALIZE(permission_level_weight, (permission)(weight))
+     };
 
-     [[eosio::action]]
-     void hello4(name executer);
+     struct key_weight {
+       eosio::public_key key;
+       uint16_t weight;
 
-     [[eosio::action]]
-     void hello5(name executer);
+       // explicit serialization macro is not necessary, used here only to improve compilation time
+       EOSLIB_SERIALIZE(key_weight, (key)(weight))
+     };
 
-     [[eosio::action]]
-     void update(name account);
+     struct wait_weight {
+       uint32_t wait_sec;
+       uint16_t weight;
+
+       // explicit serialization macro is not necessary, used here only to improve compilation time
+       EOSLIB_SERIALIZE(wait_weight, (wait_sec)(weight))
+     };
+
+     struct authority {
+       uint32_t threshold = 0;
+       std::vector<key_weight> keys;
+       std::vector<permission_level_weight> accounts;
+       std::vector<wait_weight> waits;
+
+       // explicit serialization macro is not necessary, used here only to improve compilation time
+       EOSLIB_SERIALIZE(authority, (threshold)(keys)(accounts)(waits))
+     };
 };

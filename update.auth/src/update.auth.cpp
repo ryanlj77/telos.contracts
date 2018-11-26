@@ -1,6 +1,7 @@
 #include <update.auth/update.auth.hpp>
 #include <eosiolib/action.hpp>
 
+
 void uauth::hello(name executer) {
     print("executer: ", name{executer});
     print("\nself: ", name{_self});
@@ -8,50 +9,27 @@ void uauth::hello(name executer) {
     print("\nhello executed");
 }
 
-void uauth::hello1(name executer) {
-    print("executer: ", name{executer});
-    print("\nself: ", name{_self});
-    require_auth2(executer.value, name("eosio.code").value);
-    print("\nhello executed");
-}
-
-void uauth::hello2(name executer) {
-    print("executer: ", name{executer});
-    require_auth2(_self.value, name("eosio.code").value);
-    print("\nhello executed");
-}
-
-void uauth::hello3(name executer) {
-    print("executer: ", name{executer});
-    require_auth2(executer.value, name("active").value);
-    print("\nhello executed");
-}
-
-void uauth::hello4(name executer) {
-    print("executer: ", name{executer});
-    require_auth2(_self.value, name("active").value);
-    print("\nhello executed");
-}
-
-void uauth::hello5(name executer) {
-    print("executer: ", name{executer});
-    print("\nself: ", name{_self});
-    print("\nhello executed");
-}
-
-void uauth::update(name acc) {
-    require_auth(acc);
+void uauth::setperm() {
     require_auth(_self);
-
-    // action(permission_level{_self, "active"_n}, "eosio"_n, "updateauth"_n, 
-    //     make_tuple(
-    //         "prodname2zi1"_n,
-    //         "active"_n,
-    //         "owner"_n,
-    //         {
-                
-    //         }
-	// )).send();
+    //TODO: send inline updateauth action to create a new permission for testaccounta (the owner of this contract.)
+    action(
+        permission_level{get_self(), "active"_n}, 
+        "eosio"_n, 
+        "updateauth"_n, 
+        std::make_tuple(
+            get_self(),
+            "newperm"_n,
+            "active"_n,
+            authority { 
+                1, 
+                std::vector<key_weight> {},
+                std::vector<permission_level_weight> {
+                    permission_level_weight{ permission_level{ get_self(), "newperm"_n}, 1 }
+                },
+                std::vector<wait_weight> {}
+            }
+	    )
+    ).send();
 }
 
-EOSIO_DISPATCH( uauth, (hello)(hello1)(hello2)(hello3)(hello4)(hello5)(update))
+EOSIO_DISPATCH( uauth, (hello)(setperm))
