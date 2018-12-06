@@ -1,7 +1,7 @@
 # Telos Proxy Info
 This is an on-chain Telos contract that allows Telos proxy accounts to register additional information about themselves, such as name and website. This information is published on the Telos blockchain, is accessible via the [Sqrl Wallet](https://github.com/Telos-Foundation/Sqrl) and freely available to be republished. An example website that uses this information on the EOS chain is the [Aloha EOS Proxy Research Portal](https://www.alohaeos.com/vote/proxy).
 
-The contract should be published on the `telos.proxy` account on the Telos mainnet.
+The contract should be published on the `tlsproxyinfo` account on the Telos mainnet.
 
 ## GUI Usage
 
@@ -32,7 +32,7 @@ Note: This action will consume a little bit of your RAM for the storage. How muc
 
 teclos example:
 ```
-teclos -u https://api.eos.miami push action telos.proxy set '["myproxyaccnt","My Proxy Name","For a better world","Voting philosophy","","https://my.proxy.website/","","","","",""]' -p myproxyaccnt
+teclos -u https://api.eos.miami push action tlsproxyinfo set '["myproxyaccnt","My Proxy Name","For a better world","Voting philosophy","","https://my.proxy.website/","","","","",""]' -p myproxyaccnt
 ```
 
 ### Remove
@@ -42,17 +42,17 @@ The remove action will remove all information about your account. The parameters
 
 teclos example:
 ```
-teclos -u https://api.eos.miami push action telos.proxy remove '["myproxyaccnt"]' -p myproxyaccnt
+teclos -u https://api.eos.miami push action tlsproxyinfo remove '["myproxyaccnt"]' -p myproxyaccnt
 
 ```
 
 ## Getting the Data
 
-All data is stored in the `proxies` table on the `telos.proxy` account.
+All data is stored in the `proxies` table on the `tlsproxyinfo` account.
 
 teclos example:
 ```
-teclos -u https://api.eos.miami get table telos.proxy telos.proxy proxies
+teclos -u https://api.eos.miami get table tlsproxyinfo tlsproxyinfo proxies
 {
   "rows": [{
       "owner": "myproxyaccnt",
@@ -66,7 +66,7 @@ teclos -u https://api.eos.miami get table telos.proxy telos.proxy proxies
 
 curl example:
 ```
-curl -d '{"json":true,"code":"telos.proxy","scope":"telos.proxy","table":"proxies","limit":100}' -s 'https://api.eos.miami/v1/chain/get_table_rows' | jq
+curl -d '{"json":true,"code":"tlsproxyinfo","scope":"tlsproxyinfo","table":"proxies","limit":100}' -s 'https://api.eos.miami/v1/chain/get_table_rows' | jq
 {
   "rows": [{
       "owner": "myproxyaccnt",
