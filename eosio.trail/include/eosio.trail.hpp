@@ -2,7 +2,7 @@
  * Trail is an EOSIO-based voting service that allows users to create ballots that
  * are voted on by the network of registered voters. It also offers custom token
  * features that let any user to create their own token and configure token settings 
- * to match a wide variety of intended use cases. 
+ * to match a wide variety of intended voting use cases. 
  * 
  * @author Craig Branscom
  */
@@ -58,15 +58,17 @@ public:
 
     #pragma region Token_Actions
 
+    //TODO: add memo for seizing?
+
     [[eosio::action]] void issuetoken(name publisher, name recipient, asset tokens, bool airgrab);
 
     [[eosio::action]] void claimairgrab(name claimant, name publisher, symbol token_symbol);
 
     [[eosio::action]] void burntoken(name balance_owner, asset amount);
 
-    [[eosio::action]] void seizetoken(name publisher, name owner, asset tokens); //TODO: add string memo?
+    [[eosio::action]] void seizetoken(name publisher, name owner, asset tokens);
 
-    [[eosio::action]] void seizeairgrab(name publisher, name recipient, asset amount); //TODO: add string memo?
+    [[eosio::action]] void seizeairgrab(name publisher, name recipient, asset amount);
 
     [[eosio::action]] void seizebygroup(name publisher, vector<name> group, asset amount);
 
@@ -74,7 +76,7 @@ public:
 
     [[eosio::action]] void lowermax(name publisher, asset amount);
 
-    [[eosio::action]] void transfer(name sender, name recipient, asset amount); //TODO: rename to something other than transfer? may be confused with eosio.token transfer
+    [[eosio::action]] void transfer(name sender, name recipient, asset amount);
 
     #pragma endregion Token_Actions
 
@@ -109,7 +111,7 @@ public:
 
     #pragma region Proxy_Actions
 
-
+    //[[eosio::action]] void proxyvote();
 
     #pragma endregion Proxy_Actions
 
@@ -120,7 +122,7 @@ public:
 
     [[eosio::action]] void unregballot(name publisher, uint64_t ballot_id);
 
-    //TODO: archivebal() action to replace ballot publisher's RAM with Trail's RAM. Could require TLOS payment?
+    //TODO: archive() action to replace ballot publisher's RAM with Trail's RAM. Could require TLOS payment?
 
     #pragma endregion Ballot_Registration
 
@@ -133,11 +135,11 @@ public:
 
     [[eosio::action]] void setallstats(name publisher, uint64_t ballot_id, vector<uint8_t> new_cand_statuses);
 
-    [[eosio::action]] void rmvcandidate(name publisher, uint64_t ballot_id, name candidate); //TODO: should candidates be allowed to remove themselves? or only publisher?
+    [[eosio::action]] void rmvcandidate(name publisher, uint64_t ballot_id, name candidate);
 
     [[eosio::action]] void setseats(name publisher, uint64_t ballot_id, uint8_t num_seats);
 
-    [[eosio::action]] void nextcycle(name publisher, uint64_t ballot_id, uint32_t new_begin_time, uint32_t new_end_time); //only for ballots?
+    [[eosio::action]] void nextcycle(name publisher, uint64_t ballot_id, uint32_t new_begin_time, uint32_t new_end_time); //only for boards?
 
     [[eosio::action]] void closeballot(name publisher, uint64_t ballot_id, uint8_t pass);
 
@@ -172,6 +174,15 @@ public:
 
     bool close_leaderboard(uint64_t board_id, uint8_t pass, name publisher);
 
+
+    uint64_t make_livebaord(name publisher, symbol voting_symbol, uint32_t begin_time, uint32_t end_time, string info_url);
+
+    bool delete_liveboard(uint64_t board_id, name publisher);
+
+    bool vote_for_liveboard(name voter, uint64_t ballot_id, uint64_t board_id, uint16_t direction);
+
+    bool close_liveboard(uint64_t board_id, uint8_t pass, name publisher);
+    
 
     asset get_vote_weight(name voter, symbol voting_token);
 
