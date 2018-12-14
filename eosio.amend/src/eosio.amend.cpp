@@ -110,7 +110,7 @@ void ratifyamend::makeproposal(string sub_title, uint64_t doc_id, uint8_t new_cl
 
 	if(dep.escrow > fee) {
 	    asset outstanding = dep.escrow - fee;
-		deposits.modify(dep, same_payer, [&](auto& depo) {
+		deposits.modify(d_itr, same_payer, [&](auto& depo) {
 			depo.escrow = outstanding;
 		});
 	} else {
@@ -183,8 +183,7 @@ void ratifyamend::addclause(uint64_t sub_id, uint8_t new_clause_num, string new_
             existing_clause = true;
         }
     }
-
-    eosio_assert(existing_clause = false, "clause number to add already exists in proposal");
+    eosio_assert(existing_clause == false, "clause number to add already exists in proposal");
 
     sub.new_clause_nums.push_back(new_clause_num);
     sub.new_ipfs_urls.push_back(new_ipfs_url);
