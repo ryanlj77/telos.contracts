@@ -111,9 +111,9 @@ void tfvt::setconfig(name member, config new_config) {
 	}
 
 	new_config.publisher = _config.publisher;
-	new_config.open_election_id = _config.open_election_id;
+	new_config.open_election_id = 999; //_config.open_election_id;
 	new_config.last_board_election_time = _config.last_board_election_time;
-	new_config.is_active_election = _config.is_active_election;
+	new_config.is_active_election = false; //_config.is_active_election;
 
 	_config = new_config;
 	configs.set(_config, get_self());
@@ -257,6 +257,7 @@ void tfvt::nominate(name nominee, name nominator) {
 
 void tfvt::makeelection(name holder, string info_url) {
     require_auth(holder);
+	eosio_assert(false, "makeelection currently disabled");
 	eosio_assert(!_config.is_active_election, "there is already an election is progress");
     eosio_assert(is_tfvt_holder(holder) || is_tfboard_holder(holder), "caller must be a TFVT or TFBOARD holder");
 	eosio_assert(_config.open_seats > 0 || is_term_expired(), "it isn't time for the next election");
@@ -295,6 +296,7 @@ void tfvt::makeelection(name holder, string info_url) {
 
 void tfvt::addcand(name nominee, string info_link) {
 	require_auth(nominee);
+	eosio_assert(_config.is_active_election, "there is currently no active election to be added to.");
 	eosio_assert(is_nominee(nominee), "only nominees can be added to the election");
 
     action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"), make_tuple(
