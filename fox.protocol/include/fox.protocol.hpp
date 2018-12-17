@@ -48,7 +48,8 @@ public:
 
     [[eosio::action]] void regdomain(name publisher, symbol native_symbol);
 
-    //TODO: regulate action to prevent abuse
     [[eosio::action]] void unregdomain(name publisher, symbol native_symbol);
+
+    [[eosio::action]] void setconfig(name publisher, config new_config);
 
 };
