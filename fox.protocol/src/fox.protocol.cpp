@@ -31,10 +31,22 @@ void fox::unregdomain(name publisher, symbol native_symbol) {
     domains.erase(d_itr);
 }
 
-void fox::setconfig(name publisher, config new_config) {
-    require_auth(publisher);
+void fox::blacklist(name host, symbol sym_to_blacklist) {
+    require_auth(host);
+    eosio_assert(host == get_self(), "Only host account can blacklist");
 
-    //TODO: update config with new_config values
+    domains_table domains(get_self(), get_self().value);
+    auto d_itr = domains.find(sym_to_blacklist.code().raw());
+    eosio_assert(d_itr != domains.end(), "Domain with that symbol doesn't exist");
+
+    domains.modify(d_itr, same_payer, [&](auto& l) {
+        l.is_blacklisted = true;
+    });
 }
 
-EOSIO_DISPATCH(fox, (regdomain)(unregdomain)(setconfig))
+// void fox::setconfig(name publisher, config new_config) {
+//     require_auth(publisher);
+//     //TODO: update config with new_config values
+// }
+
+EOSIO_DISPATCH(fox, (regdomain)(unregdomain)(blacklist))

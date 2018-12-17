@@ -28,18 +28,22 @@ public:
         symbol native_symbol;
         name publisher;
         uint32_t reg_time;
+
+        bool is_blacklisted;
+        //TODO: add blacklist metrics
         
         uint64_t primary_key() const { return native_symbol.code().raw(); }
-        EOSLIB_SERIALIZE(domain, (native_symbol)(publisher)(reg_time))
+        EOSLIB_SERIALIZE(domain, (native_symbol)(publisher)(reg_time)
+            (is_blacklisted))
     };
 
-    struct [[eosio::table]] config {
-        name host_name;
-        uint16_t unique_domains;
-
-        uint64_t primary_key() const { return host_name.value; }
-        EOSLIB_SERIALIZE(config, (host_name)(unique_domains))
-    };
+    // struct [[eosio::table]] config {
+    //     name host_name;
+    //     uint16_t domain_count;
+    //     uint16_t blacklisted_count;
+    //     uint64_t primary_key() const { return host_name.value; }
+    //     EOSLIB_SERIALIZE(config, (host_name)(domain_count)(blacklisted_count))
+    // };
     
     typedef multi_index<name("domains"), domain> domains_table;
 
@@ -50,6 +54,8 @@ public:
 
     [[eosio::action]] void unregdomain(name publisher, symbol native_symbol);
 
-    [[eosio::action]] void setconfig(name publisher, config new_config);
+    [[eosio::action]] void blacklist(name host, symbol sym_to_blacklist);
+
+    //[[eosio::action]] void setconfig(name publisher, config new_config);
 
 };
