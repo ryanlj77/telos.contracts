@@ -32,13 +32,23 @@ public:
         uint64_t primary_key() const { return native_symbol.code().raw(); }
         EOSLIB_SERIALIZE(domain, (native_symbol)(publisher)(reg_time))
     };
+
+    struct [[eosio::table]] config {
+        name host_name;
+        uint16_t unique_domains;
+
+        uint64_t primary_key() const { return host_name.value; }
+        EOSLIB_SERIALIZE(config, (host_name)(unique_domains))
+    };
     
     typedef multi_index<name("domains"), domain> domains_table;
 
     //typedef singleton<name("config"), config> config_table;
 	//config_table configs;
 
-    [[eosio::action]]
-    void regdomain(name publisher, symbol native_symbol);
+    [[eosio::action]] void regdomain(name publisher, symbol native_symbol);
+
+    //TODO: regulate action to prevent abuse
+    [[eosio::action]] void unregdomain(name publisher, symbol native_symbol);
 
 };
