@@ -112,7 +112,7 @@ void tfvt::setconfig(name member, config new_config) {
 
 	new_config.publisher = _config.publisher;
 	new_config.open_election_id = 999; //_config.open_election_id;
-	new_config.last_board_election_time = _config.last_board_election_time;
+	new_config.last_board_election_time = 0; //_config.last_board_election_time;
 	new_config.is_active_election = false; //_config.is_active_election;
 
 	_config = new_config;
