@@ -34,8 +34,23 @@ public:
         uint64_t primary_key() const { return owner.value; }
         EOSLIB_SERIALIZE(balance, (owner)(tokens)(on_order))
     };
+
+    //NOTE: coded by BUY symbol, scoped by SELL symbol (scope by match rate instead?)
+    //TODO: secondary index by match rate? (sec idx by SELL symbol?)
+    struct [[eosio::action]] order {
+        uint64_t order_id;
+        symbol quote_symbol;
+        double rate;
+
+        uint64_t primary_key() const { return order_id; }
+        uint64_t by_quote_sym() const { return quote_symbol.code().raw(); }
+        EOSLIB_SERIALIZE(order, (order_id)(quote_symbol)(rate))
+    };
     
     typedef multi_index<name("balances"), balance> balances_table;
+
+    typedef multi_index<name("orders"), order, 
+        indexed_by<name("byquotesym"), eosio::const_mem_fun<order, uint64_t, &order::by_quote_sym>>> orders_table;
 
     [[eosio::action]] void mint(name recipient, asset tokens);
 
@@ -45,4 +60,8 @@ public:
 
     [[eosio::action]] void deletewallet(name user);
 
+    [[eosio::action]] void placeorder(name orderer, asset buy, asset sell);
+
+
+    name find_domain(symbol sym);
 };

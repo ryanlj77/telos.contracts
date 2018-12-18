@@ -40,3 +40,24 @@ void foxtoken::deletewallet(name user) {
 
     balances.erase(itr);
 }
+
+void foxtoken::placeorder(name orderer, asset buy, asset sell) {
+    require_auth(orderer);
+    eosio_assert(buy.symbol == NATIVE_SYMBOL, "Cannot buy that asset here");
+
+    //TODO: find target domain
+
+    //TODO: search for match
+
+    //TODO: flag for match, validate
+
+    //TODO: check a match in constructor?? have explicit action? match on order placement?
+}
+
+name foxtoken::find_domain(symbol sym) {
+    //TODO: add domain struct to hpp
+
+    //TODO: search by sym in fox::domains
+
+    //TODO: return name, or name{0} if not found
+}
