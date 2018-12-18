@@ -39,18 +39,45 @@ public:
     //TODO: secondary index by match rate? (sec idx by SELL symbol?)
     struct [[eosio::action]] order {
         uint64_t order_id;
-        symbol quote_symbol;
+        uint32_t order_time;
+
+        symbol buying;
+        asset selling;
         double rate;
 
+        uint64_t matched_order_id;
+
         uint64_t primary_key() const { return order_id; }
-        uint64_t by_quote_sym() const { return quote_symbol.code().raw(); }
-        EOSLIB_SERIALIZE(order, (order_id)(quote_symbol)(rate))
+        double by_rate() const { return rate; }
+        EOSLIB_SERIALIZE(order, (order_id)(order_time)
+            (buying)(selling)(rate)
+            (matched_order_id))
     };
+
+    #pragma region Imported_Defs
+
+    struct [[eosio::table]] domain {
+        symbol native_symbol;
+        name publisher;
+        uint32_t reg_time;
+
+        bool is_blacklisted;
+        
+        uint64_t primary_key() const { return native_symbol.code().raw(); }
+        EOSLIB_SERIALIZE(domain, (native_symbol)(publisher)(reg_time)
+            (is_blacklisted))
+    };
+
+    typedef multi_index<name("domains"), domain> domains_table;
+
+    #pragma endregion Imported_Defs
     
     typedef multi_index<name("balances"), balance> balances_table;
 
-    typedef multi_index<name("orders"), order, 
-        indexed_by<name("byquotesym"), eosio::const_mem_fun<order, uint64_t, &order::by_quote_sym>>> orders_table;
+    typedef multi_index<name("openorders"), order, 
+        indexed_by<name("byrate"), eosio::const_mem_fun<order, double, &order::by_rate>>> orders_table;
+
+    //TODO: add partialorders table? separate by order type?
 
     [[eosio::action]] void mint(name recipient, asset tokens);
 
@@ -60,8 +87,10 @@ public:
 
     [[eosio::action]] void deletewallet(name user);
 
-    [[eosio::action]] void placeorder(name orderer, asset buy, asset sell);
+    [[eosio::action]] void marketorder(name orderer, symbol buy, asset sell);
 
 
     name find_domain(symbol sym);
+
+    double find_market_rate(symbol sym);
 };

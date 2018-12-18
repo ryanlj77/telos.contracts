@@ -1,5 +1,5 @@
 #include <fox.token.hpp>
-//#include <eosiolib/print.hpp>
+#include <eosiolib/print.hpp>
 
 foxtoken::foxtoken(name self, name code, datastream<const char*> ds) : contract(self, code, ds) {
 }
@@ -41,9 +41,9 @@ void foxtoken::deletewallet(name user) {
     balances.erase(itr);
 }
 
-void foxtoken::placeorder(name orderer, asset buy, asset sell) {
+void foxtoken::marketorder(name orderer, symbol buy_symbol, asset sell) {
     require_auth(orderer);
-    eosio_assert(buy.symbol == NATIVE_SYMBOL, "Cannot buy that asset here");
+    eosio_assert(buy_symbol == NATIVE_SYMBOL, "Cannot buy that asset here");
 
     //TODO: find target domain
 
@@ -51,13 +51,39 @@ void foxtoken::placeorder(name orderer, asset buy, asset sell) {
 
     //TODO: flag for match, validate
 
+    //auto upper = orders_by_rate.upper_bound(100);
+
     //TODO: check a match in constructor?? have explicit action? match on order placement?
 }
 
 name foxtoken::find_domain(symbol sym) {
-    //TODO: add domain struct to hpp
+    domains_table domains(name("foxprotocol"), name("foxprotocol").value);
+    auto d_itr = domains.find(sym.code().raw());
+    
+    if (d_itr != domains.end()) {
+        auto dom = *d_itr;
+        return dom.publisher;
+    }
 
-    //TODO: search by sym in fox::domains
-
-    //TODO: return name, or name{0} if not found
+    return name{0};
 }
+
+double foxtoken::find_market_rate(symbol sym) {
+    
+    orders_table openorders(get_self(), sym.code().raw());
+    auto orders_by_rate = openorders.get_index<name("byrate")>();
+    //auto upper = orders_by_rate.upper_bound(100);
+
+    int max_loops = 50;
+    for (order o : orders_by_rate) {
+        print("rate: ", o.rate);
+        max_loops--;
+        if (max_loops == 0) {
+            break;
+        }
+    }
+
+    return orders_by_rate.begin()->rate;
+}
+
+EOSIO_DISPATCH(foxtoken, (mint)(createwallet)(deletewallet)(marketorder))
