@@ -24,8 +24,25 @@ public:
 
     ~foxtoken();
 
+    symbol const NATIVE_SYMBOL = symbol("FOX", 3);
 
+    struct [[eosio::table]] balance {
+        name owner;
+        asset tokens;
+        asset on_order;
+
+        uint64_t primary_key() const { return owner.value; }
+        EOSLIB_SERIALIZE(balance, (owner)(tokens)(on_order))
+    };
     
-    //typedef multi_index<name("balances"), balance> balances_table;
+    typedef multi_index<name("balances"), balance> balances_table;
+
+    [[eosio::action]] void mint(name recipient, asset tokens);
+
+    [[eosio::action]] void transfer(name sender, name recipient, asset tokens);
+
+    [[eosio::action]] void createwallet(name user);
+
+    [[eosio::action]] void deletewallet(name user);
 
 };
