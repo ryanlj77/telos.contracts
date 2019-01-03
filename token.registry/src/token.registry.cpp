@@ -5,6 +5,7 @@
  */
 
 #include <token.registry.hpp>
+#include <eosiolib/print.hpp>
 
 registry::registry(name self, name code, datastream<const char*> ds) : contract(self, code, ds), _config(self, self.value) {
     if (!_config.exists()) {
@@ -31,11 +32,14 @@ registry::~registry() {
 void registry::mint(name recipient, asset tokens) {
     require_auth(config.publisher);
     eosio_assert(is_account(recipient), "recipient account does not exist");
+    eosio_assert(tokens.is_valid(), "invalid token");
+    eosio_assert(tokens.amount > 0, "must mint positive quantity");
+    eosio_assert(tokens.symbol == registry::TOKEN_SYM, "only native tokens are mintable");
     eosio_assert(config.supply + tokens <= config.max_supply, "minting would exceed allowed maximum supply");
 
-    add_balance(recipient, tokens, config.publisher);
-
     config.supply = (config.supply + tokens);
+
+    add_balance(recipient, tokens);
 }
 
 void registry::transfer(name sender, name recipient, asset tokens) {
@@ -44,8 +48,9 @@ void registry::transfer(name sender, name recipient, asset tokens) {
     eosio_assert(sender != recipient, "cannot transfer to self");
     eosio_assert(tokens.is_valid(), "invalid token");
     eosio_assert(tokens.amount > 0, "must transfer positive quantity");
+    eosio_assert(tokens.symbol == registry::TOKEN_SYM, "only native tokens are transferable");
     
-    add_balance(recipient, tokens, sender);
+    add_balance(recipient, tokens);
     sub_balance(sender, tokens);
 }
 
@@ -55,51 +60,53 @@ void registry::allot(name sender, name recipient, asset tokens) {
     eosio_assert(sender != recipient, "cannot allot tokens to self");
     eosio_assert(tokens.is_valid(), "invalid token");
     eosio_assert(tokens.amount > 0, "must allot positive quantity");
+    eosio_assert(tokens.symbol == registry::TOKEN_SYM, "only native tokens are allotable");
 
     sub_balance(sender, tokens);
-    add_allot(sender, recipient, tokens, sender);
+    add_allot(sender, recipient, tokens);
 }
 
 void registry::unallot(name sender, name recipient, asset tokens) {
     require_auth(sender);
     eosio_assert(tokens.is_valid(), "invalid token");
-    eosio_assert(tokens.amount > 0, "must allot positive quantity");
+    eosio_assert(tokens.amount > 0, "must unallot positive quantity");
+    eosio_assert(tokens.symbol == registry::TOKEN_SYM, "only native tokens are unallotable");
 
     sub_allot(sender, recipient, tokens);
-    add_balance(sender, tokens, sender);
+    add_balance(sender, tokens);
 }
 
 void registry::claimallot(name sender, name recipient, asset tokens) {
     require_auth(recipient);
-    eosio_assert(is_account(sender), "sender account does not exist");
     eosio_assert(tokens.is_valid(), "invalid token");
-    eosio_assert(tokens.amount > 0, "must transfer positive quantity");
+    eosio_assert(tokens.amount > 0, "must claim positive quantity");
+    eosio_assert(tokens.symbol == registry::TOKEN_SYM, "only native tokens are claimable");
     
     sub_allot(sender, recipient, tokens);
-    add_balance(recipient, tokens, recipient);
+    add_balance(recipient, tokens);
 }
 
 void registry::createwallet(name recipient) {
     require_auth(recipient);
 
-    balances_table balances(config.publisher, recipient.value);
+    balances_table balances(config.publisher, config.publisher.value);
     auto itr = balances.find(recipient.value);
 
-    eosio_assert(itr == balances.end(), "Wallet already exists for given account");
+    eosio_assert(itr == balances.end(), "Account already owns a wallet");
 
     balances.emplace(recipient, [&]( auto& a ){
         a.owner = recipient;
-        a.tokens = asset(int64_t(0), config.max_supply.symbol);
+        a.tokens = asset(int64_t(0), TOKEN_SYM);
     });
 }
 
-void registry::deletewallet(name owner) {
-    require_auth(owner);
+void registry::deletewallet(name wallet_owner) {
+    require_auth(wallet_owner);
 
-    balances_table balances(config.publisher, owner.value);
-    auto itr = balances.find(owner.value);
+    balances_table balances(config.publisher, config.publisher.value);
+    auto itr = balances.find(wallet_owner.value);
 
-    eosio_assert(itr != balances.end(), "Given account does not have a wallet");
+    eosio_assert(itr != balances.end(), "Account does not have a wallet to delete");
 
     auto b = *itr;
 
@@ -108,61 +115,64 @@ void registry::deletewallet(name owner) {
     balances.erase(itr);
 }
 
-void registry::add_balance(name recipient, asset tokens, name payer) {
-    balances_table balances(config.publisher, recipient.value);
+#pragma region Helper_Functions
+
+void registry::add_balance(name recipient, asset tokens) {
+    balances_table balances(config.publisher, config.publisher.value);
     auto itr = balances.find(recipient.value);
 
-    eosio_assert(itr != balances.end(), "No wallet found for recipient");
+    eosio_assert(itr != balances.end(), "No wallet found for recipient.");
 
     balances.modify(itr, same_payer, [&]( auto& a ) {
         a.tokens += tokens;
     });
 }
 
-void registry::sub_balance(name owner, asset tokens) {
-    balances_table balances(config.publisher, owner.value);
-    auto itr = balances.find(owner.value);
+void registry::sub_balance(name sender, asset tokens) {
+    balances_table balances(config.publisher, config.publisher.value);
+    auto itr = balances.find(sender.value);
     auto b = *itr;
 
-    eosio_assert(b.tokens.amount >= tokens.amount, "transaction would overdraw balance");
+    eosio_assert(b.tokens.amount >= tokens.amount, "Transaction would overdraw balance of sender");
 
     balances.modify(itr, same_payer, [&]( auto& a ) {
         a.tokens -= tokens;
     });
 }
 
-void registry::add_allot(name sender, name recipient, asset tokens, name payer) {
-    
+void registry::add_allot(name sender, name recipient, asset tokens) {
     allotments_table allotments(config.publisher, sender.value);
     auto itr = allotments.find(recipient.value);
 
-    if(itr == allotments.end() ) {
-        allotments.emplace(payer, [&]( auto& a ){
+    if(itr == allotments.end()) { //NOTE: create new allotment
+        allotments.emplace(sender, [&]( auto& a ){
             a.recipient = recipient;
             a.sender = sender;
             a.tokens = tokens;
         });
-   } else {
+   } else { //NOTE: add to existing allotment
         allotments.modify(itr, same_payer, [&]( auto& a ) {
             a.tokens += tokens;
         });
    }
 }
 
-void registry::sub_allot(name owner, name recipient, asset tokens) {
-    allotments_table allotments(config.publisher, owner.value);
+void registry::sub_allot(name sender, name recipient, asset tokens) {
+    allotments_table allotments(config.publisher, sender.value);
     auto itr = allotments.find(recipient.value);
     auto al = *itr;
 
     eosio_assert(al.tokens.amount >= tokens.amount, "transaction would overdraw balance");
 
-    if(al.tokens.amount == tokens.amount ) {
+    if(al.tokens.amount == tokens.amount ) { //NOTE: erasing allotment since all tokens are being claimed
         allotments.erase(itr);
-    } else {
+    } else { //NOTE: subtracting token amount from existing allotment
         allotments.modify(itr, same_payer, [&]( auto& a ) {
             a.tokens -= tokens;
         });
     }
 }
+
+#pragma endregion Helper_Functions
 
 EOSIO_DISPATCH(registry, (mint)(transfer)(allot)(unallot)(claimallot)(createwallet)(deletewallet))
