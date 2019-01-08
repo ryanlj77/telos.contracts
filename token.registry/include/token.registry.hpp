@@ -1,5 +1,5 @@
 /**
- * This contract defines the TIP-5 Single Token Interface.
+ * This contract defines an eosio.token contract with TIP5 extension.
  * 
  * For a full developer walkthrough, see the README.md
  * 
@@ -23,11 +23,6 @@ public:
 
     ~registry();
 
-    //string const TOKEN_NAME = "Viita";
-    //symbol const TOKEN_SYM = symbol("VIITA", 4);
-    //asset const INITIAL_MAX_SUPPLY = asset(int64_t(100000000000000), TOKEN_SYM); //10 billion
-    //asset const INITIAL_SUPPLY = asset(int64_t(0), TOKEN_SYM);
-
     [[eosio::action]]
     void create(name issuer, asset  maximum_supply);
 
@@ -46,29 +41,6 @@ public:
     [[eosio::action]]
     void close(name owner, const symbol& symbol);
 
-
-
-    [[eosio::action]]
-    void allot(name sender, name recipient, asset tokens);
-
-    [[eosio::action]]
-    void unallot(name sender, name recipient, asset tokens);
-
-    [[eosio::action]]
-    void claimallot(name sender, name recipient, asset tokens);
-
-    //@scope sender.value (discoverable by sender)
-    struct [[eosio::table]] allotment {
-        name recipient;
-        name sender;
-        asset tokens;
-
-        uint64_t primary_key() const { return recipient.value; }
-        EOSLIB_SERIALIZE(allotment, (recipient)(sender)(tokens))
-    };
-
-    typedef multi_index<name("allotments"), allotment> allotments_table;
-
     static asset get_supply(name token_contract_account, symbol_code sym_code) {
         stats statstable( token_contract_account, sym_code.raw() );
         const auto& st = statstable.get( sym_code.raw() );
@@ -81,41 +53,56 @@ public:
         return ac.balance;
     }
 
-    //TODO: get_allot()
+    // [[eosio::action]]
+    // void allot(name sender, name recipient, asset tokens);
 
-    //Phase out after migration is done >>>
+    // [[eosio::action]]
+    // void unallot(name sender, name recipient, asset tokens);
 
-    struct [[eosio::table]] tokenconfig {
-        name publisher;
-        string token_name;
-        asset max_supply;
-        asset supply;
+    // [[eosio::action]]
+    // void claimallot(name sender, name recipient, asset tokens);
 
-        uint64_t primary_key() const { return publisher.value; }
-        EOSLIB_SERIALIZE(tokenconfig, (publisher)(token_name)(max_supply)(supply))
-    };
+    //@scope sender.value (discoverable by sender)
+    // struct [[eosio::table]] allotment {
+    //     name recipient;
+    //     name sender;
+    //     asset tokens;
 
-    struct [[eosio::table]] balance {
-        name owner;
-        asset tokens;
+    //     uint64_t primary_key() const { return recipient.value; }
+    //     EOSLIB_SERIALIZE(allotment, (recipient)(sender)(tokens))
+    // };
 
-        uint64_t primary_key() const { return owner.value; }
-        EOSLIB_SERIALIZE(balance, (owner)(tokens))
-    };
+    // typedef multi_index<name("allotments"), allotment> allotments_table;
 
-    [[eosio::action]] void createwallet(name recipient);
+    // struct [[eosio::table]] tokenconfig {
+    //     name publisher;
+    //     string token_name;
+    //     asset max_supply;
+    //     asset supply;
 
-    [[eosio::action]] void deletewallet(name wallet_owner);
+    //     uint64_t primary_key() const { return publisher.value; }
+    //     EOSLIB_SERIALIZE(tokenconfig, (publisher)(token_name)(max_supply)(supply))
+    // };
 
-    void migrate_balance(name owner);
+    // struct [[eosio::table]] balance {
+    //     name owner;
+    //     asset tokens;
 
-    typedef eosio::singleton<name("tokenconfig"), tokenconfig> config_singleton;
-    config_singleton _config;
-    tokenconfig config;
+    //     uint64_t primary_key() const { return owner.value; }
+    //     EOSLIB_SERIALIZE(balance, (owner)(tokens))
+    // };
 
-    typedef multi_index<name("balances"), balance> balances_table;
+    // [[eosio::action]] void createwallet(name recipient);
 
-    //<<<
+    // [[eosio::action]] void deletewallet(name wallet_owner);
+
+    // void migrate_balance(name owner);
+
+    // typedef eosio::singleton<name("tokenconfig"), tokenconfig> config_singleton;
+    // config_singleton _config;
+    // tokenconfig config;
+
+    // typedef multi_index<name("balances"), balance> balances_table;
 
 private:
     struct [[eosio::table]] account {
@@ -138,6 +125,6 @@ private:
     void sub_balance(name owner, asset value);
     void add_balance(name owner, asset value, name ram_payer);
 
-    void add_allot(name sender, name recipient, asset tokens);
-    void sub_allot(name sender, name recipient, asset tokens);
+    // void add_allot(name sender, name recipient, asset tokens);
+    // void sub_allot(name sender, name recipient, asset tokens);
 };
