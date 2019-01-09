@@ -7,9 +7,7 @@
 
 #include <eosio.arbitration/eosio.arbitration.hpp>
 
-arbitration::arbitration(name s, name code, datastream<const char *> ds)
-    : eosio::contract(s, code, ds), configs(_self, _self.value) {
-
+arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds), configs(_self, _self.value) {
   _config = configs.exists() ? configs.get() : get_default_config();
 }
 
@@ -20,7 +18,7 @@ arbitration::~arbitration() {
 void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees) {
   require_auth("eosio"_n);
   
-  eosio_assert(max_elected_arbs > uint16_t(0), "Arbitraitors must be greater than 0");
+  eosio_assert(max_elected_arbs > uint16_t(0), "Arbitrators must be greater than 0");
   _config = config{get_self(),       // publisher
                    max_elected_arbs,
                    election_duration,
@@ -32,7 +30,7 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
                    _config.auto_start_election
                    };
 
-  print("\nSettings Configured: SUCCESS");
+  //print("\nSettings Configured: SUCCESS");
 }
 
 void arbitration::initelection() {
