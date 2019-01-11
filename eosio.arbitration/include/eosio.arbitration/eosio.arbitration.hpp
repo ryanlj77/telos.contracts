@@ -1,12 +1,12 @@
 /**
- * 
+ * Arbitration Contract Interface
  *
  * @author Craig Branscom, Peter Bue, Ed Silva, Douglas Horn
  * @copyright defined in telos/LICENSE.txt
  */
 
 #pragma once
-//#include <trail.voting.hpp>
+#include <trail.voting.hpp>
 #include <eosiolib/action.hpp>
 #include <eosiolib/asset.hpp>
 #include <eosiolib/eosio.hpp>
@@ -64,122 +64,22 @@ public:
     OPEN,   // 0
     PASSED, // 1
     FAILED, // 2
+    CLOSED  // 3
+  };
+
+  enum lang_code : uint8_t {
+    ENGL, //English 
+    FRCH, //French
+    GRMN, //German
+    KREA, //Korean
+    JAPN, //Japanese
+    CHNA, //Chinese
+    SPAN, //Spanish
+    PGSE, //Portuguese
+    SWED //Swedish
   };
 
 #pragma endregion Enums
-
-#pragma region Structs
-
-  struct permission_level_weight {
-    permission_level permission;
-    uint16_t weight;
-
-    EOSLIB_SERIALIZE(permission_level_weight, (permission)(weight))
-  };
-
-  struct key_weight {
-    eosio::public_key key;
-    uint16_t weight;
-
-    EOSLIB_SERIALIZE(key_weight, (key)(weight))
-  };
-
-  struct wait_weight {
-    uint32_t wait_sec;
-    uint16_t weight;
-
-    EOSLIB_SERIALIZE(wait_weight, (wait_sec)(weight))
-  };
-
-  struct authority {
-    uint32_t threshold = 0;
-    std::vector<key_weight> keys;
-    std::vector<permission_level_weight> accounts;
-    std::vector<wait_weight> waits;
-
-    EOSLIB_SERIALIZE(authority, (threshold)(keys)(accounts)(waits))
-  };
-
-  struct[[eosio::table]] pending_candidate {
-    name candidate_name;
-    string credentials_link; //NOTE: ideally ipfs hash
-    uint32_t application_time;
-
-    uint64_t primary_key() const { return candidate_name.value; }
-    EOSLIB_SERIALIZE(pending_candidate, (candidate_name)(credentials_link)(application_time))
-  };
-
-  // NOTE: diminishing subsequent response (default) times
-  // NOTE: initial deposit saved
-  // NOTE: class of claim where neither party can pay fees, TF pays instead
-  struct [[ eosio::table ]] config {
-    name publisher;
-    uint16_t max_elected_arbs;
-    uint32_t election_duration;
-    uint32_t start_election;
-    vector<int64_t> fee_structure; 
-    uint32_t arbitrator_term_length;
-    uint32_t last_time_edited;
-    uint64_t ballot_id = 0;
-    bool auto_start_election = false;     
-
-    uint64_t primary_key() const { return publisher.value; }
-    EOSLIB_SERIALIZE(config, (publisher)(max_elected_arbs)(election_duration)(start_election)
-    (fee_structure)(arbitrator_term_length)(last_time_edited)(ballot_id)(auto_start_election))
-  };
-
-  struct [[eosio::table]] arbitrator {
-    name arb;
-    uint16_t arb_status;
-    vector<uint64_t> open_case_ids;
-    vector<uint64_t> closed_case_ids;
-    string credential_link; //ipfs_url of credentials
-    uint32_t elected_time;
-    uint32_t term_length;
-    vector<string> languages; //NOTE: language codes for space?
-
-    uint64_t primary_key() const { return arb.value; }
-    EOSLIB_SERIALIZE(arbitrator,(arb)(arb_status)(open_case_ids)(closed_case_ids)
-                                (credential_link)(elected_time)(term_length)(languages))
-  };
-
-  struct claim {
-    uint16_t class_suggestion;
-    vector<string> submitted_pending_evidence; // submitted by claimant
-    vector<uint64_t> accepted_ev_ids;          // accepted and emplaced by arb
-    uint16_t class_decision;                   // initialized to UNDECIDED (0)
-
-    EOSLIB_SERIALIZE(claim, (class_suggestion)(submitted_pending_evidence)(accepted_ev_ids)(class_decision))
-  };
-
-  //TODO: evidence types?
-  struct [[eosio::table]] evidence {
-    uint64_t ev_id;
-    string ipfs_url;
-    uint32_t accept_time;
-
-    uint64_t primary_key() const { return ev_id; }
-    EOSLIB_SERIALIZE(evidence, (ev_id)(ipfs_url)(accept_time))
-  };
-
-  struct[[eosio::table]] casefile {
-    uint64_t case_id;
-    name claimant; //TODO: add vector for claimant's party? same for respondant and their party?
-    name respondant; //NOTE: can be set to 0 for no respondant
-    vector<claim> claims;
-    vector<name> arbitrators; //CLARIFY: do arbitrators get added when joining?
-    uint16_t case_status;
-    uint32_t last_edit;
-    vector<string> findings_ipfs;
-    //vector<asset> additional_fees; //NOTE: case by case?
-    //TODO: add messages field
-
-    uint64_t primary_key() const { return case_id; }
-    uint64_t by_claimant() const { return claimant.value; }
-    EOSLIB_SERIALIZE(casefile, (case_id)(claimant)(claims)(arbitrators)(case_status)(last_edit)(findings_ipfs))
-  };
-
-#pragma endregion Structs
 
   arbitration(name s, name code, datastream<const char *> ds);
   
@@ -209,7 +109,6 @@ public:
   void endelection(name candidate);
                                                       
 #pragma endregion Arb_Elections
-
 
 #pragma region Case_Setup
 
@@ -280,25 +179,192 @@ public:
 
 #pragma endregion BP_Multisig_Actions
 
+#pragma region System Structs
+
+  struct permission_level_weight {
+    permission_level permission;
+    uint16_t weight;
+
+    EOSLIB_SERIALIZE(permission_level_weight, (permission)(weight))
+  };
+
+  struct key_weight {
+    eosio::public_key key;
+    uint16_t weight;
+
+    EOSLIB_SERIALIZE(key_weight, (key)(weight))
+  };
+
+  struct wait_weight {
+    uint32_t wait_sec;
+    uint16_t weight;
+
+    EOSLIB_SERIALIZE(wait_weight, (wait_sec)(weight))
+  };
+
+  struct authority {
+    uint32_t threshold = 0;
+    std::vector<key_weight> keys;
+    std::vector<permission_level_weight> accounts;
+    std::vector<wait_weight> waits;
+
+    EOSLIB_SERIALIZE(authority, (threshold)(keys)(accounts)(waits))
+  };
+
+#pragma endregion System Structs
 
 protected:
-#pragma region Tables
+#pragma region Tables and Structs
 
-  typedef singleton<"config"_n, config> config_singleton;
+  /**
+   * Holds all arbitrator candidate applications.
+   * @scope get_self().value
+   * @key uint64_t candidate_name.value
+   */
+  struct[[eosio::table]] pending_candidate {
+    name candidate_name;
+    string credentials_link; //NOTE: ideally ipfs hash
+    uint32_t application_time;
+
+    uint64_t primary_key() const { return candidate_name.value; }
+    EOSLIB_SERIALIZE(pending_candidate, (candidate_name)(credentials_link)(application_time))
+  };
+
+  /**
+   * Holds all currently elected arbitrators.
+   * @scope get_self().value
+   * @key uint64_t arb.value
+   */
+  struct [[eosio::table]] arbitrator {
+    name arb;
+    uint8_t arb_status;
+    vector<uint64_t> open_case_ids;
+    vector<uint64_t> closed_case_ids;
+    string credentials_link; //NOTE: ipfs_url of arbitrator credentials
+    uint32_t elected_time;
+    uint32_t term_expiration;
+    vector<uint8_t> languages; //NOTE: language codes
+
+    uint64_t primary_key() const { return arb.value; }
+    EOSLIB_SERIALIZE(arbitrator, (arb)(arb_status)(open_case_ids)(closed_case_ids)
+      (credentials_link)(elected_time)(term_expiration)(languages))
+  };
+
+  //NOTE: Stores all information related to a single claim.
+  struct claim {
+    uint16_t class_suggestion;
+    vector<string> submitted_pending_evidence; //NOTE: submitted by claimant
+    vector<uint64_t> accepted_ev_ids;          //NOTE: accepted and emplaced by arb
+    uint16_t class_decision;                   //NOTE: initialized to UNDECIDED (0)
+
+    EOSLIB_SERIALIZE(claim, (class_suggestion)(submitted_pending_evidence)(accepted_ev_ids)(class_decision))
+  };
+
+  /**
+   * Case Files for all arbitration cases.
+   * @scope get_self().value
+   * @key case_id
+   */
+  struct[[eosio::table]] casefile {
+    uint64_t case_id;
+    uint8_t case_status;
+
+    vector<name> claimants;
+    vector<name> respondants; //NOTE: empty for no respondant
+    vector<name> arbitrators; //CLARIFY: do arbitrators get added when joining?
+    vector<uint8_t> required_langs;
+
+    vector<claim> claims;
+    vector<string> result_links; //NOTE: mapped key to key with claims vector i.e. result of claim[5] is results_link[5]
+    
+    string comment;
+    uint32_t last_edit;
+
+    //vector<asset> additional_fees; //NOTE: case by case?
+    //bool is_joined; //NOTE: unnecessary?
+
+    uint64_t primary_key() const { return case_id; }
+    EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
+      (claimants)(respondants)(arbitrators)(required_langs)
+      (claims)(result_links)
+      (comment)(last_edit))
+  };
+
+  /**
+   * Stores evidence accepted from arbitration cases.
+   * @scope get_self().value
+   * @key uint64_t ev_id
+   */
+  //TODO: evidence types?
+  struct [[eosio::table]] evidence {
+    uint64_t ev_id;
+    string ipfs_url;
+    uint32_t accept_time;
+    name accepted_by;
+
+    //vector<uint8_t> doc_langs; //maybe?
+
+    uint64_t primary_key() const { return ev_id; }
+    EOSLIB_SERIALIZE(evidence, (ev_id)(ipfs_url)(accept_time)(accepted_by))
+  };
+
+  /**
+   * Singleton for global config settings.
+   * @scope singleton scope (get_self().value)
+   * @key table name
+   */
+  //TODO: make fee structure a constant?
+  // NOTE: diminishing subsequent response (default) times
+  // NOTE: initial deposit saved
+  // NOTE: class of claim where neither party can pay fees, TF pays instead
+  struct [[ eosio::table ]] config {
+    name publisher;
+    vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value
+
+    uint16_t max_elected_arbs;
+    uint32_t election_duration;
+    uint32_t election_start;
+    bool auto_start_election = false;
+    uint64_t current_ballot_id = 0;
+    uint32_t arb_term_length;
+
+    //TODO: response times vector?
+    //TODO: 
+
+    uint64_t primary_key() const { return publisher.value; }
+    EOSLIB_SERIALIZE(config, (publisher)(fee_structure)
+    (max_elected_arbs)(election_duration)(election_start)(auto_start_election)(current_ballot_id)(arb_term_length))
+  };
+
+  /**
+   * Holds instances of joinder cases.
+   * @scope get_self().value
+   * @key uint64_t join_id
+   */
+  struct [[eosio::table]] joinder {
+    uint64_t join_id;
+    vector<uint64_t> cases;
+    uint32_t join_time;
+
+    uint64_t primary_key() const { return join_id; }
+    EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time))
+  };
+
+  typedef multi_index<name("pendingcands"), pending_candidate> pending_candidates_table;
+
+  typedef multi_index<name("arbitrators"), arbitrator> arbitrators_table;
+
+  typedef multi_index<name("casefiles"), casefile> casefiles_table;
+
+  typedef multi_index<name("joinedcases"), joinder> joinders_table;
+
+  typedef multi_index<name("evidence"), evidence> evidence_table;
+
+  typedef singleton<name("config"), config> config_singleton;
   config_singleton configs;
   config _config;
 
-  typedef multi_index<"pendingcands"_n, pending_candidate> pending_candidates_table;
-
-  typedef multi_index<"arbitrators"_n, arbitrator> arbitrators_table;
-
-  typedef multi_index<"casefiles"_n, casefile> casefiles_table;
-
-  typedef multi_index<"joinedcases"_n, joinder> joinders_table;
-
-  typedef multi_index<"evidence"_n, evidence> evidence_table;
-
-#pragma endregion Tables
+#pragma endregion Tables and Structs
 
 
   void validate_ipfs_url(string ipfs_url);

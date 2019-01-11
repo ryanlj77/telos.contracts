@@ -15,32 +15,32 @@ arbitration::~arbitration() {
   if (configs.exists()) configs.set(_config, get_self());
 }
 
-void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees) {
-  require_auth("eosio"_n);
+void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees) {
+  require_auth(name("eosio"));
   
   eosio_assert(max_elected_arbs > uint16_t(0), "Arbitrators must be greater than 0");
-  _config = config{get_self(),       // publisher
-                   max_elected_arbs,
-                   election_duration,
-                   start_election,
-                   fees,
-                   arbitrator_term_length,
-                   now(),
-                   _config.ballot_id,
-                   _config.auto_start_election
-                   };
+  _config = config{
+                    get_self(), //publisher
+                    fees, //fee_structure
+                    max_elected_arbs, //max_elected_arbs
+                    election_duration, //election_duration
+                    election_start, //election_start
+                    _config.auto_start_election,
+                    _config.current_ballot_id,
+                    arbitrator_term_length
+                  };
 
   //print("\nSettings Configured: SUCCESS");
 }
 
 void arbitration::initelection() {
-  require_auth("eosio"_n);
+  require_auth(name("eosio"));
 
   eosio_assert(!_config.auto_start_election, "Election is on auto start mode.");
 
-  ballots_table ballots("eosio.trail"_n, "eosio.trail"_n.value);
+  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
   
-  _config.ballot_id = ballots.available_primary_key();
+  _config.current_ballot_id = ballots.available_primary_key();
   
   _config.auto_start_election = true;
 
@@ -63,17 +63,17 @@ void arbitration::candaddlead( name candidate, string creds_ipfs_url )  {
   auto c = candidates.find(candidate.value);
   eosio_assert(c != candidates.end(), "Candidate isn't an applicant. Use regcand action to register candidate");
 
-  ballots_table ballots("eosio.trail"_n, "eosio.trail"_n.value);
-  auto b = ballots.get(_config.ballot_id, "ballot doesn't exist");
+  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
+  auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
 
-  leaderboards_table leaderboards("eosio.trail"_n, "eosio.trail"_n.value);
+  leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
   auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
 
   eosio_assert(board.status != uint8_t(CLOSED), "A new election hasn't started. Use initelection action to start a new election.");
   
-  action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "addcandidate"_n,
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
         make_tuple(get_self(), 
-          _config.ballot_id, 
+          _config.current_ballot_id, 
           candidate, 
           creds_ipfs_url
         )
@@ -95,7 +95,7 @@ void arbitration::regcand( name candidate, string creds_ipfs_url ) {
   auto arb = arbitrators.find(candidate.value);
 
   if (arb != arbitrators.end()) {
-    eosio_assert(now() > arb->term_length, "Candidate is already an Arbitrator and the seat isn't expired");
+    eosio_assert(now() > arb->term_expiration, "Candidate is already an Arbitrator and the seat isn't expired");
 
     arbitrators.modify(arb, same_payer, [&](auto &a) {
       a.arb_status = SEAT_EXPIRED;
@@ -103,9 +103,9 @@ void arbitration::regcand( name candidate, string creds_ipfs_url ) {
   }
 
   candidates.emplace(_self, [&](auto &c) {
-    c.cand_name = candidate;
-    c.credential_link = creds_ipfs_url;
-    c.applied_time = now();
+    c.candidate_name = candidate;
+    c.credentials_link = creds_ipfs_url;
+    c.application_time = now();
   });
 }
 
@@ -117,9 +117,9 @@ void arbitration::candrmvlead( name candidate ) {
 
   eosio_assert(c != candidates.end(), "Candidate isn't an applicant.");
 
-  action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "rmvcandidate"_n,
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("rmvcandidate"),
     make_tuple(get_self(), 
-      _config.ballot_id, 
+      _config.current_ballot_id, 
       candidate
     )
   ).send();
@@ -135,10 +135,10 @@ void arbitration::unregcand( name candidate ) {
 
   eosio_assert(c != candidates.end(), "Candidate isn't an applicant");
 
-  ballots_table ballots("eosio.trail"_n, "eosio.trail"_n.value);
-  auto b = ballots.get(_config.ballot_id, "ballot doesn't exist");
+  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
+  auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
 
-  leaderboards_table leaderboards("eosio.trail"_n, "eosio.trail"_n.value);
+  leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
   auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
 
   //TODO: assert candidate is on leaderboard
@@ -150,10 +150,10 @@ void arbitration::unregcand( name candidate ) {
 void arbitration::endelection( name candidate ) {
    require_auth(candidate);
    
-   ballots_table ballots("eosio.trail"_n, "eosio.trail"_n.value);
-   auto b = ballots.get(_config.ballot_id, "ballot doesn't exist");
+   ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
+   auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
 
-   leaderboards_table leaderboards("eosio.trail"_n, "eosio.trail"_n.value);
+   leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
    auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
    
    eosio_assert(now() > board.end_time, 
@@ -216,7 +216,7 @@ void arbitration::endelection( name candidate ) {
       // add current arbitrators to permission list
       for(const auto &a : arbitrators) {
         if(a.arb_status != uint16_t(SEAT_EXPIRED)) {
-          arbs_perms.emplace_back( permission_level_weight { permission_level{  a.arb,  "active"_n }, 1 });
+          arbs_perms.emplace_back( permission_level_weight { permission_level{  a.arb,  name("active") }, 1 });
         }
       }
 
@@ -227,7 +227,7 @@ void arbitration::endelection( name candidate ) {
       if(arbs_perms.size() > 0) {
          uint32_t weight = arbs_perms.size() > 3 ? ((( 2 * arbs_perms.size() ) / uint32_t(3)) + 1) : 1;
       
-         action(permission_level{get_self(), "owner"_n }, "eosio"_n, "updateauth"_n,
+         action(permission_level{get_self(), name("owner") }, name("eosio"), name("updateauth"),
               std::make_tuple(
                 get_self(), 
                 name("major"), 
@@ -244,10 +244,10 @@ void arbitration::endelection( name candidate ) {
    } 
 
    // close ballot action.
-   action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "closeballot"_n, 
+   action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("closeballot"), 
             make_tuple(
                get_self(), 
-               _config.ballot_id, 
+               _config.current_ballot_id, 
                uint8_t(CLOSED)
                )
          ).send(); 
@@ -258,16 +258,16 @@ void arbitration::endelection( name candidate ) {
    auto remaining_candidates = distance(candidates.begin(), candidates.end());
 
    if ( remaining_candidates > 0 && has_available_seats(arbitrators, available_seats) ) {
-      _config.ballot_id = ballots.available_primary_key();
+      _config.current_ballot_id = ballots.available_primary_key();
       
       start_new_election(available_seats);
 
       for (const auto &c : candidates) {
-         action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "addcandidate"_n,
+         action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
             make_tuple(get_self(), 
-               _config.ballot_id, 
+               _config.current_ballot_id, 
                c, 
-               c.credential_link
+               c.credentials_link
             )
          ).send(); 
       }
@@ -280,13 +280,13 @@ void arbitration::endelection( name candidate ) {
    }
 }
 
-/*
-void arbitration::filecase(name claimant, uint16_t class_suggestion, string ev_ipfs_url) {
+//TODO: update casefile emplacement
+void arbitration::filecase(name claimant, uint8_t class_suggestion, string ev_ipfs_url) {
   require_auth(claimant);
 	eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14"); //TODO: improve this message to include directions
 	validate_ipfs_url(ev_ipfs_url);
 
-	action(permission_level{ claimant, "active"_n}, "eosio.token"_n, "transfer"_n, make_tuple(
+	action(permission_level{ claimant, name("active")}, name("eosio.token"), name("transfer"), make_tuple(
 		claimant,
 		get_self(),
 		asset(int64_t(1000000), symbol("TLOS", 4)), //TODO: Check initial filing fee
@@ -297,21 +297,22 @@ void arbitration::filecase(name claimant, uint16_t class_suggestion, string ev_i
   vector<name> arbs; //empty vector of arbitrator accounts
 	vector<claim> claims;
 	auto case_id = casefiles.available_primary_key();
-    casefiles.emplace(_self, [&]( auto& a ){
-        a.case_id = case_id;
-        a.claimant = claimant;
-		    a.respondant = name(0);
-        a.claims = claims;
-        a.arbitrators = arbs;
-        a.case_status = CASE_SETUP;
-        a.last_edit = now();
-    });
+  // casefiles.emplace(_self, [&]( auto& a ){
+  //     a.case_id = case_id;
+  //     a.claimant = claimant;
+  //     a.respondant = name(0);
+  //     a.claims = claims;
+  //     a.arbitrators = arbs;
+  //     a.case_status = CASE_SETUP;
+  //     a.last_edit = now();
+  // });
 
-	addclaim(case_id, class_suggestion, ev_ipfs_url, claimant);
+	// addclaim(case_id, class_suggestion, ev_ipfs_url, claimant);
 
   print("\nCased Filed!");
 } 
 
+//TODO: update c.claimant to vector of claimants
 void arbitration::addclaim(uint64_t case_id, uint16_t class_suggestion, string ev_ipfs_url, name claimant) { 
   require_auth(claimant);
 	eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14"); //TODO: improve this message to include directions
@@ -321,7 +322,7 @@ void arbitration::addclaim(uint64_t case_id, uint16_t class_suggestion, string e
 	auto c = casefiles.get(case_id, "Case Not Found");
 	print("\nProposal Found!");
 
-	require_auth(c.claimant);
+	//require_auth(c.claimant);
 	eosio_assert(c.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
 
 	vector<uint64_t> accepted_ev_ids;
@@ -335,13 +336,14 @@ void arbitration::addclaim(uint64_t case_id, uint16_t class_suggestion, string e
 	print("\nClaim Added!");
 }
 
+//TODO: update c.claimant to vector of claimants
 void arbitration::removeclaim(uint64_t case_id, uint16_t claim_num, name claimant) {
   require_auth(claimant);
 
 	casefiles_table casefiles(_self, _self.value);
 	auto c = casefiles.get(case_id, "Case Not Found");
 	
-	require_auth(c.claimant);
+	//require_auth(c.claimant);
 	eosio_assert(c.case_status == CASE_SETUP, "claims cannot be removed after CASE_SETUP is complete.");
 
 	vector<claim> new_claims = c.claims;
@@ -356,6 +358,7 @@ void arbitration::removeclaim(uint64_t case_id, uint16_t claim_num, name claiman
 	print("\nClaim Removed!");
 }
 
+//TODO: update c.claimant to vector of claimants
 void arbitration::shredcase(uint64_t case_id, name claimant) {
   require_auth(claimant);
 
@@ -364,7 +367,7 @@ void arbitration::shredcase(uint64_t case_id, name claimant) {
   print("\nProposal Found!");
   eosio_assert(c_itr != casefiles.end(), "Case Not Found");
 
-  require_auth(c_itr->claimant);
+  //require_auth(c_itr->claimants);
   eosio_assert(c_itr->case_status == CASE_SETUP, "cases can only be shredded during CASE_SETUP");
 
   casefiles.erase(c_itr);
@@ -372,13 +375,14 @@ void arbitration::shredcase(uint64_t case_id, name claimant) {
   print("\nCase Shredded!");
 }
 
+//TODO: update c.claimant to vector of claimants
 void arbitration::readycase(uint64_t case_id, name claimant) {
   require_auth(claimant);
 
   casefiles_table casefiles(_self, _self.value);
   auto c = casefiles.get(case_id, "Case Not Found");
 
-  require_auth(c.claimant);
+  //require_auth(c.claimant);
   eosio_assert(c.case_status == CASE_SETUP, "cases can only be readied during CASE_SETUP");
   eosio_assert(c.claims.size() >= 1, "cases must have atleast one claim");
 
@@ -400,11 +404,11 @@ void arbitration::closecase(uint64_t case_id, name arb, string ipfs_url) {
   auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
   eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
 
-  auto new_ipfs_list = c.findings_ipfs;
+  auto new_ipfs_list = c.result_links;
   new_ipfs_list.emplace_back(ipfs_url);
 
   casefiles.modify(c, same_payer, [&](auto &cf) {
-    cf.findings_ipfs = new_ipfs_list;
+    cf.result_links = new_ipfs_list;
     cf.case_status = COMPLETE;
     cf.last_edit = now();
   });
@@ -423,11 +427,11 @@ void arbitration::dismisscase(uint64_t case_id, name arb, string ipfs_url) {
   eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
   eosio_assert(c.case_status == CASE_INVESTIGATION, "case is dismissed or complete");
 
-  auto new_ipfs_list = c.findings_ipfs;
+  auto new_ipfs_list = c.result_links;
   new_ipfs_list.emplace_back(ipfs_url);
 
   casefiles.modify(c, same_payer, [&](auto &cf) {
-    cf.findings_ipfs = new_ipfs_list;
+    cf.result_links = new_ipfs_list;
     cf.case_status = DISMISSED;
     cf.last_edit = now();
   });
@@ -461,13 +465,13 @@ void arbitration::dismissev(uint64_t case_id, uint16_t claim_index, uint16_t ev_
     cf.last_edit = now();
   });
 
-  dismissed_evidence_table d_evidences(_self, _self.value);
-  auto dev_id = d_evidences.available_primary_key();
+  // dismissed_evidence_table d_evidences(_self, _self.value);
+  // auto dev_id = d_evidences.available_primary_key();
+  // d_evidences.emplace(_self, [&](auto &dev) {
+  //   dev.ev_id = dev_id;
+  //   dev.ipfs_url = ipfs_url;
+  // });
 
-  d_evidences.emplace(_self, [&](auto &dev) {
-    dev.ev_id = dev_id;
-    dev.ipfs_url = ipfs_url;
-  });
   print("\nEvidence dismissed");
 }
 
@@ -585,7 +589,7 @@ void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
 }
 
 void arbitration::dismissarb(name arb) {
-  require_auth2(arb.value, "active"_n.value); // REQUIRES 2/3+1 Vote from eosio.prods for MSIG
+  require_auth2(arb.value, name("active").value); // REQUIRES 2/3+1 Vote from eosio.prods for MSIG
   // require_auth2("eosio.prods"_n.value, "active"_n.value); //REQUIRES 2/3+1
   // Vote from eosio.prods for MSIG
 
@@ -600,7 +604,7 @@ void arbitration::dismissarb(name arb) {
 
   print("\nArbitrator Dismissed!");
 }
-*/
+
 #pragma region Helper_Functions
 
 void arbitration::validate_ipfs_url(string ipfs_url) {
@@ -611,23 +615,25 @@ arbitration::config arbitration::get_default_config() {
   vector<int64_t> fees{100000, 200000, 300000};
   auto c = config{
       get_self(),  // publisher
+      fees,        // fee_structure
       uint16_t(0), // max_elected_arbs
       uint32_t(0), // election_duration
-      uint32_t(0), // start_election
-      fees,        // fee_structure
-      uint32_t(0), // arbitrator_term_length
-      now()        // last_time_edited
+      uint32_t(0), // election_start
+      bool(0),     // auto_start_election
+      uint64_t(0), // current_ballot_id
+      uint32_t(0)  // arb_term_length
   };
+
   configs.set(c, get_self());
 
   return c;
 }
 
 void arbitration::start_new_election(uint8_t available_seats) {
-  uint32_t begin_time = now() + _config.start_election;
+  uint32_t begin_time = now() + _config.election_start;
   uint32_t end_time = begin_time + _config.election_duration;
 
-  action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "regballot"_n,
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("regballot"),
          make_tuple(get_self(),         // publisher
                     uint8_t(2),         // ballot_type (2 == leaderboard)
                     symbol("VOTE", 4),  // voting_symbol
@@ -637,9 +643,9 @@ void arbitration::start_new_election(uint8_t available_seats) {
                   )
                 ).send();
 
-  action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "setseats"_n,
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("setseats"),
          make_tuple(get_self(),
-          _config.ballot_id, 
+          _config.current_ballot_id, 
           available_seats
         )
       ).send();
@@ -652,7 +658,7 @@ bool arbitration::has_available_seats(arbitrators_table &arbitrators, uint8_t &a
   
   for (auto &arb : arbitrators) {
     // check if arb seat is expired
-    if (now() > arb.term_length && arb.arb_status != uint16_t(SEAT_EXPIRED)) {
+    if (now() > arb.term_expiration && arb.arb_status != uint16_t(SEAT_EXPIRED)) {
       arbitrators.modify(arb, same_payer, [&](auto &a) {
         a.arb_status = uint16_t(SEAT_EXPIRED);
       });
@@ -672,24 +678,24 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
     arbitrators.emplace(_self, [&](auto &a) {
       a.arb = arb_name;
       a.arb_status = uint16_t(UNAVAILABLE);
-      a.term_length = now() + _config.arbitrator_term_length;
+      a.term_expiration = now() + _config.arb_term_length;
       a.open_case_ids = vector<uint64_t>();
       a.closed_case_ids = vector<uint64_t>();
-      a.credential_link = credential_link;
+      a.credentials_link = credential_link;
     });
   } else {
     arbitrators.modify(arb, same_payer, [&](auto &a){
       a.arb_status = uint16_t(UNAVAILABLE);
-      a.term_length = now() + _config.arbitrator_term_length;
-      a.credential_link = credential_link;
+      a.term_expiration = now() + _config.arb_term_length;
+      a.credentials_link = credential_link;
     });
   }
 }
 
 #pragma endregion Helper_Functions
 
-EOSIO_DISPATCH( arbitration, (setconfig)(initelection)(candaddlead)(regcand)
+EOSIO_DISPATCH(arbitration, (setconfig)(initelection)(candaddlead)(regcand)
                              (unregcand)(candrmvlead)(endelection)
-                             /*(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
+                             (filecase)(addclaim)(removeclaim)(shredcase)(readycase)
                              (dismisscase)(closecase)(dismissev)(acceptev)
-                             (arbstatus)(casestatus)(changeclass)(recuse)(dismissarb)*/ )
+                             (arbstatus)(casestatus)(changeclass)(recuse)(dismissarb))
