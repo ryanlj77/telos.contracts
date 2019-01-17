@@ -38,13 +38,10 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 
 void arbitration::initelection() {
   require_auth(name("eosio"));
-
   eosio_assert(!_config.auto_start_election, "Election is on auto start mode.");
 
   ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
-  
   _config.current_ballot_id = ballots.available_primary_key();
-  
   _config.auto_start_election = true;
 
   arbitrators_table arbitrators(_self, _self.value);
@@ -54,71 +51,88 @@ void arbitration::initelection() {
     start_new_election(available_seats);
   }
 
-  print("\nElection started: SUCCESS");
+  // print("\nElection started: SUCCESS");
 }
 
-void arbitration::candaddlead( name candidate, string creds_ipfs_url )  {
+void arbitration::regcand(name candidate, string credentials_link) {
   require_auth(candidate);
-  validate_ipfs_url(creds_ipfs_url);
-  eosio_assert(_config.auto_start_election, "there is no active election");
+  validate_ipfs_url(credentials_link);
 
-  pending_candidates_table candidates(_self, _self.value);
-  auto c = candidates.find(candidate.value);
-  eosio_assert(c != candidates.end(), "Candidate isn't an applicant. Use regcand action to register candidate");
-
-  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
-  auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
-
-  leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
-  auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
-
-  eosio_assert(board.status != uint8_t(CLOSED), "A new election hasn't started. Use initelection action to start a new election.");
+  candidates_table candidates(get_self(), get_self().value);
+  auto cand_itr = candidates.find(candidate.value);
+  eosio_assert(cand_itr == candidates.end(), "Candidate is already an applicant");
   
-  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
-        make_tuple(get_self(), 
-          _config.current_ballot_id, 
-          candidate, 
-          creds_ipfs_url
-        )
-      ).send();
-  
-  print("\nArb Application: SUCCESS");
-}
+  arbitrators_table arbitrators(get_self(), get_self().value);
+  auto arb_itr = arbitrators.find(candidate.value);
 
-void arbitration::regcand( name candidate, string creds_ipfs_url ) {
-  require_auth(candidate);
-  validate_ipfs_url(creds_ipfs_url);
+  if (arb_itr != arbitrators.end()) {
+    eosio_assert(now() > arb_itr->term_expiration, "Candidate is already an Arbitrator and the seat isn't expired");
 
-  pending_candidates_table candidates(_self, _self.value);
-
-  auto c = candidates.find(candidate.value);
-  eosio_assert(c == candidates.end(), "Candidate is already an applicant");
-  
-  arbitrators_table arbitrators(_self, _self.value);
-  auto arb = arbitrators.find(candidate.value);
-
-  if (arb != arbitrators.end()) {
-    eosio_assert(now() > arb->term_expiration, "Candidate is already an Arbitrator and the seat isn't expired");
-
-    arbitrators.modify(arb, same_payer, [&](auto &a) {
-      a.arb_status = SEAT_EXPIRED;
+    //NOTE: set arb_status to SEAT_EXPIRED until re-election
+    arbitrators.modify(arb_itr, same_payer, [&](auto &row) {
+      row.arb_status = SEAT_EXPIRED;
     });
   }
 
-  candidates.emplace(_self, [&](auto &c) {
-    c.candidate_name = candidate;
-    c.credentials_link = creds_ipfs_url;
-    c.application_time = now();
+  candidates.emplace(get_self(), [&](auto &row) {
+    row.candidate_name = candidate;
+    row.credentials_link = credentials_link;
+    row.application_time = now();
   });
 }
 
-void arbitration::candrmvlead( name candidate ) {
+void arbitration::unregcand(name candidate) {
+  require_auth(candidate);
+
+  candidates_table candidates(get_self(), get_self().value);
+  auto cand_itr = candidates.find(candidate.value);
+  eosio_assert(cand_itr != candidates.end(), "Candidate isn't an applicant");
+
+  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
+  auto bal = ballots.get(_config.current_ballot_id, "Ballot doesn't exist");
+
+  leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
+  auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
+
+  //TODO: assert candidate is on leaderboard?
+  eosio_assert(now() < board.begin_time, "Cannot unregister while election is in progress");
+
+  candidates.erase(cand_itr);
+}
+
+void arbitration::candaddlead(name candidate, string credentials_link) {
+  require_auth(candidate);
+  validate_ipfs_url(credentials_link);
+  eosio_assert(_config.auto_start_election, "there is no active election");
+
+  candidates_table candidates(_self, _self.value);
+  auto cand_itr = candidates.find(candidate.value);
+  eosio_assert(cand_itr != candidates.end(), "Candidate isn't an applicant. Use regcand action to register as a candidate");
+
+  ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
+  auto bal = ballots.get(_config.current_ballot_id, "Ballot doesn't exist");
+
+  leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
+  auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
+  eosio_assert(board.status != CLOSED, "A new election hasn't started. Use initelection action to start a new election.");
+  
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
+    make_tuple(get_self(), 
+      _config.current_ballot_id, 
+      candidate, 
+      credentials_link
+    )
+  ).send();
+  
+  //print("\nArb Application: SUCCESS");
+}
+
+void arbitration::candrmvlead(name candidate) {
   require_auth(candidate);
   
-  pending_candidates_table candidates(_self, _self.value);
-  auto c = candidates.find(candidate.value);  
-
-  eosio_assert(c != candidates.end(), "Candidate isn't an applicant.");
+  candidates_table candidates(get_self(), get_self().value);
+  auto cand_itr = candidates.find(candidate.value);
+  eosio_assert(cand_itr != candidates.end(), "Candidate isn't an applicant.");
 
   action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("rmvcandidate"),
     make_tuple(get_self(), 
@@ -127,160 +141,139 @@ void arbitration::candrmvlead( name candidate ) {
     )
   ).send();
   
-  print("\nCancel Application: SUCCESS");
+  //print("\nCancel Application: SUCCESS");
 }
 
-void arbitration::unregcand( name candidate ) {
+void arbitration::endelection(name candidate) {
   require_auth(candidate);
-
-  pending_candidates_table candidates(_self, _self.value);
-  auto c = candidates.find(candidate.value);
-
-  eosio_assert(c != candidates.end(), "Candidate isn't an applicant");
-
+   
   ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
-  auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
+  auto bal = ballots.get(_config.current_ballot_id, "Ballot doesn't exist");
 
   leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
-  auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
+  auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
+  
+  eosio_assert(now() > board.end_time, 
+    std::string("Election hasn't ended. Please check again after the election is over in"
+    + std::to_string(uint32_t(board.end_time - now())) //TODO: convert to minutes for error message?
+    + " seconds").c_str()
+  );
+  
+  //sort board candidates by votes
+  auto board_candidates = board.candidates;
+  sort(board_candidates.begin(), board_candidates.end(), [](const auto &c1, const auto &c2) { return c1.votes > c2.votes; });
+  
+  //resolve tie clonficts
+  if(board_candidates.size() > board.available_seats) {      
+    auto first_cand_out = board_candidates[board.available_seats];
+    board_candidates.resize(board.available_seats);
+    
+    //count candidates that are tied with first_cand_out
+    uint8_t tied_cands = 0;
+    for(int i = board_candidates.size() - 1; i >= 0; i--) {
+      if(board_candidates[i].votes == first_cand_out.votes) 
+        tied_cands++;
+    }
 
-  //TODO: assert candidate is on leaderboard
-  eosio_assert(now() < board.begin_time, "Cannot unregister while election is in progress");
+    //remove all tied candidates
+    if(tied_cands > 0) board_candidates.resize(board_candidates.size() - tied_cands);
+  }
 
-  candidates.erase(c);
-}
+  candidates_table candidates(get_self(), get_self().value);
+  auto cand_itr = candidates.find(candidate.value);
+  eosio_assert(cand_itr != candidates.end(), "Candidate isn't an applicant.");
+  
+  arbitrators_table arbitrators(get_self(), get_self().value);
+  std::vector<permission_level_weight> arbs_perms;  
 
-void arbitration::endelection( name candidate ) {
-   require_auth(candidate);
-   
-   ballots_table ballots(name("eosio.trail"), name("eosio.trail").value);
-   auto b = ballots.get(_config.current_ballot_id, "ballot doesn't exist");
-
-   leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
-   auto board = leaderboards.get(b.reference_id, "leaderboard doesn't exist");
-   
-   eosio_assert(now() > board.end_time, 
-   std::string("election isn't ended. Please check again in "
-   + std::to_string( uint32_t( board.end_time - now() ))
-   + " seconds").c_str() );
-   
-   // sort board candidates by votes
-   auto board_candidates = board.candidates;
-
-   sort(board_candidates.begin(), board_candidates.end(), [](const auto &c1, const auto &c2) { return c1.votes > c2.votes; });
-   
-   //resolve tie clonficts.
-   if(board_candidates.size() > board.available_seats) {      
-      auto first_cand_out = board_candidates[board.available_seats];
-      board_candidates.resize(board.available_seats);
-      
-      // count candidates that are tied with first_cand_out
-      uint8_t tied_cands = 0;
-      for(int i = board_candidates.size() - 1; i >= 0; i--) {
-        if(board_candidates[i].votes == first_cand_out.votes) 
-          tied_cands++;
-      }
-
-      // remove all tied candidates
-      if(tied_cands > 0) board_candidates.resize(board_candidates.size() - tied_cands);
-   }
-
-   pending_candidates_table candidates(_self, _self.value);
-   
-   auto cand = candidates.find(candidate.value);
-   eosio_assert(cand != candidates.end(), "Candidate isn't an applicant.");
-   
-   arbitrators_table arbitrators(_self, _self.value);
-   
-   std::vector<permission_level_weight> arbs_perms;  
-
-   // in case there are still candidates (not all tied)
-   if(board_candidates.size() > 0) {
-      for (int i = 0; i < board_candidates.size(); i++) {
-         name cand_name = board_candidates[i].member;  
-         auto c = candidates.find(cand_name.value);
-         
-         if (c != candidates.end()) {
-            auto cand_credential = board_candidates[i].info_link;
-            auto cand_votes = board_candidates[i].votes;
+  //in case there are still candidates (not all tied)
+  if(board_candidates.size() > 0) {
+    for (int i = 0; i < board_candidates.size(); i++) {
+        name cand_name = board_candidates[i].member;  
+        auto c = candidates.find(cand_name.value);
+        
+        if (c != candidates.end()) {
+          auto cand_credential = board_candidates[i].info_link;
+          auto cand_votes = board_candidates[i].votes;
+        
+          if(cand_votes == asset(0, cand_votes.symbol)) continue;
           
-            if(cand_votes == asset(0, cand_votes.symbol)) continue;
-            
-            // remove candidates from candidates table / arbitration contract
-            candidates.erase(c);
-            
-            // add candidates to arbitration table / arbitration contract
-            add_arbitrator(arbitrators, cand_name, cand_credential);
-         } else {
-            print("\ncandidate: ", name{cand_name}, " was not found.");
-         }
-      }
-
-      // add current arbitrators to permission list
-      for(const auto &a : arbitrators) {
-        if(a.arb_status != uint16_t(SEAT_EXPIRED)) {
-          arbs_perms.emplace_back( permission_level_weight { permission_level{  a.arb,  name("active") }, 1 });
+          //remove candidates from candidates table / arbitration contract
+          candidates.erase(c);
+          
+          //add candidates to arbitration table / arbitration contract
+          add_arbitrator(arbitrators, cand_name, cand_credential);
+        } else {
+          print("\ncandidate: ", name{cand_name}, " was not found."); //TODO: remove?
         }
+    }
+
+    //add current arbitrators to permission list
+    for(const auto &a : arbitrators) {
+      if(a.arb_status != SEAT_EXPIRED) {
+        arbs_perms.emplace_back(permission_level_weight{ permission_level{a.arb, name("active") }, 1 });
       }
+    }
 
-      // permissions need to be sorted 
-      sort(arbs_perms.begin(), arbs_perms.end(), [](const auto &first, const auto &second) { return first.permission.actor.value < second.permission.actor.value; });
+    //permissions need to be sorted 
+    sort(arbs_perms.begin(), arbs_perms.end(), [](const auto &first, const auto &second) { return first.permission.actor.value < second.permission.actor.value; });
 
-      // review update auth permissions and weights.
-      if(arbs_perms.size() > 0) {
-         uint32_t weight = arbs_perms.size() > 3 ? ((( 2 * arbs_perms.size() ) / uint32_t(3)) + 1) : 1;
-      
-         action(permission_level{get_self(), name("owner") }, name("eosio"), name("updateauth"),
-              std::make_tuple(
-                get_self(), 
-                name("major"), 
-                name("owner"),
-                authority {
-                    weight, 
-                    std::vector<key_weight>{},
-                    arbs_perms,
-                    std::vector<wait_weight>{}
-                    }
-                )
-          ).send(); 
-      } 
-   } 
+    //review update auth permissions and weights.
+    if(arbs_perms.size() > 0) {
+      uint32_t weight = arbs_perms.size() > 3 ? ((( 2 * arbs_perms.size() ) / uint32_t(3)) + 1) : 1;
+  
+      action(permission_level{get_self(), name("owner")}, name("eosio"), name("updateauth"),
+        std::make_tuple(
+          get_self(), 
+          name("major"), 
+          name("owner"),
+          authority {
+            weight, 
+            std::vector<key_weight>{},
+            arbs_perms,
+            std::vector<wait_weight>{}
+          }
+        )
+      ).send();
+    }
+  }
 
-   // close ballot action.
-   action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("closeballot"), 
-            make_tuple(
-               get_self(), 
-               _config.current_ballot_id, 
-               uint8_t(CLOSED)
-               )
-         ).send(); 
+  //close ballot action.
+  action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("closeballot"), 
+    make_tuple(
+      get_self(), 
+      _config.current_ballot_id, 
+      CLOSED
+    )
+  ).send(); 
 
-   // start new election with remaining candidates 
-   // and new candidates that registered after past election had started.
-   uint8_t available_seats = 0;
-   auto remaining_candidates = distance(candidates.begin(), candidates.end());
+  //start new election with remaining candidates 
+  //and new candidates that registered after past election had started.
+  uint8_t available_seats = 0;
+  auto remaining_candidates = distance(candidates.begin(), candidates.end());
 
-   if ( remaining_candidates > 0 && has_available_seats(arbitrators, available_seats) ) {
-      _config.current_ballot_id = ballots.available_primary_key();
-      
-      start_new_election(available_seats);
+  if (remaining_candidates > 0 && has_available_seats(arbitrators, available_seats)) {
+    _config.current_ballot_id = ballots.available_primary_key();
+    
+    start_new_election(available_seats);
 
-      for (const auto &c : candidates) {
-         action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
-            make_tuple(get_self(), 
-               _config.current_ballot_id, 
-               c, 
-               c.credentials_link
-            )
-         ).send(); 
-      }
-      
-      print("\nA new election has started.");
-   } else {
-      for(auto i = candidates.begin(); i != candidates.end(); i = candidates.erase(i));
-      _config.auto_start_election = false;
-      print("\nThere aren't enough seats available or candidates to start a new election.\nUse init action to start a new election.");
-   }
+    for (const auto &c : candidates) {
+      action(permission_level{get_self(), name("active")}, name("eosio.trail"), name("addcandidate"),
+        make_tuple(
+          get_self(), 
+          _config.current_ballot_id, 
+          c, 
+          c.credentials_link
+        )
+      ).send(); 
+    }
+    
+    //print("\nA new election has started.");
+  } else {
+    for(auto i = candidates.begin(); i != candidates.end(); i = candidates.erase(i));
+    _config.auto_start_election = false;
+    //print("\nThere aren't enough seats available or candidates to start a new election.\nUse init action to start a new election.");
+  }
 }
 
 #pragma endregion Arb_Elections

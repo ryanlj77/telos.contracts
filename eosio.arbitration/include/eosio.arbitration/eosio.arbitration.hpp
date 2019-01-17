@@ -96,13 +96,13 @@ public:
   void initelection();
 
   [[eosio::action]]
-  void regcand(name candidate, string creds_ipfs_url);
+  void regcand(name candidate, string credentials_link);
 
   [[eosio::action]]
   void unregcand(name candidate);
 
   [[eosio::action]]
-  void candaddlead(name candidate, string creds_ipfs_url);
+  void candaddlead(name candidate, string credentials_link);
   
   [[eosio::action]]
   void candrmvlead(name candidate);
@@ -333,7 +333,7 @@ protected:
     EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time)(joined_by))
   };
 
-  typedef multi_index<name("pendingcands"), candidate> pending_candidates_table;
+  typedef multi_index<name("candidates"), candidate> candidates_table;
 
   typedef multi_index<name("arbitrators"), arbitrator> arbitrators_table;
 
