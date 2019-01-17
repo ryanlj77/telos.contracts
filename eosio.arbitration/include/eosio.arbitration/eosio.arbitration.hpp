@@ -136,12 +136,12 @@ public:
 
 #pragma endregion Case_Setup
 
-#pragma region Arb_Only
+#pragma region Arb_Actions
 
   //TODO: Set case respondant action
   //TODO: require rationale?
   [[eosio::action]]
-  void dismisscase(uint64_t case_id, name arb, string ipfs_url);
+  void dismisscase(uint64_t case_id, name arb, string ipfs_link);
 
   //TODO: require decision?
   [[eosio::action]]
@@ -173,7 +173,7 @@ public:
   [[eosio::action]]
   void recuse(uint64_t case_id, string rationale, name arb);
 
-#pragma endregion Arb_Only
+#pragma endregion Arb_Actions
 
 #pragma region BP_Multisig_Actions
 
@@ -349,6 +349,8 @@ protected:
 
 #pragma endregion Tables and Structs
 
+#pragma region Helpers
+
   bool is_claimant(name claimant, vector<name> list);
 
   void validate_ipfs_url(string ipfs_url);
@@ -360,5 +362,7 @@ protected:
   bool has_available_seats(arbitrators_table &arbitrators, uint8_t &available_seats);
 
   void add_arbitrator(arbitrators_table &arbitrators, name arb_name, std::string credential_link);
+
+#pragma endregion Helpers
 
 };

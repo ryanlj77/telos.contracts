@@ -7,6 +7,7 @@
 
 #include <eosio.arbitration/eosio.arbitration.hpp>
 
+
 arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds), configs(_self, _self.value) {
   _config = configs.exists() ? configs.get() : get_default_config();
 }
@@ -416,6 +417,8 @@ void arbitration::readycase(uint64_t case_id, name claimant) {
 #pragma endregion Case_Setup
 
 
+#pragma region Arb_Actions
+
 void arbitration::closecase(uint64_t case_id, name arb, string ipfs_url) {
   require_auth(arb);
   validate_ipfs_url(ipfs_url);
@@ -627,6 +630,8 @@ void arbitration::dismissarb(name arb) {
 
   print("\nArbitrator Dismissed!");
 }
+
+#pragma endregion Arb_Actions
 
 #pragma region Helper_Functions
 
