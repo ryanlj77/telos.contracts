@@ -23,16 +23,18 @@ public:
   
   #pragma region Enums
 
+  //TODO: describe each enum in README
+
   enum case_state : uint8_t {
     CASE_SETUP,         // 0
     AWAITING_ARBS,      // 1
     CASE_INVESTIGATION, // 2
-    DISMISSED,          // 3
+    DISMISSED,          // 3 NOTE: Dismissed cases stop here. Claims are unfounded.
     HEARING,            // 4
     DELIBERATION,       // 5
     DECISION,           // 6 NOTE: No more joinders allowed
     ENFORCEMENT,        // 7
-    COMPLETE            // 8
+    RESOLVED            // 8
   };
 
   enum claim_class : uint8_t {
@@ -68,15 +70,15 @@ public:
   };
 
   enum lang_code : uint8_t {
-    ENGL, //English 
-    FRCH, //French
-    GRMN, //German
-    KREA, //Korean
-    JAPN, //Japanese
-    CHNA, //Chinese
-    SPAN, //Spanish
-    PGSE, //Portuguese
-    SWED //Swedish
+    ENGL, //0 English 
+    FRCH, //1 French
+    GRMN, //2 German
+    KREA, //3 Korean
+    JAPN, //4 Japanese
+    CHNA, //5 Chinese
+    SPAN, //6 Spanish
+    PGSE, //7 Portuguese
+    SWED //8 Swedish
   };
 
 #pragma endregion Enums
@@ -114,20 +116,21 @@ public:
 
   //NOTE: filing a case doesn't require a respondent
   [[eosio::action]]
-  void filecase(name claimant, uint8_t class_suggestion, string ev_ipfs_url);
+  void filecase(name claimant, string claim_link);
 
   //NOTE: adds subsequent claims to a case
   [[eosio::action]]
-  void addclaim( uint64_t case_id, uint16_t class_suggestion, string ev_ipfs_url, name claimant);
+  void addclaim(uint64_t case_id, string claim_link, name claimant);
 
-  //NOTE: Claims can only be removed by a claimant during case setup. Enforce they have atleast one claim before awaiting arbs.
+  //NOTE: claims can only be removed by a claimant during case setup
   [[eosio::action]]
-  void removeclaim(uint64_t case_id, uint16_t claim_num, name claimant);
+  void removeclaim(uint64_t case_id, uint64_t claim_id, name claimant);
 
   //NOTE: member-level case removal, called during CASE_SETUP
   [[eosio::action]]
-  void shredcase( uint64_t case_id, name claimant);
-                                                                     
+  void shredcase(uint64_t case_id, name claimant);
+
+  //NOTE: enforce claimant has at least 1 claim before readying                                 
   [[eosio::action]]
   void readycase(uint64_t case_id, name claimant);
 
@@ -214,6 +217,7 @@ public:
 #pragma endregion System Structs
 
 protected:
+
 #pragma region Tables and Structs
 
   /**
@@ -221,13 +225,13 @@ protected:
    * @scope get_self().value
    * @key uint64_t candidate_name.value
    */
-  struct[[eosio::table]] pending_candidate {
+  struct[[eosio::table]] candidate {
     name candidate_name;
-    string credentials_link; //NOTE: ideally ipfs hash
+    string credentials_link;
     uint32_t application_time;
 
     uint64_t primary_key() const { return candidate_name.value; }
-    EOSLIB_SERIALIZE(pending_candidate, (candidate_name)(credentials_link)(application_time))
+    EOSLIB_SERIALIZE(candidate, (candidate_name)(credentials_link)(application_time))
   };
 
   /**
@@ -251,13 +255,13 @@ protected:
   };
 
   //NOTE: Stores all information related to a single claim.
-  struct claim {
-    uint16_t class_suggestion;
-    vector<string> submitted_pending_evidence; //NOTE: submitted by claimant
-    vector<uint64_t> accepted_ev_ids;          //NOTE: accepted and emplaced by arb
-    uint16_t class_decision;                   //NOTE: initialized to UNDECIDED (0)
+  struct [[eosio::table]] claim {
+    uint64_t claim_id;
+    string claim_summary; //NOTE: ipfs link to claim document
+    string decision_link; //NOTE: ipfs link to decision document
 
-    EOSLIB_SERIALIZE(claim, (class_suggestion)(submitted_pending_evidence)(accepted_ev_ids)(class_decision))
+    uint64_t primary_key() const { return claim_id; }
+    EOSLIB_SERIALIZE(claim, (claim_id)(claim_summary)(decision_link))
   };
 
   /**
@@ -271,41 +275,20 @@ protected:
 
     vector<name> claimants;
     vector<name> respondants; //NOTE: empty for no respondant
-    vector<name> arbitrators; //CLARIFY: do arbitrators get added when joining?
+    vector<name> arbitrators;
     vector<uint8_t> required_langs;
 
-    vector<claim> claims;
-    vector<string> result_links; //NOTE: mapped key to key with claims vector i.e. result of claim[5] is results_link[5]
+    vector<uint64_t> submitted_claims; //TODO: make vector of claims? don't need to save claims until accepted
+    vector<uint64_t> accepted_claims;
     
-    string comment;
+    string arb_comment;
     uint32_t last_edit;
-
-    //vector<asset> additional_fees; //NOTE: case by case?
-    //bool is_joined; //NOTE: unnecessary?
 
     uint64_t primary_key() const { return case_id; }
     EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
       (claimants)(respondants)(arbitrators)(required_langs)
-      (claims)(result_links)
-      (comment)(last_edit))
-  };
-
-  /**
-   * Stores evidence accepted from arbitration cases.
-   * @scope get_self().value
-   * @key uint64_t ev_id
-   */
-  //TODO: evidence types?
-  struct [[eosio::table]] evidence {
-    uint64_t ev_id;
-    string ipfs_url;
-    uint32_t accept_time;
-    name accepted_by;
-
-    //vector<uint8_t> doc_langs; //maybe?
-
-    uint64_t primary_key() const { return ev_id; }
-    EOSLIB_SERIALIZE(evidence, (ev_id)(ipfs_url)(accept_time)(accepted_by))
+      (submitted_claims)(accepted_claims)
+      (arb_comment)(last_edit))
   };
 
   /**
@@ -329,7 +312,6 @@ protected:
     uint32_t arb_term_length;
 
     //TODO: response times vector?
-    //TODO: 
 
     uint64_t primary_key() const { return publisher.value; }
     EOSLIB_SERIALIZE(config, (publisher)(fee_structure)
@@ -345,12 +327,13 @@ protected:
     uint64_t join_id;
     vector<uint64_t> cases;
     uint32_t join_time;
+    name joined_by;
 
     uint64_t primary_key() const { return join_id; }
-    EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time))
+    EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time)(joined_by))
   };
 
-  typedef multi_index<name("pendingcands"), pending_candidate> pending_candidates_table;
+  typedef multi_index<name("pendingcands"), candidate> pending_candidates_table;
 
   typedef multi_index<name("arbitrators"), arbitrator> arbitrators_table;
 
@@ -358,7 +341,7 @@ protected:
 
   typedef multi_index<name("joinedcases"), joinder> joinders_table;
 
-  typedef multi_index<name("evidence"), evidence> evidence_table;
+  typedef multi_index<name("claims"), claim> claims_table;
 
   typedef singleton<name("config"), config> config_singleton;
   config_singleton configs;
@@ -366,6 +349,7 @@ protected:
 
 #pragma endregion Tables and Structs
 
+  bool is_claimant(name claimant, vector<name> list);
 
   void validate_ipfs_url(string ipfs_url);
   

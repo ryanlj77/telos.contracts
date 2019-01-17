@@ -1,5 +1,5 @@
 /**
- * Arbitration Implementation. See function bodies for further notes.
+ * Arbitration Contract Implementation. See function bodies for further notes.
  * 
  * @author Craig Branscom, Peter Bue, Ed Silva, Douglas Horn
  * @copyright defined in telos/LICENSE.txt
@@ -32,6 +32,9 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 
   //print("\nSettings Configured: SUCCESS");
 }
+
+
+#pragma region Arb_Elections
 
 void arbitration::initelection() {
   require_auth(name("eosio"));
@@ -280,118 +283,145 @@ void arbitration::endelection( name candidate ) {
    }
 }
 
-//TODO: update casefile emplacement
-void arbitration::filecase(name claimant, uint8_t class_suggestion, string ev_ipfs_url) {
+#pragma endregion Arb_Elections
+
+
+#pragma region Case_Setup
+
+void arbitration::filecase(name claimant, string claim_link) {
   require_auth(claimant);
-	eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14"); //TODO: improve this message to include directions
-	validate_ipfs_url(ev_ipfs_url);
+	//eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14");
+	validate_ipfs_url(claim_link);
 
 	action(permission_level{ claimant, name("active")}, name("eosio.token"), name("transfer"), make_tuple(
 		claimant,
 		get_self(),
-		asset(int64_t(1000000), symbol("TLOS", 4)), //TODO: Check initial filing fee
+		asset(int64_t(1000000), symbol("TLOS", 4)),
 		std::string("Arbitration Case Filing Fee")
 	)).send();
 
-	casefiles_table casefiles(_self, _self.value);
-  vector<name> arbs; //empty vector of arbitrator accounts
-	vector<claim> claims;
-	auto case_id = casefiles.available_primary_key();
-  // casefiles.emplace(_self, [&]( auto& a ){
-  //     a.case_id = case_id;
-  //     a.claimant = claimant;
-  //     a.respondant = name(0);
-  //     a.claims = claims;
-  //     a.arbitrators = arbs;
-  //     a.case_status = CASE_SETUP;
-  //     a.last_edit = now();
-  // });
+  claims_table claims(get_self(), get_self().value);
+  auto claim_id = claims.available_primary_key();
 
-	// addclaim(case_id, class_suggestion, ev_ipfs_url, claimant);
+  claims.emplace(claimant, [&](auto& row){
+    row.claim_id = claim_id;
+    row.claim_summary = claim_link;
+    row.decision_link = "";
+  });
 
-  print("\nCased Filed!");
+	casefiles_table casefiles(get_self(), get_self().value);
+  auto case_id = casefiles.available_primary_key();
+  vector<name> arbs;
+  vector<name> respondants;
+  vector<uint8_t> lang_codes;
+	vector<uint64_t> sub_claims = {claim_id};
+  vector<uint64_t> acc_claims;
+
+  casefiles.emplace(claimant, [&](auto& row){
+    row.case_id = case_id;
+    row.case_status = CASE_SETUP;
+    row.claimants = claimants;
+    row.respondants = respondants;
+    row.arbitrators = arbs;
+    row.required_langs = lang_codes;
+    row.submitted_claims = sub_claims;
+    row.accepted_claims = acc_claims;
+    row.arb_comment = "";
+    row.last_edit = now();
+  });
+
+  //print("\nCased Filed");
 } 
 
-//TODO: update c.claimant to vector of claimants
-void arbitration::addclaim(uint64_t case_id, uint16_t class_suggestion, string ev_ipfs_url, name claimant) { 
+void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant) { 
   require_auth(claimant);
-	eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14"); //TODO: improve this message to include directions
-	validate_ipfs_url(ev_ipfs_url);
+	//eosio_assert(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14");
+	validate_ipfs_url(claim_link);
 
-	casefiles_table casefiles(_self, _self.value);
+  claims_table claims(get_self(), get_self().value);
+  auto claim_id = claims.available_primary_key();
+
+  claims.emplace(claimant, [&](auto& row){
+    row.claim_id = claim_id;
+    row.claim_summary = claim_link;
+    row.decision_link = "";
+  });
+
+	casefiles_table casefiles(get_self(), get_self().value);
 	auto c = casefiles.get(case_id, "Case Not Found");
-	print("\nProposal Found!");
-
-	//require_auth(c.claimant);
 	eosio_assert(c.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
+  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
 
-	vector<uint64_t> accepted_ev_ids;
-
-	auto new_claims = c.claims;
-	new_claims.emplace_back(claim { class_suggestion, vector<string>{ev_ipfs_url}, accepted_ev_ids, UNDECIDED });
-	casefiles.modify(c, same_payer, [&](auto& a) { 
-		a.claims = new_claims;
+	auto new_claims = c.submitted_claims;
+	new_claims.emplace_back(claim_id);
+  casefiles.modify(c, same_payer, [&](auto& row) { 
+		row.claims = new_claims;
 	});
-
-	print("\nClaim Added!");
 }
 
-//TODO: update c.claimant to vector of claimants
-void arbitration::removeclaim(uint64_t case_id, uint16_t claim_num, name claimant) {
+void arbitration::removeclaim(uint64_t case_id, uint64_t claim_id, name claimant) {
   require_auth(claimant);
 
-	casefiles_table casefiles(_self, _self.value);
+	casefiles_table casefiles(get_self(), get_self().value);
 	auto c = casefiles.get(case_id, "Case Not Found");
-	
-	//require_auth(c.claimant);
-	eosio_assert(c.case_status == CASE_SETUP, "claims cannot be removed after CASE_SETUP is complete.");
+	eosio_assert(c.case_status == CASE_SETUP, "Claims cannot be removed after CASE_SETUP is complete");
+  eosio_assert(c.submitted_claims.size() > 0, "No claims to remove");
+  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
+  
+  vector<uint64_t> new_claims = c.submitted_claims;
 
-	vector<claim> new_claims = c.claims;
-	eosio_assert(new_claims.size() > 0, "no claims to remove");
-	eosio_assert(claim_num < new_claims.size(), "claim number does not exist");
-	new_claims.erase(new_claims.begin() + claim_num);
+  bool found = false;
+  auto itr = new_claims.begin();
+  while (itr != new_claims.end()) {
+    if (*itr == claim_id) {
+      new_claims.erase(itr);
+      found = true;
+      break;
+    }
+    itr++;
+  }
+  eosio_assert(found, "Claim ID not found in casefile");
 
 	casefiles.modify(c, same_payer, [&](auto& a) {
 		a.claims = new_claims;
 	});
 
-	print("\nClaim Removed!");
+  claims_table claims(get_self(), get_self().value);
+  auto cl = claims.get(claim_id, "Claim not found in table");
+  claims.erase(cl);
+
+	//print("\nClaim Removed");
 }
 
-//TODO: update c.claimant to vector of claimants
 void arbitration::shredcase(uint64_t case_id, name claimant) {
   require_auth(claimant);
 
-  casefiles_table casefiles(_self, _self.value);
+  casefiles_table casefiles(get_self(), get_self().value);
   auto c_itr = casefiles.find(case_id);
-  print("\nProposal Found!");
   eosio_assert(c_itr != casefiles.end(), "Case Not Found");
+  eosio_assert(is_claimant(claimant, c_itr->claimants), "not in list of claimants for casefile");
 
-  //require_auth(c_itr->claimants);
+  //TODO: erase all claims for case as well
+
   eosio_assert(c_itr->case_status == CASE_SETUP, "cases can only be shredded during CASE_SETUP");
 
   casefiles.erase(c_itr);
-
-  print("\nCase Shredded!");
 }
 
-//TODO: update c.claimant to vector of claimants
 void arbitration::readycase(uint64_t case_id, name claimant) {
-  require_auth(claimant);
-
-  casefiles_table casefiles(_self, _self.value);
+  casefiles_table casefiles(get_self(), get_self().value);
   auto c = casefiles.get(case_id, "Case Not Found");
-
-  //require_auth(c.claimant);
   eosio_assert(c.case_status == CASE_SETUP, "cases can only be readied during CASE_SETUP");
-  eosio_assert(c.claims.size() >= 1, "cases must have atleast one claim");
+  eosio_assert(c.submitted_claims.size() >= 1, "cases must have atleast one claim");
+  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
 
   casefiles.modify(c, same_payer, [&](auto &a) { 
       c.case_status = AWAITING_ARBS; 
-    });
-
-  print("\nCase Readied!");
+  });
 }
+
+#pragma endregion Case_Setup
+
 
 void arbitration::closecase(uint64_t case_id, name arb, string ipfs_url) {
   require_auth(arb);
@@ -606,6 +636,17 @@ void arbitration::dismissarb(name arb) {
 }
 
 #pragma region Helper_Functions
+
+bool arbitration::is_claimant(name claimant, vector<name> list) {
+  auto itr = list.begin();
+  while (itr != list.end()) {
+    if (*itr == claimant) {
+      return true;
+    }
+    itr++;
+  }
+  return false;
+}
 
 void arbitration::validate_ipfs_url(string ipfs_url) {
 	eosio_assert(ipfs_url.length() == 53, "invalid ipfs string, valid schema: /ipfs/<hash>/");
