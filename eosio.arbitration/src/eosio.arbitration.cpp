@@ -308,7 +308,7 @@ void arbitration::filecase(name claimant, string claim_link) {
   vector<name> arbs;
   vector<name> respondants;
   vector<uint8_t> lang_codes;
-	vector<uint64_t> sub_claims = {claim_id};
+	vector<uint64_t> unr_claims = {claim_id};
   vector<uint64_t> acc_claims;
 
   casefiles.emplace(claimant, [&](auto& row){
@@ -318,7 +318,7 @@ void arbitration::filecase(name claimant, string claim_link) {
     row.respondants = respondants;
     row.arbitrators = arbs;
     row.required_langs = lang_codes;
-    row.submitted_claims = sub_claims;
+    row.unread_claims = unr_claims;
     row.accepted_claims = acc_claims;
     row.arb_comment = "";
     row.last_edit = now();
@@ -342,13 +342,13 @@ void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant) {
   });
 
 	casefiles_table casefiles(get_self(), get_self().value);
-	auto c = casefiles.get(case_id, "Case Not Found");
-	eosio_assert(c.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
-  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
+	auto cf = casefiles.get(case_id, "Case Not Found");
+	eosio_assert(cf.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
+  eosio_assert(is_claimant(claimant, cf.claimants), "not in list of claimants for casefile");
 
-	auto new_claims = c.submitted_claims;
+	auto new_claims = cf.unread_claims;
 	new_claims.emplace_back(claim_id);
-  casefiles.modify(c, same_payer, [&](auto& row) { 
+  casefiles.modify(cf, same_payer, [&](auto& row) { 
 		row.claims = new_claims;
 	});
 }
@@ -357,12 +357,12 @@ void arbitration::removeclaim(uint64_t case_id, uint64_t claim_id, name claimant
   require_auth(claimant);
 
 	casefiles_table casefiles(get_self(), get_self().value);
-	auto c = casefiles.get(case_id, "Case Not Found");
-	eosio_assert(c.case_status == CASE_SETUP, "Claims cannot be removed after CASE_SETUP is complete");
-  eosio_assert(c.submitted_claims.size() > 0, "No claims to remove");
-  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
+	auto cf = casefiles.get(case_id, "Case Not Found");
+	eosio_assert(cf.case_status == CASE_SETUP, "Claims cannot be removed after CASE_SETUP is complete");
+  eosio_assert(cf.unread_claims.size() > 0, "No claims to remove");
+  eosio_assert(is_claimant(claimant, cf.claimants), "Not in list of claimants for casefile");
   
-  vector<uint64_t> new_claims = c.submitted_claims;
+  vector<uint64_t> new_claims = cf.unread_claims;
 
   bool found = false;
   auto itr = new_claims.begin();
@@ -376,8 +376,8 @@ void arbitration::removeclaim(uint64_t case_id, uint64_t claim_id, name claimant
   }
   eosio_assert(found, "Claim ID not found in casefile");
 
-	casefiles.modify(c, same_payer, [&](auto& a) {
-		a.claims = new_claims;
+	casefiles.modify(cf, same_payer, [&](auto& row) {
+		row.claims = new_claims;
 	});
 
   claims_table claims(get_self(), get_self().value);
@@ -404,89 +404,68 @@ void arbitration::shredcase(uint64_t case_id, name claimant) {
 
 void arbitration::readycase(uint64_t case_id, name claimant) {
   casefiles_table casefiles(get_self(), get_self().value);
-  auto c = casefiles.get(case_id, "Case Not Found");
-  eosio_assert(c.case_status == CASE_SETUP, "cases can only be readied during CASE_SETUP");
-  eosio_assert(c.submitted_claims.size() >= 1, "cases must have atleast one claim");
-  eosio_assert(is_claimant(claimant, c.claimants), "not in list of claimants for casefile");
+  auto cf = casefiles.get(case_id, "Case Not Found");
+  eosio_assert(cf.case_status == CASE_SETUP, "Cases can only be readied during CASE_SETUP");
+  eosio_assert(cf.unread_claims.size() >= 1, "Cases must have atleast one claim");
+  eosio_assert(is_claimant(claimant, cf.claimants), "not in list of claimants for casefile");
 
-  casefiles.modify(c, same_payer, [&](auto &a) { 
-      c.case_status = AWAITING_ARBS; 
+  casefiles.modify(cf, same_payer, [&](auto &row) { 
+    row.case_status = AWAITING_ARBS;
+    row.last_edit = now();
   });
 }
 
 #pragma endregion Case_Setup
 
 
-#pragma region Arb_Actions
+#pragma region Case_Actions
 
-void arbitration::closecase(uint64_t case_id, name arb, string ipfs_url) {
+void arbitration::assigntocase(uint64_t case_id, name arb) {
   require_auth(arb);
-  validate_ipfs_url(ipfs_url);
 
-  casefiles_table casefiles(_self, _self.value);
-  auto c = casefiles.get(case_id, "no case found for given case_id");
-  eosio_assert(c.case_status == ENFORCEMENT, "case hasn't been enforced");
-
-  auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
-  eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
-
-  auto new_ipfs_list = c.result_links;
-  new_ipfs_list.emplace_back(ipfs_url);
-
-  casefiles.modify(c, same_payer, [&](auto &cf) {
-    cf.result_links = new_ipfs_list;
-    cf.case_status = COMPLETE;
-    cf.last_edit = now();
-  });
-
-  print("\nCase Close: SUCCESS");
+  //TODO: add arb to list of arbs in casefile
 }
 
-void arbitration::dismisscase(uint64_t case_id, name arb, string ipfs_url) {
+void arbitration::advancecase(uint64_t case_id, name arb) {
   require_auth(arb);
-  validate_ipfs_url(ipfs_url);
-
-  casefiles_table casefiles(_self, _self.value);
-  auto c = casefiles.get(case_id, "no case found for given case_id");
-
-  auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
-  eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
-  eosio_assert(c.case_status == CASE_INVESTIGATION, "case is dismissed or complete");
-
-  auto new_ipfs_list = c.result_links;
-  new_ipfs_list.emplace_back(ipfs_url);
-
-  casefiles.modify(c, same_payer, [&](auto &cf) {
-    cf.result_links = new_ipfs_list;
-    cf.case_status = DISMISSED;
-    cf.last_edit = now();
-  });
-
-  print("\nCase Dismissed: SUCCESS");
 }
 
-void arbitration::dismissev(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url) {
+void arbitration::dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment) {
   require_auth(arb);
-  validate_ipfs_url(ipfs_url);
+  validate_ipfs_url(ipfs_link);
 
-  casefiles_table casefiles(_self, _self.value);
-  auto c = casefiles.get(case_id, "Case not found");
-  auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
+  casefiles_table casefiles(get_self(), get_self().value);
+  auto cf = casefiles.get(case_id, "No case found with given case_id");
 
-  eosio_assert(arb_case != c.arbitrators.end(), "only arbitrator can dismiss case");
-  eosio_assert(claim_index < 0 || claim_index >= c.claims.size(), "claim_index is out of range");
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  eosio_assert(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case");
+  eosio_assert(cf.case_status == CASE_INVESTIGATION, "Case is already dismissed or complete");
 
-  vector<claim> new_claims = c.claims;
-  auto clm = c.claims[claim_index];
+  casefiles.modify(cf, same_payer, [&](auto &row) {
+    row.case_status = DISMISSED;
+    row.arb_comment = comment;
+    row.last_edit = now();
+  });
 
-  eosio_assert(ev_index < 0 || ev_index >= clm.accepted_ev_ids.size(), "ev_index is out of range");
+  //print("\nCase Dismissed: SUCCESS");
+}
 
-  vector<uint64_t> new_accepted_ev_ids = clm.accepted_ev_ids;
-  new_accepted_ev_ids.erase(clm.accepted_ev_ids.begin() + ev_index);
-  clm.accepted_ev_ids = new_accepted_ev_ids;
-  new_claims[claim_index] = clm;
+void arbitration::dismissclaim(uint64_t case_id, name arb, string claim_hash) {
+  require_auth(arb);
+  validate_ipfs_url(claim_hash);
 
-  casefiles.modify(c, same_payer, [&](auto &cf) {
+  casefiles_table casefiles(get_self(), get_self().value);
+  auto cf = casefiles.get(case_id, "Case not found");
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  eosio_assert(arb_case != cf.arbitrators.end(), "Only an assigned arbitrator can dismiss a claim");
+
+  //vector<claim> new_claims = cf.unread_claims;
+  // vector<uint64_t> new_accepted_ev_ids = clm.accepted_ev_ids;
+  // new_accepted_ev_ids.erase(clm.accepted_ev_ids.begin() + ev_index);
+  // clm.accepted_ev_ids = new_accepted_ev_ids;
+  // new_claims[claim_index] = clm;
+
+  casefiles.modify(cf, same_payer, [&](auto &cf) {
     cf.claims = new_claims;
     cf.last_edit = now();
   });
@@ -498,10 +477,10 @@ void arbitration::dismissev(uint64_t case_id, uint16_t claim_index, uint16_t ev_
   //   dev.ipfs_url = ipfs_url;
   // });
 
-  print("\nEvidence dismissed");
+  //print("\nClaim dismissed");
 }
 
-void arbitration::acceptev(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url) {
+void arbitration::acceptclaim(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url) {
   require_auth(arb);
   validate_ipfs_url(ipfs_url);
 
@@ -539,7 +518,7 @@ void arbitration::acceptev(uint64_t case_id, uint16_t claim_index, uint16_t ev_i
   print("\nEvidence accepted");
 }
 
-void arbitration::arbstatus(uint16_t new_status, name arb) {
+void arbitration::newarbstatus(uint16_t new_status, name arb) {
   require_auth(arb);
 
   arbitrators_table arbitrators(_self, _self.value);
@@ -554,7 +533,7 @@ void arbitration::arbstatus(uint16_t new_status, name arb) {
   print("\nArbitrator status updated: SUCCESS");
 }
 
-void arbitration::casestatus(uint64_t case_id, uint16_t new_status, name arb) {
+void arbitration::newcfstatus(uint64_t case_id, uint16_t new_status, name arb) {
   require_auth(arb);
 
   casefiles_table casefiles(_self, _self.value);
@@ -570,27 +549,6 @@ void arbitration::casestatus(uint64_t case_id, uint16_t new_status, name arb) {
   });
 
   print("\nCase updated: SUCCESS");
-}
-
-void arbitration::changeclass(uint64_t case_id, uint16_t claim_index, uint16_t new_class, name arb) {
-  require_auth(arb);
-
-  casefiles_table casefiles(_self, _self.value);
-  auto c = casefiles.get(case_id, "no case found for given case_id");
-  auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
-
-  eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
-  eosio_assert(claim_index < 0 || claim_index >= c.claims.size(), "claim_index is out of range");
-
-  vector<claim> new_claims = c.claims;
-  new_claims[claim_index].class_suggestion = new_class;
-
-  casefiles.modify(c, same_payer, [&](auto &cf) {
-    cf.claims = new_claims;
-    cf.last_edit = now();
-  });
-
-  print("\nClaim updated: SUCCESS");
 }
 
 void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
@@ -614,26 +572,57 @@ void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
   print("\nArbitrator was removed from the case");
 }
 
-void arbitration::dismissarb(name arb) {
-  require_auth2(arb.value, name("active").value); // REQUIRES 2/3+1 Vote from eosio.prods for MSIG
-  // require_auth2("eosio.prods"_n.value, "active"_n.value); //REQUIRES 2/3+1
-  // Vote from eosio.prods for MSIG
+// void arbitration::changeclass(uint64_t case_id, uint16_t claim_index, uint16_t new_class, name arb) {
+//   require_auth(arb);
+//   casefiles_table casefiles(_self, _self.value);
+//   auto c = casefiles.get(case_id, "no case found for given case_id");
+//   auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
+//   eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
+//   eosio_assert(claim_index < 0 || claim_index >= c.claims.size(), "claim_index is out of range");
+//   vector<claim> new_claims = c.claims;
+//   new_claims[claim_index].class_suggestion = new_class;
+//   casefiles.modify(c, same_payer, [&](auto &cf) {
+//     cf.claims = new_claims;
+//     cf.last_edit = now();
+//   });
+//   print("\nClaim updated: SUCCESS");
+// }
 
-  arbitrators_table arbitrators(_self, _self.value);
-  auto a = arbitrators.get(arb.value, "Arbitrator Not Found");
+// void arbitration::dismissarb(name arb) {
+//   require_auth2(arb.value, name("active").value); // REQUIRES 2/3+1 Vote from eosio.prods for MSIG
+//   // require_auth2("eosio.prods"_n.value, "active"_n.value); //REQUIRES 2/3+1
+//   // Vote from eosio.prods for MSIG
+//   arbitrators_table arbitrators(_self, _self.value);
+//   auto a = arbitrators.get(arb.value, "Arbitrator Not Found")
+//   eosio_assert(a.arb_status != INACTIVE, "Arbitrator is already inactive");
+//   arbitrators.modify(a, same_payer, [&](auto &a) {
+//        a.arb_status = INACTIVE; 
+//     });
+//   print("\nArbitrator Dismissed!");
+// }
 
-  eosio_assert(a.arb_status != INACTIVE, "Arbitrator is already inactive");
+// void arbitration::closecase(uint64_t case_id, name arb, string ipfs_url) {
+//   require_auth(arb);
+//   validate_ipfs_url(ipfs_url);
+//   casefiles_table casefiles(_self, _self.value);
+//   auto c = casefiles.get(case_id, "no case found for given case_id");
+//   eosio_assert(c.case_status == ENFORCEMENT, "case hasn't been enforced");
+//   auto arb_case = std::find(c.arbitrators.begin(), c.arbitrators.end(), arb);
+//   eosio_assert(arb_case != c.arbitrators.end(), "arbitrator isn't selected for this case.");
+//   auto new_ipfs_list = c.result_links;
+//   new_ipfs_list.emplace_back(ipfs_url);
+//   casefiles.modify(c, same_payer, [&](auto &cf) {
+//     cf.result_links = new_ipfs_list;
+//     cf.case_status = COMPLETE;
+//     cf.last_edit = now();
+//   });
+//   print("\nCase Close: SUCCESS");
+// }
 
-  arbitrators.modify(a, same_payer, [&](auto &a) {
-       a.arb_status = INACTIVE; 
-    });
+#pragma endregion Case_Actions
 
-  print("\nArbitrator Dismissed!");
-}
 
-#pragma endregion Arb_Actions
-
-#pragma region Helper_Functions
+#pragma region Helpers
 
 bool arbitration::is_claimant(name claimant, vector<name> list) {
   auto itr = list.begin();
@@ -731,7 +720,7 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
   }
 }
 
-#pragma endregion Helper_Functions
+#pragma endregion Helpers
 
 EOSIO_DISPATCH(arbitration, (setconfig)(initelection)(candaddlead)(regcand)
                              (unregcand)(candrmvlead)(endelection)

@@ -29,12 +29,12 @@ public:
     CASE_SETUP,         // 0
     AWAITING_ARBS,      // 1
     CASE_INVESTIGATION, // 2
-    DISMISSED,          // 3 NOTE: Dismissed cases stop here. Claims are unfounded.
-    HEARING,            // 4
-    DELIBERATION,       // 5
-    DECISION,           // 6 NOTE: No more joinders allowed
-    ENFORCEMENT,        // 7
-    RESOLVED            // 8
+    HEARING,            // 3
+    DELIBERATION,       // 4
+    DECISION,           // 5 NOTE: No more joinders allowed
+    ENFORCEMENT,        // 6
+    RESOLVED,           // 7
+    DISMISSED           // 8 NOTE: Dismissed cases advance and stop here
   };
 
   enum claim_class : uint8_t {
@@ -136,29 +136,40 @@ public:
 
 #pragma endregion Case_Setup
 
-#pragma region Arb_Actions
+#pragma region Case_Actions
 
-  //TODO: Set case respondant action
+  [[eosio::action]]
+  void assigntocase(uint64_t case_id, name arb);
+
+  [[eosio::action]]
+  void advancecase(uint64_t case_id, name arb);
+
   //TODO: require rationale?
   [[eosio::action]]
-  void dismisscase(uint64_t case_id, name arb, string ipfs_link);
-
-  //TODO: require decision?
-  [[eosio::action]]
-  void closecase(uint64_t case_id, name arb, string ipfs_url);
+  void dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment);
 
   [[eosio::action]]
-  void dismissev( uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url);
+  void dismissclaim(uint64_t case_id, name arb, string claim_hash);
 
   //NOTE: moves to evidence_table and assigns ID
   [[eosio::action]]
-  void acceptev(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url);
+  void acceptclaim(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url);
 
   [[eosio::action]]
-  void arbstatus(uint16_t new_status, name arb);
+  void newarbstatus(uint16_t new_status, name arb);
 
   [[eosio::action]]
-  void casestatus(uint64_t case_id, uint16_t new_status, name arb);
+  void newcfstatus(uint64_t case_id, uint16_t new_status, name arb);
+
+  [[eosio::action]]
+  void recuse(uint64_t case_id, string rationale, name arb);
+
+
+
+
+  //TODO: require decision?
+  [[eosio::action]]
+  void closecase(uint64_t case_id, name arb, string ipfs_url); //TODO: rename to resolvecase()?
 
   [[eosio::action]]
   void changeclass(uint64_t case_id, uint16_t claim_index, uint16_t new_class, name arb);
@@ -170,10 +181,9 @@ public:
   [[eosio::action]]
   void addevidence(uint64_t case_id, vector<uint64_t> ipfs_urls, name arb);
 
-  [[eosio::action]]
-  void recuse(uint64_t case_id, string rationale, name arb);
+  [
 
-#pragma endregion Arb_Actions
+#pragma endregion Case_Actions
 
 #pragma region BP_Multisig_Actions
 
@@ -278,8 +288,9 @@ protected:
     vector<name> arbitrators;
     vector<uint8_t> required_langs;
 
-    vector<uint64_t> submitted_claims; //TODO: make vector of claims? don't need to save claims until accepted
+    vector<uint64_t> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
     vector<uint64_t> accepted_claims;
+    //TODO: string case_ruling? //discrete document like claims?
     
     string arb_comment;
     uint32_t last_edit;
