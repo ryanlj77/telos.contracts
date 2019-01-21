@@ -309,12 +309,11 @@ protected:
    * @key table name
    */
   //TODO: make fee structure a constant?
-  // NOTE: diminishing subsequent response (default) times
-  // NOTE: initial deposit saved
-  // NOTE: class of claim where neither party can pay fees, TF pays instead
+  //NOTE: diminishing subsequent response (default) times
+  //NOTE: initial deposit saved
   struct [[ eosio::table ]] config {
     name publisher;
-    vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value
+    vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value //TODO: just make vector of assets
 
     uint16_t max_elected_arbs;
     uint32_t election_duration;
