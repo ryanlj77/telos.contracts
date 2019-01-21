@@ -291,7 +291,7 @@ protected:
 
     vector<claim> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
     vector<uint64_t> accepted_claims;
-    string case_ruling;
+    string case_ruling; //NOTE: ipfs hash to ruling doc
     
     string arb_comment;
     uint32_t last_edit;
