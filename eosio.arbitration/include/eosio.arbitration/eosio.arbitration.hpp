@@ -81,7 +81,7 @@ public:
     SWED //8 Swedish
   };
 
-#pragma endregion Enums
+  #pragma endregion Enums
 
   arbitration(name s, name code, datastream<const char *> ds);
   
@@ -90,16 +90,16 @@ public:
   [[eosio::action]]
   void setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees);
 
-#pragma region Arb_Elections
+  #pragma region Arb_Elections
 
   [[eosio::action]]
   void initelection();
 
   [[eosio::action]]
-  void regcand(name candidate, string credentials_link);
+  void regnominee(name nominee, string credentials_link);
 
   [[eosio::action]]
-  void unregcand(name candidate);
+  void unregnominee(name nominee);
 
   [[eosio::action]]
   void candaddlead(name candidate, string credentials_link);
@@ -110,9 +110,9 @@ public:
   [[eosio::action]]
   void endelection(name candidate);
                                                       
-#pragma endregion Arb_Elections
+  #pragma endregion Arb_Elections
 
-#pragma region Case_Setup
+  #pragma region Case_Setup
 
   //NOTE: filing a case doesn't require a respondent
   [[eosio::action]]
@@ -124,7 +124,7 @@ public:
 
   //NOTE: claims can only be removed by a claimant during case setup
   [[eosio::action]]
-  void removeclaim(uint64_t case_id, uint64_t claim_id, name claimant);
+  void removeclaim(uint64_t case_id, string claim_hash, name claimant);
 
   //NOTE: member-level case removal, called during CASE_SETUP
   [[eosio::action]]
@@ -134,19 +134,12 @@ public:
   [[eosio::action]]
   void readycase(uint64_t case_id, name claimant);
 
-#pragma endregion Case_Setup
+  #pragma endregion Case_Setup
 
-#pragma region Case_Actions
+  #pragma region Case_Actions
 
   [[eosio::action]]
   void assigntocase(uint64_t case_id, name arb);
-
-  [[eosio::action]]
-  void advancecase(uint64_t case_id, name arb);
-
-  //TODO: require rationale?
-  [[eosio::action]]
-  void dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment);
 
   [[eosio::action]]
   void dismissclaim(uint64_t case_id, name arb, string claim_hash);
@@ -155,16 +148,18 @@ public:
   [[eosio::action]]
   void acceptclaim(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url);
 
+  //TODO: require rationale?
   [[eosio::action]]
-  void newarbstatus(uint16_t new_status, name arb);
+  void dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment);
+
+  [[eosio::action]]
+  void advancecase(uint64_t case_id, name arb);
 
   [[eosio::action]]
   void newcfstatus(uint64_t case_id, uint16_t new_status, name arb);
 
   [[eosio::action]]
   void recuse(uint64_t case_id, string rationale, name arb);
-
-
 
 
   //TODO: require decision?
@@ -181,18 +176,24 @@ public:
   [[eosio::action]]
   void addevidence(uint64_t case_id, vector<uint64_t> ipfs_urls, name arb);
 
-  [
 
-#pragma endregion Case_Actions
+  #pragma endregion Case_Actions
 
-#pragma region BP_Multisig_Actions
+  #pragma region Arb_Actions
+
+  [[eosio::action]]
+  void newarbstatus(uint8_t new_status, name arb);
+
+  #pragma endregion Arb_Actions
+
+  #pragma region BP_Multisig_Actions
 
   [[eosio::action]] 
   void dismissarb(name arb);
 
-#pragma endregion BP_Multisig_Actions
+  #pragma endregion BP_Multisig_Actions
 
-#pragma region System Structs
+  #pragma region System Structs
 
   struct permission_level_weight {
     permission_level permission;
@@ -224,24 +225,24 @@ public:
     EOSLIB_SERIALIZE(authority, (threshold)(keys)(accounts)(waits))
   };
 
-#pragma endregion System Structs
+  #pragma endregion System Structs
 
 protected:
 
-#pragma region Tables and Structs
+  #pragma region Tables and Structs
 
   /**
-   * Holds all arbitrator candidate applications.
+   * Holds all arbitrator nominee applications.
    * @scope get_self().value
-   * @key uint64_t candidate_name.value
+   * @key uint64_t nominee_name.value
    */
-  struct[[eosio::table]] candidate {
-    name candidate_name;
+  struct [[eosio::table]] nominee {
+    name nominee_name;
     string credentials_link;
     uint32_t application_time;
 
-    uint64_t primary_key() const { return candidate_name.value; }
-    EOSLIB_SERIALIZE(candidate, (candidate_name)(credentials_link)(application_time))
+    uint64_t primary_key() const { return nominee_name.value; }
+    EOSLIB_SERIALIZE(nominee, (nominee_name)(credentials_link)(application_time))
   };
 
   /**
@@ -288,9 +289,9 @@ protected:
     vector<name> arbitrators;
     vector<uint8_t> required_langs;
 
-    vector<uint64_t> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
+    vector<claim> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
     vector<uint64_t> accepted_claims;
-    //TODO: string case_ruling? //discrete document like claims?
+    string case_ruling;
     
     string arb_comment;
     uint32_t last_edit;
@@ -298,7 +299,7 @@ protected:
     uint64_t primary_key() const { return case_id; }
     EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
       (claimants)(respondants)(arbitrators)(required_langs)
-      (submitted_claims)(accepted_claims)
+      (submitted_claims)(accepted_claims)(case_ruling)
       (arb_comment)(last_edit))
   };
 
@@ -344,7 +345,7 @@ protected:
     EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time)(joined_by))
   };
 
-  typedef multi_index<name("candidates"), candidate> candidates_table;
+  typedef multi_index<name("nominees"), nominee> nominees_table;
 
   typedef multi_index<name("arbitrators"), arbitrator> arbitrators_table;
 
@@ -358,9 +359,9 @@ protected:
   config_singleton configs;
   config _config;
 
-#pragma endregion Tables and Structs
+  #pragma endregion Tables and Structs
 
-#pragma region Helpers
+  #pragma region Helpers
 
   bool is_claimant(name claimant, vector<name> list);
 
@@ -374,6 +375,6 @@ protected:
 
   void add_arbitrator(arbitrators_table &arbitrators, name arb_name, std::string credential_link);
 
-#pragma endregion Helpers
+  #pragma endregion Helpers
 
 };
