@@ -21,8 +21,16 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 public:
   using contract::contract;
+
+  arbitration(name s, name code, datastream<const char *> ds);
   
+  ~arbitration();
+
+  [[eosio::action]]
+  void setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees);
+
   #pragma region Enums
+
 
   //TODO: describe each enum in README
 
@@ -82,14 +90,8 @@ public:
     SWED //8 Swedish
   };
 
+
   #pragma endregion Enums
-
-  arbitration(name s, name code, datastream<const char *> ds);
-  
-  ~arbitration();
-
-  [[eosio::action]]
-  void setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees);
 
   #pragma region Arb_Elections
 
@@ -148,11 +150,11 @@ public:
   void assigntocase(uint64_t case_id, name arb_to_assign);
 
   [[eosio::action]]
-  void dismissclaim(uint64_t case_id, name arb, string claim_hash);
+  void dismissclaim(uint64_t case_id, name arb, string claim_hash, string memo);
 
   //NOTE: moves to evidence_table and assigns ID
   [[eosio::action]]
-  void acceptclaim(uint64_t case_id, uint16_t claim_index, uint16_t ev_index, name arb, string ipfs_url);
+  void acceptclaim(uint64_t case_id, name arb, string claim_hash, string decision_link, uint8_t decision_class);
 
   //TODO: require rationale?
   [[eosio::action]]
@@ -188,7 +190,7 @@ public:
 
 
   [[eosio::action]]
-  void newarbstatus(uint8_t new_status, name arb);
+  void newarbstatus(uint8_t new_status, name arbitrator);
 
 
   #pragma endregion Arb_Actions
