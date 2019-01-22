@@ -18,6 +18,7 @@ using namespace std;
 using namespace eosio;
 
 class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contract {
+
 public:
   using contract::contract;
   
@@ -92,6 +93,7 @@ public:
 
   #pragma region Arb_Elections
 
+
   [[eosio::action]]
   void initelection();
 
@@ -109,10 +111,12 @@ public:
 
   [[eosio::action]]
   void endelection(name candidate);
-                                                      
+
+                                            
   #pragma endregion Arb_Elections
 
   #pragma region Case_Setup
+
 
   //NOTE: filing a case doesn't require a respondent
   [[eosio::action]]
@@ -134,9 +138,11 @@ public:
   [[eosio::action]]
   void readycase(uint64_t case_id, name claimant);
 
+
   #pragma endregion Case_Setup
 
   #pragma region Case_Actions
+
 
   [[eosio::action]]
   void assigntocase(uint64_t case_id, name arb);
@@ -170,26 +176,29 @@ public:
   void changeclass(uint64_t case_id, uint16_t claim_index, uint16_t new_class, name arb);
 
   [[eosio::action]]
-  void joincases(vector<uint64_t> case_ids, name arb);
+  void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?
 
-  //NOTE: member version is submitev()
   [[eosio::action]]
-  void addevidence(uint64_t case_id, vector<uint64_t> ipfs_urls, name arb);
+  void joincases(uint64_t joinder_id, uint64_t new_case_id, name arb); //TODO: add memo for joining?
 
 
   #pragma endregion Case_Actions
 
   #pragma region Arb_Actions
 
+
   [[eosio::action]]
   void newarbstatus(uint8_t new_status, name arb);
+
 
   #pragma endregion Arb_Actions
 
   #pragma region BP_Multisig_Actions
 
+
   [[eosio::action]] 
   void dismissarb(name arb);
+
 
   #pragma endregion BP_Multisig_Actions
 
@@ -231,6 +240,7 @@ protected:
 
   #pragma region Tables and Structs
 
+
   /**
    * Holds all arbitrator nominee applications.
    * @scope get_self().value
@@ -270,9 +280,10 @@ protected:
     uint64_t claim_id;
     string claim_summary; //NOTE: ipfs link to claim document
     string decision_link; //NOTE: ipfs link to decision document
+    uint8_t decision_class;
 
     uint64_t primary_key() const { return claim_id; }
-    EOSLIB_SERIALIZE(claim, (claim_id)(claim_summary)(decision_link))
+    EOSLIB_SERIALIZE(claim, (claim_id)(claim_summary)(decision_link)(decision_class))
   };
 
   /**
@@ -357,6 +368,7 @@ protected:
   typedef singleton<name("config"), config> config_singleton;
   config_singleton configs;
   config _config;
+
 
   #pragma endregion Tables and Structs
 
