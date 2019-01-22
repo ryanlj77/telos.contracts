@@ -145,7 +145,7 @@ public:
 
 
   [[eosio::action]]
-  void assigntocase(uint64_t case_id, name arb);
+  void assigntocase(uint64_t case_id, name arb_to_assign);
 
   [[eosio::action]]
   void dismissclaim(uint64_t case_id, name arb, string claim_hash);
@@ -374,6 +374,7 @@ protected:
 
   #pragma region Helpers
 
+
   bool is_claimant(name claimant, vector<name> list);
 
   void validate_ipfs_url(string ipfs_url);
@@ -385,6 +386,7 @@ protected:
   bool has_available_seats(arbitrators_table &arbitrators, uint8_t &available_seats);
 
   void add_arbitrator(arbitrators_table &arbitrators, name arb_name, std::string credential_link);
+
 
   #pragma endregion Helpers
 

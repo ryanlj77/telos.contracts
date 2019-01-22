@@ -416,10 +416,34 @@ void arbitration::readycase(uint64_t case_id, name claimant) {
 
 #pragma region Case_Actions
 
-void arbitration::assigntocase(uint64_t case_id, name arb) {
-  require_auth(arb);
 
-  //TODO: add arb to list of arbs in casefile
+void arbitration::assigntocase(uint64_t case_id, name arb_to_assign) {
+  //TODO: require_auth on "assigner" account? 
+  require_auth(arb_to_assign);
+
+  arbitrators_table arbitrators(get_self(), get_self().value);
+  auto arb = arbitrators.get(arb_to_assign.value, "Arb is not a registered Arbitrator");
+  //TODO: check arb_status before assigning
+
+  vector<uint64_t> new_open_cases = arb.open_case_ids;
+  new_open_cases.emplace_back(case_id);
+
+  arbitrators.modify(arb, same_payer, [&](auto& row) { 
+		row.open_case_ids = new_open_cases;
+	});
+
+  casefiles_table casefiles(get_self(), get_self().value);
+  auto cf = casefiles.get(case_id, "Case not found with given Case ID");
+  eosio_assert(cf.arbitrators.size() == size_t(0), "Case already has an assigned arbitrator");
+  //TODO: check arb is not already assigned to case
+
+  vector<name> new_arbs = cf.arbitrators;
+  new_arbs.emplace_back(arb);
+
+  casefiles.modify(cf, same_payer, [&](auto& row) { 
+		row.arbitrators = new_arbs;
+	});
+
 }
 
 void arbitration::dismissclaim(uint64_t case_id, name arb, string claim_hash) {
@@ -590,6 +614,7 @@ void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
 //   });
 //   print("\nCase Close: SUCCESS");
 // }
+
 
 #pragma endregion Case_Actions
 
