@@ -22,16 +22,16 @@ class [[eosio::contract("telos.snaps")]] snapshots : public contract {
      }
 
      ACTION define( uint64_t snapshot_id,
+                  name owner,
                   uint64_t snapshot_block,
                   uint64_t expire_block );
-
-     // TODO: add a setbalances method that can update multiple balances in a single action
 
      ACTION setbalance( uint64_t snapshot_id,
                       name account,
                       uint64_t amount );
 
-     ACTION remove( uint64_t snapshot );
+     ACTION remove( uint64_t snapshot_id, uint32_t count );
+     ACTION clear( uint64_t snapshot_id );
 
   private:
      TABLE balance {
@@ -43,6 +43,7 @@ class [[eosio::contract("telos.snaps")]] snapshots : public contract {
 
      TABLE snapshot {
          uint64_t snapshot_id;
+         name owner;
          uint64_t snapshot_block;
          uint64_t expire_block;
          uint32_t last_updated;
