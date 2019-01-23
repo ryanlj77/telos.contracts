@@ -53,7 +53,7 @@ void arbitration::initelection() {
   }
 }
 
-void arbitration::regnominee(name nominee, string credentials_link) {
+void arbitration::regarb(name nominee, string credentials_link) {
   require_auth(nominee);
   validate_ipfs_url(credentials_link);
 
@@ -544,7 +544,7 @@ void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling
 
 }
 
-void arbitration::newcfstatus(uint64_t case_id, uint16_t new_status, name assigned_arb) {
+void arbitration::newcfstatus(uint64_t case_id, uint8_t new_status, name assigned_arb) {
   require_auth(assigned_arb);
 
   casefiles_table casefiles(get_self(), get_self().value);
@@ -704,7 +704,7 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 #pragma endregion Helpers
 
 EOSIO_DISPATCH(arbitration, (setconfig)
-  (initelection)(regnominee)(unregnominee)(candaddlead)(candrmvlead)(endelection)
+  (initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)
   (filecase)(addclaim)(removeclaim)(shredcase)(readycase)
-  (assigntocase)(dismissclaim)(acceptclaim)(dismisscase)(advancecase)(closecase)
-  (newarbstatus)(recuse)(dismissarb))
+  (assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)
+  (newarbstatus))
