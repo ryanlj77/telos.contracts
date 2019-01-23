@@ -414,9 +414,9 @@ void arbitration::readycase(uint64_t case_id, name claimant) {
 #pragma endregion Case_Setup
 
 
-#pragma region Case_Actions
+#pragma region Case_Progression
 
-
+//TODO: assignment logic
 void arbitration::assigntocase(uint64_t case_id, name arb_to_assign) {
   //TODO: require_auth on "assigner" account? 
   require_auth(arb_to_assign);
@@ -446,13 +446,13 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign) {
 
 }
 
-void arbitration::dismissclaim(uint64_t case_id, name arb, string claim_hash, string memo) {
-  require_auth(arb);
+void arbitration::dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo) {
+  require_auth(assigned_arb);
   validate_ipfs_url(claim_hash);
 
   casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "Case not found");
-  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
   eosio_assert(arb_case != cf.arbitrators.end(), "Only an assigned arbitrator can dismiss a claim");
 
   vector<claim> new_claims = cf.unread_claims;
@@ -476,14 +476,14 @@ void arbitration::dismissclaim(uint64_t case_id, name arb, string claim_hash, st
 
 }
 
-void arbitration::acceptclaim(uint64_t case_id, name arb, string claim_hash, string decision_link, uint8_t decision_class) {
-  require_auth(arb);
+void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class) {
+  require_auth(assigned_arb);
   validate_ipfs_url(claim_hash); //TODO: necessary?
   validate_ipfs_url(decision_link);
 
   casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "Case not found");
-  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
   eosio_assert(arb_case != cf.arbitrators.end(), "Only the assigned arbitrator can accept a claim");
 
   claims_table claims(get_self(), get_self().value);
@@ -501,7 +501,7 @@ void arbitration::acceptclaim(uint64_t case_id, name arb, string claim_hash, str
     row.last_edit = now();
   });
 
-  claims.emplace(arb, [&](auto& row){ //TODO: should arb pay for emplacement?
+  claims.emplace(assigned_arb, [&](auto& row){ //TODO: should arb pay for emplacement?
     row.claim_id = new_claim_id;
     row.claim_summary = claim_hash;
     row.decision_link = decision_link;
@@ -510,12 +510,14 @@ void arbitration::acceptclaim(uint64_t case_id, name arb, string claim_hash, str
 
 }
 
-void arbitration::advancecase(uint64_t case_id, name arb) {
-  require_auth(arb);
+void arbitration::advancecase(uint64_t case_id, name assigned_arb) {
+  require_auth(assigned_arb);
 
   casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "Case not found with given Case ID");
   eosio_assert(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
+
+  //TODO: check assigned_arb is arb in casefile
 
   casefiles.modify(cf, same_payer, [&](auto& row) { 
 		row.case_status = cf.case_status++;
@@ -523,33 +525,33 @@ void arbitration::advancecase(uint64_t case_id, name arb) {
 
 }
 
-void arbitration::dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment) {
-  require_auth(arb);
-  validate_ipfs_url(ipfs_link);
+void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling_link) {
+  require_auth(assigned_arb);
+  validate_ipfs_url(ruling_link);
 
   casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "No case found with given case_id");
 
-  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
   eosio_assert(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case");
   eosio_assert(cf.case_status == CASE_INVESTIGATION, "Case is already dismissed or complete");
 
   casefiles.modify(cf, same_payer, [&](auto &row) {
     row.case_status = DISMISSED;
-    row.arb_comment = comment;
+    row.case_ruling = ruling_link;
     row.last_edit = now();
   });
 
 }
 
-void arbitration::newcfstatus(uint64_t case_id, uint16_t new_status, name arb) {
-  require_auth(arb);
+void arbitration::newcfstatus(uint64_t case_id, uint16_t new_status, name assigned_arb) {
+  require_auth(assigned_arb);
 
-  casefiles_table casefiles(_self, _self.value);
+  casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "No case found for given case_id");
-  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 
-  eosio_assert(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case.");
+  eosio_assert(arb_case != cf.arbitrators.end(), "Arbitrator isn't assigned to this case.");
   eosio_assert(cf.case_status != DISMISSED || cf.case_status != RESOLVED, "Case is already dismissed or resolved");
 
   casefiles.modify(cf, same_payer, [&](auto &row) {
@@ -559,17 +561,17 @@ void arbitration::newcfstatus(uint64_t case_id, uint16_t new_status, name arb) {
 
 }
 
-void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
-  require_auth(arb);
+void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb) {
+  require_auth(assigned_arb);
 
   casefiles_table casefiles(get_self(), get_self().value);
   auto cf = casefiles.get(case_id, "No case found for given case_id");
-  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb);
 
+  auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
   eosio_assert(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case.");
 
   vector<name> new_arbs = cf.arbitrators;
-  remove(new_arbs.begin(), new_arbs.end(), arb);
+  remove(new_arbs.begin(), new_arbs.end(), assigned_arb);
 
   casefiles.modify(cf, same_payer, [&](auto &row) {
     row.arbitrators = new_arbs;
@@ -579,7 +581,7 @@ void arbitration::recuse(uint64_t case_id, string rationale, name arb) {
 }
 
 
-#pragma endregion Case_Actions
+#pragma endregion Case_Progression
 
 
 #pragma region Arb_Actions

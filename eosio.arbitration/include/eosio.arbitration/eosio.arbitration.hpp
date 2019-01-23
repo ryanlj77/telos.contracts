@@ -93,7 +93,7 @@ public:
 
   #pragma endregion Enums
 
-  #pragma region Arb_Elections
+  #pragma region Arb_Electionsa
 
 
   [[eosio::action]]
@@ -105,14 +105,14 @@ public:
   [[eosio::action]]
   void unregnominee(name nominee);
 
-  [[eosio::action]]
-  void candaddlead(name candidate, string credentials_link);
+  [[eosio::action]] //TODO: rename?
+  void candaddlead(name nominee, string credentials_link);
   
-  [[eosio::action]]
-  void candrmvlead(name candidate);
+  [[eosio::action]] //TODO: rename?
+  void candrmvlead(name nominee);
 
-  [[eosio::action]]
-  void endelection(name candidate);
+  [[eosio::action]] //TODO: need nominee param?
+  void endelection(name nominee);
 
                                             
   #pragma endregion Arb_Elections
@@ -143,39 +143,36 @@ public:
 
   #pragma endregion Case_Setup
 
-  #pragma region Case_Actions
+  #pragma region Case_Progression
 
 
   [[eosio::action]]
   void assigntocase(uint64_t case_id, name arb_to_assign);
 
   [[eosio::action]]
-  void dismissclaim(uint64_t case_id, name arb, string claim_hash, string memo);
+  void dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo);
 
   //NOTE: moves to evidence_table and assigns ID
   [[eosio::action]]
-  void acceptclaim(uint64_t case_id, name arb, string claim_hash, string decision_link, uint8_t decision_class);
+  void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class);
+
+  [[eosio::action]]
+  void advancecase(uint64_t case_id, name assigned_arb);
 
   //TODO: require rationale?
   [[eosio::action]]
-  void dismisscase(uint64_t case_id, name arb, string ipfs_link, string comment);
+  void dismisscase(uint64_t case_id, name assigned_arb, string ruling_link);
 
   [[eosio::action]]
-  void advancecase(uint64_t case_id, name arb);
+  void resolvecase(uint64_t case_id, name assigned_arb, string case_ruling);
 
   [[eosio::action]]
-  void newcfstatus(uint64_t case_id, uint16_t new_status, name arb);
+  void newcfstatus(uint64_t case_id, uint8_t new_status, name assigned_arb);
 
-  [[eosio::action]]
-  void recuse(uint64_t case_id, string rationale, name arb);
+  [[eosio::action]] //TODO: change rationale to full recusal doc?
+  void recuse(uint64_t case_id, string rationale, name assigned_arb);
 
 
-  //TODO: require decision?
-  [[eosio::action]]
-  void closecase(uint64_t case_id, name arb, string ipfs_url); //TODO: rename to resolvecase()?
-
-  [[eosio::action]]
-  void changeclass(uint64_t case_id, uint16_t claim_index, uint16_t new_class, name arb);
 
   [[eosio::action]]
   void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?
@@ -184,7 +181,7 @@ public:
   void joincases(uint64_t joinder_id, uint64_t new_case_id, name arb); //TODO: add memo for joining?
 
 
-  #pragma endregion Case_Actions
+  #pragma endregion Case_Progression
 
   #pragma region Arb_Actions
 
