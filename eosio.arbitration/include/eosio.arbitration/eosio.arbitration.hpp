@@ -93,14 +93,14 @@ public:
 
   #pragma endregion Enums
 
-  #pragma region Arb_Electionsa
+  #pragma region Arb_Elections
 
 
   [[eosio::action]]
   void initelection();
 
   [[eosio::action]]
-  void regnominee(name nominee, string credentials_link);
+  void regarb(name nominee, string credentials_link); //NOTE: actually regnominee, currently regarb for nonsense governance reasons
 
   [[eosio::action]]
   void unregnominee(name nominee);

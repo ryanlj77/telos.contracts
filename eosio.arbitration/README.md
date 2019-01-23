@@ -86,5 +86,7 @@ Description here...
 
 * `CASE_INVESTIGATION` : When a case has been assigned one or more arbitrators, the case then enters the CASE_INVESTIGATION stage. In this stage the arbitrators review and assess the claims within the case to determine their validity. This stage may also involve communication between the claimant and the arbitrator in situations that require clarification or more sufficient evidence.
 
+* `RESOLVED` : 
+
 * `DISMISSED` : If during the CASE_INVESTIGATION stage the case is found to be invalid or without merit the arbitrator may move to file the case as DISMISSED.
 
