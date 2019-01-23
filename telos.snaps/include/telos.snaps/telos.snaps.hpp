@@ -31,7 +31,7 @@ class [[eosio::contract("telos.snaps")]] snapshots : public contract {
                       uint64_t amount );
 
      ACTION remove( uint64_t snapshot_id, uint32_t count );
-     ACTION clear( uint64_t snapshot_id );
+     //ACTION clear( uint64_t snapshot_id );
 
   private:
      TABLE balance {
