@@ -22,7 +22,7 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     ~canopy();
 
-    const symbol NATIVE_SYM = symbol("DISK", 2);
+    const symbol NATIVE_SYM = symbol("DISK", 0);
 
     enum provider_status : uint8_t {
         APPLIED, //status until accepted and in compliance
@@ -41,24 +41,26 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         EOSLIB_SERIALIZE(provider, (account)(status)(ipfs_endpoint))
     };
 
-    struct [[eosio::table]] row {
+    struct [[eosio::table]] file {
         uint64_t ipfs_cid; //NOTE: base32 encoding by IPFS
         name payer;
 
         uint64_t primary_key() const { return ipfs_cid; }
         uint64_t by_payer() const { return payer.value; }
-        EOSLIB_SERIALIZE(row, (ipfs_cid)(payer))
+        EOSLIB_SERIALIZE(file, (ipfs_cid)(payer))
     };
 
-    typedef multi_index<name("harddisk"), row> harddisk_table;
+    typedef multi_index<name("filerequests"), file> file_requests; //TODO: different struct? could hold consensus data until pinned to harddrive
 
-    typedef multi_index<name("providers"), provider> providers_table;
+    typedef multi_index<name("harddrive"), file> harddrive;
+
+    typedef multi_index<name("providers"), provider> providers;
 
 
     //Canopy User Actions
 
     [[eosio::action]]
-    void addfile(string ipfs_cid, name payer);
+    void addfile(uint64_t ipfs_cid, name payer);
 
     [[eosio::action]]
     void rmvfile(string ipfs_cid, name payer);
@@ -70,10 +72,10 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
     void regprovider(name provider_name, string endpoint);
 
     [[eosio::action]]
-    void acceptfile(string ipfs_cid, name node_operator);
+    void acceptfile(string ipfs_cid, name provider_name);
 
     [[eosio::action]]
-    void releasefile(string ipfs_cid, name node_operator);
+    void releasefile(string ipfs_cid, name provider_name);
 
 
     //Do Later
