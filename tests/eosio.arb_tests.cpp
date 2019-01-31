@@ -57,7 +57,7 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
    produce_blocks(1);
    produce_block(fc::seconds(start_election + election_duration));
    produce_blocks(1);
-   regcand(test_voters[0], "12345678901234567890123456789012345678901234567890123");
+   regnominee(test_voters[0], "12345678901234567890123456789012345678901234567890123");
    endelection(test_voters[0]);
    produce_blocks(1);
 
@@ -158,7 +158,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1/");
 
    // candidates cannot register without an election
-   regcand(candidate, credentials);
+   regnominee(candidate, credentials);
    BOOST_REQUIRE_EXCEPTION( 
       candaddlead(candidate, credentials), 
       eosio_assert_message_exception, 
@@ -189,51 +189,51 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
 
    // register 
    candaddlead( candidate, credentials );
-   regcand( dropout, credentials );
+   regnominee( dropout, credentials );
    candaddlead( dropout, credentials );
    produce_blocks(1);
 
    // check integrity
-   auto c = get_candidate(dropout.value);
+   auto c = get_nominee(dropout.value);
    BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), dropout );
    BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
    
-   c = get_candidate(candidate.value);
+   c = get_nominee(candidate.value);
    BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate );
    BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
 
    // dropout unregisters
    candrmvlead( dropout );
-   unregcand( dropout );
+   unregnominee( dropout );
    // candidate unregisters
    candrmvlead( candidate );
-   unregcand( candidate );
+   unregnominee( candidate );
    produce_blocks(1);
 
    // check dropout is not a candidate anymore
-   c = get_candidate(dropout.value);
+   c = get_nominee(dropout.value);
    BOOST_REQUIRE_EQUAL(true, c.is_null());
-   c = get_candidate(candidate.value);
+   c = get_nominee(candidate.value);
    BOOST_REQUIRE_EQUAL(true, c.is_null());
    
    // candidate registers back
-   regcand( candidate, credentials );
+   regnominee( candidate, credentials );
    candaddlead( candidate, credentials );
-   c = get_candidate(candidate.value);
+   c = get_nominee(candidate.value);
    BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate );
    BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
    produce_blocks(1);
 
    // candidates cannot register multiple times
    BOOST_REQUIRE_EXCEPTION( 
-      regcand(candidate, credentials), 
+      regnominee(candidate, credentials), 
       eosio_assert_message_exception, 
       eosio_assert_message_is( "Candidate is already an applicant" )
    );
 
    // dropout cannot unregister multiple times
    BOOST_REQUIRE_EXCEPTION( 
-      unregcand(dropout), 
+      unregnominee(dropout), 
       eosio_assert_message_exception, 
       eosio_assert_message_is( "Candidate isn't an applicant" )
    );
@@ -250,7 +250,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    
    // candidates cannot unregister during election
    BOOST_REQUIRE_EXCEPTION( 
-      unregcand(candidate), 
+      unregnominee(candidate), 
       eosio_assert_message_exception, 
       eosio_assert_message_is( "Cannot unregister while election is in progress" )
    );
@@ -261,11 +261,11 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    );
    
    // new candidates can register while an election is ongoing
-   regcand(dropout, credentials);
+   regnominee(dropout, credentials);
 
    // but they cannot unregister during election even if they are not part of it
    BOOST_REQUIRE_EXCEPTION( 
-      unregcand(dropout), 
+      unregnominee(dropout), 
       eosio_assert_message_exception, 
       eosio_assert_message_is( "Cannot unregister while election is in progress" )
    );
@@ -318,7 +318,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    // the single candidate passes
    // so, candidate should be an arbitrator
    // and candidate is removed from the pending_candidates_table
-   c = get_candidate(candidate.value);
+   c = get_nominee(candidate.value);
    BOOST_REQUIRE_EQUAL(true, c.is_null());
 
    auto arb = get_arbitrator(candidate.value);
@@ -329,7 +329,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
    // candidate is not in the candidates table anymore
-   BOOST_REQUIRE_EQUAL(true, get_candidate(candidate.value).is_null());
+   BOOST_REQUIRE_EQUAL(true, get_nominee(candidate.value).is_null());
    
    config = get_config();
    auto next_cbid = config["ballot_id"].as_uint64();   
@@ -386,7 +386,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
 
    // arbitrators with a valid seat cannot register for election
    BOOST_REQUIRE_EXCEPTION( 
-      regcand(candidate, credentials), 
+      regnominee(candidate, credentials), 
       eosio_assert_message_exception, 
       eosio_assert_message_is( "Candidate is already an Arbitrator and the seat isn't expired" )
    );
@@ -396,7 +396,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    produce_blocks(1);
 
    // arbitrators with expired terms can join the election
-   regcand(candidate, credentials);
+   regnominee(candidate, credentials);
    candaddlead(candidate, credentials);
    produce_blocks(1);
 
@@ -452,7 +452,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){
       // register 
-      regcand( test_voters[i], credentials);
+      regnominee( test_voters[i], credentials);
       candaddlead( test_voters[i], credentials);
       produce_blocks(1);
    }
@@ -461,9 +461,9 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    // note for the continuation of the test :
    // unreg + rereg will put the candidate at the end of the leaderboard queue 
    candrmvlead(candidate3);
-   unregcand(candidate3);
+   unregnominee(candidate3);
    produce_blocks(1);
-   regcand(candidate3, credentials);
+   regnominee(candidate3, credentials);
    candaddlead(candidate3, credentials);
    produce_blocks(1);
 
@@ -539,7 +539,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
    BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
-   auto c = get_candidate(candidate1.value);
+   auto c = get_nominee(candidate1.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
    
    // candidate2 should be arbitrator and not a candidate anymore
@@ -549,14 +549,14 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
    BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
-   c = get_candidate(candidate2.value);
+   c = get_nominee(candidate2.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
 
    // candidate3 should NOT be an arbitrator, only 2 seats were available
    arb = get_arbitrator(candidate3.value);
    BOOST_REQUIRE_EQUAL(true, arb.is_null());
    // candidate3 will be removed as a candidate because there are no more seats available , and no new election will start
-   c = get_candidate(candidate3.value);
+   c = get_nominee(candidate3.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
 
    auto previous_cbid = cbid;
@@ -582,7 +582,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
       eosio_assert_message_is( "Candidate isn't an applicant. Use regcand action to register candidate" )
    );
 
-   regcand(noncandidate, credentials);
+   regnominee(noncandidate, credentials);
    produce_blocks(1);
 
    BOOST_REQUIRE_EXCEPTION( 
@@ -625,7 +625,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){
       // register 
-      regcand( test_voters[i], credentials);
+      regnominee( test_voters[i], credentials);
       candaddlead( test_voters[i], credentials);
       produce_blocks(1);
    }
@@ -634,9 +634,9 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    // note for the continuation of the test :
    // unreg + rereg will put the candidate at the end of the leaderboard queue 
    candrmvlead(candidate3);
-   unregcand(candidate3);
+   unregnominee(candidate3);
    produce_blocks(1);
-   regcand(candidate3, credentials);
+   regnominee(candidate3, credentials);
    candaddlead(candidate3, credentials);
    produce_blocks(1);
 
@@ -707,19 +707,19 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
    BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
-   auto c = get_candidate(candidate1.value);
+   auto c = get_nominee(candidate1.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
    
    // candidate2 and candidate3 should still be candidates in new election for a tie breaker
    arb = get_arbitrator(candidate2.value);
    BOOST_REQUIRE_EQUAL(true, arb.is_null());
-   c = get_candidate(candidate2.value);
+   c = get_nominee(candidate2.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), false);
    BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate2 );
    
    arb = get_arbitrator(candidate3.value);
    BOOST_REQUIRE_EQUAL(true, arb.is_null());
-   c = get_candidate(candidate3.value);
+   c = get_nominee(candidate3.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), false);
    BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate3 );
 

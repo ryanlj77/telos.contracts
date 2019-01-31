@@ -309,7 +309,7 @@ protected:
     uint64_t primary_key() const { return case_id; }
     EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
       (claimants)(respondants)(arbitrators)(required_langs)
-      (submitted_claims)(accepted_claims)(case_ruling)
+      (unread_claims)(accepted_claims)(case_ruling)
       (arb_comment)(last_edit))
   };
 
@@ -367,8 +367,7 @@ protected:
   typedef singleton<name("config"), config> config_singleton;
   config_singleton configs;
   config _config;
-
-
+   
   #pragma endregion Tables and Structs
 
   #pragma region Helpers
@@ -386,6 +385,8 @@ protected:
 
   void add_arbitrator(arbitrators_table &arbitrators, name arb_name, std::string credential_link);
 
+  void assert_string(string to_check, string error_msg);
+ 
 
   #pragma endregion Helpers
 
