@@ -125,7 +125,13 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
     void acceptfile(checksum256 ipfs_cid, name provider_name, name file_name, uint16_t chunks);
 
     [[eosio::action]]
-    void releasefile(string ipfs_cid, name provider_name);
+    void releasefile(checksum256 ipfs_cid, name provider_name, name file_name);
+
+    [[eosio::action]]
+    void maintainnode(name provider_name);
+
+    [[eosio::action]]
+    void activatenode(name provider_name);
 
     //Functions
 

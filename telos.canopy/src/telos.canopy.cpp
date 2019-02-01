@@ -120,6 +120,30 @@ void canopy::acceptfile(checksum256 ipfs_cid, name provider_name, name file_name
 
 }
 
+void canopy::maintainnode(name provider_name) {
+    require_auth(provider_name);
+
+    providers providers(get_self(), get_self().value);
+    auto p = providers.get(provider_name.value, "Provider is not registered");
+    eosio_assert(p.status == ACTIVE, "Producer must be active to enter maintenance");
+
+    providers.modify(p, same_payer, [&](auto& row) {
+        row.status = MAINTENANCE;
+    });
+}
+
+void canopy::activatenode(name provider_name) {
+    require_auth(provider_name);
+
+    providers providers(get_self(), get_self().value);
+    auto p = providers.get(provider_name.value, "Provider is not registered");
+    eosio_assert(p.status == MAINTENANCE, "Provider must be in maintenance to reactivate");
+
+    providers.modify(p, same_payer, [&](auto& row) {
+        row.status = MAINTENANCE;
+    });
+}
+
 void canopy::process_transfer(name to, asset amt) {
     users users(get_self(), get_self().value);
     auto u = users.find(to.value);
