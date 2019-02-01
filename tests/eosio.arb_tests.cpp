@@ -11,6 +11,8 @@
 #include "test_symbol.hpp"
 #include "eosio.arb_tester.hpp"
 
+#include <iostream>
+
 using namespace eosio::testing;
 using namespace eosio;
 using namespace eosio::chain;
@@ -42,22 +44,21 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
    REQUIRE_MATCHING_OBJECT(
       config, 
       mvo()
-         ("publisher", eosio::chain::name("eosio.arb"))
+		 ("publisher", eosio::chain::name("eosio.arb"))
+         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("max_elected_arbs", max_elected_arbs)
          ("election_duration", election_duration)
-         ("start_election", start_election)
-         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
-         ("arbitrator_term_length", uint32_t(one_day * 10))
-         ("last_time_edited", now())
-         ("ballot_id", 0)
-         ("auto_start_election", false)
+         ("election_start", start_election)
+         ("auto_start_election", 0)
+         ("current_ballot_id", 0)
+         ("arb_term_length", uint32_t(one_day * 10))
    );
 
    init_election();
    produce_blocks(1);
    produce_block(fc::seconds(start_election + election_duration));
    produce_blocks(1);
-   regnominee(test_voters[0], "12345678901234567890123456789012345678901234567890123");
+   regarb(test_voters[0], "12345678901234567890123456789012345678901234567890123");
    endelection(test_voters[0]);
    produce_blocks(1);
 
@@ -73,14 +74,13 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
       config, 
       mvo()
          ("publisher", eosio::chain::name("eosio.arb"))
+         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("max_elected_arbs", max_elected_arbs)
          ("election_duration", election_duration)
-         ("start_election", start_election)
-         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
-         ("arbitrator_term_length", uint32_t(one_day * 10 + 1))
-         ("last_time_edited", now())
-         ("ballot_id", 1)
-         ("auto_start_election", true)
+         ("election_start", start_election)
+         ("auto_start_election", 1)
+         ("current_ballot_id", 1)
+         ("arb_term_length", uint32_t(one_day * 10 + 1))
    );
    produce_blocks(1);
    
@@ -114,7 +114,7 @@ BOOST_FIXTURE_TEST_CASE( init_election_integrity, eosio_arb_tester ) try {
    produce_blocks(1);
 
    auto config = get_config();
-   auto cbid = config["ballot_id"].as_uint64();   
+   auto cbid = config["current_ballot_id"].as_uint64();   
 
    auto ballot = get_ballot(cbid);
    auto bid = ballot["reference_id"].as_uint64();
@@ -158,11 +158,11 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1/");
 
    // candidates cannot register without an election
-   regnominee(candidate, credentials);
+   regarb(candidate, credentials);
    BOOST_REQUIRE_EXCEPTION( 
       candaddlead(candidate, credentials), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "ballot doesn't exist" )
+      eosio_assert_message_is( "there is no active election" )
    );
 
    auto config = get_config();
@@ -184,23 +184,23 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EXCEPTION( 
       candaddlead( dropout, credentials ), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant. Use regcand action to register candidate" )
+      eosio_assert_message_is( "Nominee isn't an applicant. Use regarb action to register as a nominee" )
    );
 
    // register 
    candaddlead( candidate, credentials );
-   regnominee( dropout, credentials );
+   regarb( dropout, credentials );
    candaddlead( dropout, credentials );
    produce_blocks(1);
 
    // check integrity
    auto c = get_nominee(dropout.value);
-   BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), dropout );
-   BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
+   BOOST_REQUIRE_EQUAL( c["nominee_name"].as<name>(), dropout );
+   BOOST_REQUIRE_EQUAL( c["credentials_link"],  credentials );
    
    c = get_nominee(candidate.value);
-   BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate );
-   BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
+   BOOST_REQUIRE_EQUAL( c["nominee_name"].as<name>(), candidate );
+   BOOST_REQUIRE_EQUAL( c["credentials_link"],  credentials );
 
    // dropout unregisters
    candrmvlead( dropout );
@@ -217,31 +217,31 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EQUAL(true, c.is_null());
    
    // candidate registers back
-   regnominee( candidate, credentials );
+   regarb( candidate, credentials );
    candaddlead( candidate, credentials );
    c = get_nominee(candidate.value);
-   BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate );
-   BOOST_REQUIRE_EQUAL( c["credential_link"],  credentials );
+   BOOST_REQUIRE_EQUAL( c["nominee_name"].as<name>(), candidate );
+   BOOST_REQUIRE_EQUAL( c["credentials_link"],  credentials );
    produce_blocks(1);
 
    // candidates cannot register multiple times
    BOOST_REQUIRE_EXCEPTION( 
-      regnominee(candidate, credentials), 
+      regarb(candidate, credentials), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate is already an applicant" )
+      eosio_assert_message_is( "Nominee is already an applicant" )
    );
 
    // dropout cannot unregister multiple times
    BOOST_REQUIRE_EXCEPTION( 
       unregnominee(dropout), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant" )
+      eosio_assert_message_is( "Nominee isn't an applicant" )
    );
 
    BOOST_REQUIRE_EXCEPTION( 
       candrmvlead(dropout), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant." )
+      eosio_assert_message_is( "Nominee isn't an applicant." )
    );
    
    // start the election period
@@ -261,7 +261,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    );
    
    // new candidates can register while an election is ongoing
-   regnominee(dropout, credentials);
+   regarb(dropout, credentials);
 
    // but they cannot unregister during election even if they are not part of it
    BOOST_REQUIRE_EXCEPTION( 
@@ -271,13 +271,13 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    );
 
    config = get_config();
-   auto cbid = config["ballot_id"].as_uint64();   
+   auto cbid = config["current_ballot_id"].as_uint64();   
 
    // vote for candidate
    symbol vote_symbol = symbol(4, "VOTE");
    register_voters(test_voters, 0, 1, vote_symbol);
    mirrorcast(voter.value, symbol(4, "TLOS"));
-   castvote(voter.value, config["ballot_id"].as_uint64(), 0);
+   castvote(voter.value, config["current_ballot_id"].as_uint64(), 0);
    produce_blocks(1);
 
    auto ballot = get_ballot(cbid);
@@ -291,7 +291,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EXCEPTION( 
       endelection(candidate), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "election isn't ended. Please check again in " + std::to_string( remaining_seconds ) + " seconds" )
+      eosio_assert_message_is( "Election hasn't ended. Please check again after the election is over in " + std::to_string( remaining_seconds ) + " seconds" )
    );
 
    // election period is over
@@ -302,12 +302,12 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EXCEPTION( 
       endelection(voter), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant." )
+      eosio_assert_message_is( "Nominee isn't an applicant." )
    );
    produce_blocks(1);
 
    config = get_config();
-   cbid = config["ballot_id"].as_uint64();   
+   cbid = config["current_ballot_id"].as_uint64();   
 
    uint32_t expected_term_length = now() + arbitrator_term_length;
 
@@ -326,13 +326,13 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EQUAL(false, arb.is_null());
    BOOST_REQUIRE_EQUAL(arb["arb"].as<name>(), candidate);
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
-   BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
-   BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
+   BOOST_REQUIRE_EQUAL(arb["credentials_link"].as<std::string>(), credentials);
+//    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
    // candidate is not in the candidates table anymore
    BOOST_REQUIRE_EQUAL(true, get_nominee(candidate.value).is_null());
    
    config = get_config();
-   auto next_cbid = config["ballot_id"].as_uint64();   
+   auto next_cbid = config["current_ballot_id"].as_uint64();   
 
    BOOST_REQUIRE_EQUAL(true, config["auto_start_election"]);
 
@@ -340,7 +340,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_NE(cbid, next_cbid);
 
    config = get_config();
-   cbid = config["ballot_id"].as_uint64();   
+   cbid = config["current_ballot_id"].as_uint64();   
 
    ballot = get_ballot(cbid);
    bid = ballot["reference_id"].as_uint64();
@@ -363,7 +363,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EXCEPTION( 
       endelection(candidate), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant." )
+      eosio_assert_message_is( "Nominee isn't an applicant." )
    );
    produce_blocks(1);
 
@@ -376,7 +376,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
 
    config = get_config();
    cbid = next_cbid;
-   next_cbid = config["ballot_id"].as_uint64();   
+   next_cbid = config["current_ballot_id"].as_uint64();   
 
    BOOST_REQUIRE_EQUAL(true, config["auto_start_election"]);
 
@@ -386,9 +386,9 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
 
    // arbitrators with a valid seat cannot register for election
    BOOST_REQUIRE_EXCEPTION( 
-      regnominee(candidate, credentials), 
+      regarb(candidate, credentials), 
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate is already an Arbitrator and the seat isn't expired" )
+      eosio_assert_message_is( "Nominee is already an Arbitrator and the seat hasn't expired" )
    );
 
    // let the term expire
@@ -396,7 +396,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    produce_blocks(1);
 
    // arbitrators with expired terms can join the election
-   regnominee(candidate, credentials);
+   regarb(candidate, credentials);
    candaddlead(candidate, credentials);
    produce_blocks(1);
 
@@ -406,7 +406,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EQUAL(arb["arb_status"], SEAT_EXPIRED_STATUS);
    
    config = get_config();
-   cbid = config["ballot_id"].as_uint64();   
+   cbid = config["current_ballot_id"].as_uint64();   
 
    ballot = get_ballot(cbid);
    bid = ballot["reference_id"].as_uint64();
@@ -452,7 +452,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){
       // register 
-      regnominee( test_voters[i], credentials);
+      regarb( test_voters[i], credentials);
       candaddlead( test_voters[i], credentials);
       produce_blocks(1);
    }
@@ -463,7 +463,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    candrmvlead(candidate3);
    unregnominee(candidate3);
    produce_blocks(1);
-   regnominee(candidate3, credentials);
+   regarb(candidate3, credentials);
    candaddlead(candidate3, credentials);
    produce_blocks(1);
 
@@ -475,7 +475,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    asset weight = asset::from_string("200.0000 VOTE"), zero_asset = asset::from_string("0.0000 VOTE");
    vector<asset> expected_weights = {zero_asset, zero_asset, zero_asset};
    auto config = get_config();
-   auto cbid = config["ballot_id"].as_uint64();   
+   auto cbid = config["current_ballot_id"].as_uint64();   
 
    auto ballot = get_ballot(cbid);
    auto bid = ballot["reference_id"].as_uint64();
@@ -486,7 +486,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
   
       // everyone votes candidate1 => the direction is actually candidate index for leaderboard voting
       uint16_t vote_for_candidate = 0;      
-      castvote(test_voters[i].value, config["ballot_id"].as_uint64(), vote_for_candidate);
+      castvote(test_voters[i].value, config["current_ballot_id"].as_uint64(), vote_for_candidate);
       expected_weights[vote_for_candidate] += weight;
 
       // todo : recast vote test ??
@@ -494,7 +494,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
       // other vote :
       // every 3rd voter votes for candidate3 and others vote for candidate2
       vote_for_candidate = ( i % 3 == 0 ) ? uint16_t(2) : uint16_t(1);
-      castvote(test_voters[i].value, config["ballot_id"].as_uint64(), vote_for_candidate);
+      castvote(test_voters[i].value, config["current_ballot_id"].as_uint64(), vote_for_candidate);
       expected_weights[vote_for_candidate] += weight;
 
       produce_blocks(1);
@@ -524,7 +524,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    produce_blocks(1);
 
    config = get_config();
-   cbid = config["ballot_id"].as_uint64();   
+   cbid = config["current_ballot_id"].as_uint64();   
 
    // end the election
    endelection(candidate1);
@@ -537,8 +537,8 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(false, arb.is_null());
    BOOST_REQUIRE_EQUAL(arb["arb"].as<name>(), candidate1);
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
-   BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
-   BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
+   BOOST_REQUIRE_EQUAL(arb["credentials_link"].as<std::string>(), credentials);
+//    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
    auto c = get_nominee(candidate1.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
    
@@ -547,8 +547,8 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(false, arb.is_null());
    BOOST_REQUIRE_EQUAL(arb["arb"].as<name>(), candidate2);
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
-   BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
-   BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
+   BOOST_REQUIRE_EQUAL(arb["credentials_link"].as<std::string>(), credentials);
+//    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length); //TODO: determine term length test based on new struct fields
    c = get_nominee(candidate2.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
 
@@ -562,7 +562,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    auto previous_cbid = cbid;
    
    config = get_config();
-   cbid = config["ballot_id"].as_uint64();   
+   cbid = config["current_ballot_id"].as_uint64();   
 
    ballot = get_ballot(cbid);
    bid = ballot["reference_id"].as_uint64();
@@ -579,16 +579,16 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    BOOST_REQUIRE_EXCEPTION( 
       candaddlead(noncandidate, credentials),
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "Candidate isn't an applicant. Use regcand action to register candidate" )
+      eosio_assert_message_is( "there is no active election" )
    );
 
-   regnominee(noncandidate, credentials);
+   regarb(noncandidate, credentials);
    produce_blocks(1);
 
    BOOST_REQUIRE_EXCEPTION( 
       candaddlead(noncandidate, credentials),
       eosio_assert_message_exception, 
-      eosio_assert_message_is( "A new election hasn't started. Use initelection action to start a new election." )
+      eosio_assert_message_is( "there is no active election" )
    );
 } FC_LOG_AND_RETHROW()
 
@@ -625,7 +625,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){
       // register 
-      regnominee( test_voters[i], credentials);
+      regarb( test_voters[i], credentials);
       candaddlead( test_voters[i], credentials);
       produce_blocks(1);
    }
@@ -636,7 +636,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    candrmvlead(candidate3);
    unregnominee(candidate3);
    produce_blocks(1);
-   regnominee(candidate3, credentials);
+   regarb(candidate3, credentials);
    candaddlead(candidate3, credentials);
    produce_blocks(1);
 
@@ -649,7 +649,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    vector<asset> expected_weights = {zero_asset, zero_asset, zero_asset};
 
    auto config = get_config();
-   auto cbid = config["ballot_id"].as_uint64();   
+   auto cbid = config["current_ballot_id"].as_uint64();   
 
    auto ballot = get_ballot(cbid);
    auto bid = ballot["reference_id"].as_uint64();
@@ -660,12 +660,12 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
   
       // everyone votes candidate1 => the direction is actually candidate index for leaderboard voting
       uint16_t vote_for_candidate = 0;      
-      castvote(test_voters[i].value, config["ballot_id"].as_uint64(), vote_for_candidate);
+      castvote(test_voters[i].value, config["current_ballot_id"].as_uint64(), vote_for_candidate);
       expected_weights[vote_for_candidate] += weight;
 
       // other vote : 1 for candidate2 and 1 for candidate3 to get a tie
       vote_for_candidate = ( i % 2 == 0 ) ? uint16_t(2) : uint16_t(1);
-      castvote(test_voters[i].value, config["ballot_id"].as_uint64(), vote_for_candidate);
+      castvote(test_voters[i].value, config["current_ballot_id"].as_uint64(), vote_for_candidate);
       expected_weights[vote_for_candidate] += weight;
 
       produce_blocks(1);
@@ -705,8 +705,8 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(false, arb.is_null());
    BOOST_REQUIRE_EQUAL(arb["arb"].as<name>(), candidate1);
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
-   BOOST_REQUIRE_EQUAL(arb["credential_link"].as<std::string>(), credentials);
-   BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
+   BOOST_REQUIRE_EQUAL(arb["credentials_link"].as<std::string>(), credentials);
+//    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
    auto c = get_nominee(candidate1.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), true);
    
@@ -715,18 +715,18 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    BOOST_REQUIRE_EQUAL(true, arb.is_null());
    c = get_nominee(candidate2.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), false);
-   BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate2 );
+   BOOST_REQUIRE_EQUAL( c["nominee_name"].as<name>(), candidate2 );
    
    arb = get_arbitrator(candidate3.value);
    BOOST_REQUIRE_EQUAL(true, arb.is_null());
    c = get_nominee(candidate3.value);
    BOOST_REQUIRE_EQUAL(c.is_null(), false);
-   BOOST_REQUIRE_EQUAL( c["cand_name"].as<name>(), candidate3 );
+   BOOST_REQUIRE_EQUAL( c["nominee_name"].as<name>(), candidate3 );
 
    config = get_config();
    // a new leaderboard for the re-election / tiebreaker
-   BOOST_REQUIRE_NE(config["ballot_id"].as_uint64(), cbid);
-   cbid = config["ballot_id"].as_uint64();   
+   BOOST_REQUIRE_NE(config["current_ballot_id"].as_uint64(), cbid);
+   cbid = config["current_ballot_id"].as_uint64();   
 
    ballot = get_ballot(cbid);
    bid = ballot["reference_id"].as_uint64();

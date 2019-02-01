@@ -82,9 +82,9 @@ public:
         return push_transaction(trx);
     }
 
-    transaction_trace_ptr regnominee(name nominee, string credentials_link) {
+    transaction_trace_ptr regarb(name nominee, string credentials_link) {
         signed_transaction trx;
-        trx.actions.emplace_back(get_action(N(eosio.arb), N(regnominee), vector<permission_level>{{nominee, config::active_name}}, mvo()
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(regarb), vector<permission_level>{{nominee, config::active_name}}, mvo()
             ("nominee", nominee)
             ("credentials_link", credentials_link)));
         set_transaction_headers(trx);
