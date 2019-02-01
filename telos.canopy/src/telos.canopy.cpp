@@ -183,6 +183,15 @@ void canopy::process_bill(name from, name to, asset bill) {
 
 }
 
+asset canopy::calc_bill(uint16_t chunks, uint32_t last_bill_time) {
+
+    //TODO: revise billing calculation to prevent missed billing time
+    int64_t days_since_last_bill = int64_t((now() - last_bill_time) / DAY_IN_SEC);
+    int64_t raw_bill = (uint32_t(chunks) * days_since_last_bill);
+
+    return asset(raw_bill, NATIVE_SYM);
+}
+
 extern "C" {
     void apply(uint64_t self, uint64_t code, uint64_t action) {
 

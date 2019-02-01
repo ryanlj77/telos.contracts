@@ -139,4 +139,6 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     void process_bill(name from, name to, asset bill);
 
+    asset calc_bill(uint16_t chunks, uint32_t last_bill_time);
+
 };
