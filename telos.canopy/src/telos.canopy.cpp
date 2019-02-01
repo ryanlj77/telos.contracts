@@ -23,7 +23,7 @@ void canopy::buydisk(name payer, name recipient, asset tlos_amount) {
 
     users.modify(u, same_payer, [&](auto& row) {
         row.tlos_balance -= tlos_amount;
-        row.disk_balance += symbol(int64_t(tlos_amount.amount), NATIVE_SYM); //NOTE: buying at 10000 DISK / TLOS for easy testing
+        row.disk_balance += asset(int64_t(tlos_amount.amount), NATIVE_SYM); //NOTE: buying at 10000 DISK / TLOS for easy testing
     });
     
 }
@@ -39,7 +39,7 @@ void canopy::addfile(name payer, name file_name, checksum256 ipfs_cid) {
     auto files_by_cid = filerequests.get_index<name("bycid")>();
 
     auto fr = files_by_cid.find(ipfs_cid);
-    eosio_assert(fr == filerequests.end(), "File has already been requested");
+    eosio_assert(fr == files_by_cid.end(), "File has already been requested");
     // assert file_name is unique, will fail anyway if not but allows for a custom failure message
 
     //harddrive harddrive(get_self(), get_self().value);
@@ -66,7 +66,7 @@ void canopy::regprovider(name provider_name, string endpoint) {
         row.account = provider_name;
         row.status = APPLIED;
         row.ipfs_endpoint = endpoint;
-        row.disk_balance = symbol(int64_t(0), NATIVE_SYM)
+        row.disk_balance = asset(int64_t(0), NATIVE_SYM);
     });
 
 }
@@ -76,16 +76,16 @@ void canopy::acceptfile(checksum256 ipfs_cid, name provider_name, name file_name
 
     //NOTE: check ipfs_cid IS in requests table
     file_requests filerequests(get_self(), get_self().value);
-    auto files_by_cid = filerequests.get_index<name("bycid")>();
-    auto fr = files_by_cid.find(ipfs_cid);
-    eosio_assert(fr != filerequests.end(), "File hasn't been requested");
+    auto fr_by_cid = filerequests.get_index<name("bycid")>();
+    auto fr = fr_by_cid.find(ipfs_cid);
+    eosio_assert(fr != fr_by_cid.end(), "File hasn't been requested");
     name req = fr->payer;
 
     //TODO: check ipfs_cid is NOT in harddrive table
     harddrive harddrive(get_self(), get_self().value);
     auto files_by_cid = harddrive.get_index<name("bycid")>();
     auto f = files_by_cid.find(ipfs_cid);
-    eosio_assert(f == harddrive.end(), "File already exists on Hard Drive");
+    eosio_assert(f == files_by_cid.end(), "File already exists on Hard Drive");
 
     metadata metadata(get_self(), get_self().value);
     auto m = metadata.find(file_name.value);
@@ -116,7 +116,7 @@ void canopy::acceptfile(checksum256 ipfs_cid, name provider_name, name file_name
     });
 
     //NOTE: erase file request
-    filerequests.erase(fr);
+    filerequests.erase(*fr);
 
 }
 

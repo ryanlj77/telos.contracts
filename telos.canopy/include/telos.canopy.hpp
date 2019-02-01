@@ -64,7 +64,7 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     struct [[eosio::table]] file {
         name file_name;
-        name payer; //TODO: rename bill_disk_to?
+        name payer; //TODO: rename bill_to?
         checksum256 ipfs_cid; //NOTE: base32 encoding by IPFS hashed with sha256
 
         uint64_t primary_key() const { return file_name.value; }
@@ -84,7 +84,10 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         EOSLIB_SERIALIZE(file_meta, (file_name)(file_ext)(ipfs_chunks)(add_time)(last_charge_time))
     };
 
-    typedef multi_index<name("filerequests"), file> file_requests; //TODO: different struct? could hold consensus data until pinned to harddrive
+    typedef multi_index<name("filerequests"), file,
+    indexed_by<name("bypayer"), const_mem_fun<file, uint64_t, &file::by_payer>>,
+    indexed_by<name("bycid"), const_mem_fun<file, checksum256, &file::by_cid>>
+    > file_requests; //TODO: different struct? could hold consensus data until pinned to harddrive?
 
     typedef multi_index<name("harddrive"), file,
     indexed_by<name("bypayer"), const_mem_fun<file, uint64_t, &file::by_payer>>,
