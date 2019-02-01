@@ -5,6 +5,11 @@ Telos Canopy is a document storage solution designed to supplement EOS.IO softwa
 Telos Canopy incentivizes node operators to run the nodeos Canopy Plugin and Canopy API Plugin through a native tokenomics model. By running the Canopy Plugins, node operators supplement the IPFS Cluster with extra resources and additional redundancy replication. In return for providing this service, node operators will be paid out in the native HDD token (Hard Disk Drive) upon removal of the file from the cluster, in addition to small recurring fees for maintaining the service.
 
 
+1. transfer to teloscanopy
+2. buydisk
+3. addfile
+
+
 ## Stephanie's Model
 
 Account requests object be stored.  Current rate is $V TLOS/block (256KiB).
