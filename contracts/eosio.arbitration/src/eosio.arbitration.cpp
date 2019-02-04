@@ -33,6 +33,8 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 		arbitrator_term_length
 	};
 
+	configs.remove();
+
 	//print("\nSettings Configured: SUCCESS");
 }
 
@@ -632,16 +634,16 @@ void arbitration::assert_string(string to_check, string error_msg) {
 
 arbitration::config arbitration::get_default_config()
 {
-	vector<int64_t> fees{100000, 200000, 300000};
-	auto c = config{
-		get_self(),  // publisher
-		fees,		 // fee_structure
-		uint16_t(0), // max_elected_arbs
-		uint32_t(0), // election_duration
-		uint32_t(0), // election_start
-		bool(0),	 // auto_start_election
-		uint64_t(0), // current_ballot_id
-		uint32_t(0)  // arb_term_length
+	vector<int64_t> fees{1000000, 2000000, 3000000};
+	auto c = config {
+		get_self(),  		// publisher
+		fees,		 		// fee_structure
+		uint16_t(21), 		// max_elected_arbs
+		uint32_t(2505600), 	// election_duration
+		uint32_t(604800),	// election_start
+		bool(0),	 		// auto_start_election
+		uint64_t(0), 		// current_ballot_id
+		uint32_t(31536000)  // arb_term_length
 	};
 
 	return c;

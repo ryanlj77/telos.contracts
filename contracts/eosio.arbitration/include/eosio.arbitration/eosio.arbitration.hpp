@@ -172,7 +172,8 @@ public:
   [[eosio::action]] //TODO: change rationale to full recusal doc?
   void recuse(uint64_t case_id, string rationale, name assigned_arb);
 
-
+  [[eosio::action]]
+  void fix();
 
   [[eosio::action]]
   void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?

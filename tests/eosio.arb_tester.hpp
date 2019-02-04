@@ -273,6 +273,15 @@ public:
         return push_transaction(trx);
     }
 
+	transaction_trace_ptr fix() {   
+        signed_transaction trx;
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(fix), vector<permission_level>{{N(eosio.arb), config::active_name}},
+                                            mvo() ));
+        set_transaction_headers(trx);
+        trx.sign(get_private_key(N(eosio.arb), "active"), control->get_chain_id());
+        return push_transaction(trx);
+    }
+
     #pragma endregion Actions
 
 

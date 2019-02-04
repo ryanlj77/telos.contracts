@@ -749,5 +749,41 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 
 } FC_LOG_AND_RETHROW()
 
+BOOST_FIXTURE_TEST_CASE( fix_test, eosio_arb_tester ) try {
+	fix();
+
+	auto c = get_config();
+
+	REQUIRE_MATCHING_OBJECT(
+		c,
+		mvo()
+			("publisher", eosio::chain::name("eosio.arb"))
+			("fee_structure", vector<int64_t>({int64_t(1000000), int64_t(2000000), int64_t(3000000)}))
+			("max_elected_arbs", 21)
+			("election_duration", 2505600)
+			("election_start", 604800)
+			("auto_start_election", 0)
+			("current_ballot_id", 0)
+			("arb_term_length", 31536000)
+	)
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( assign_arbitrator_flow, eosio_arb_tester ) try {
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {
+
+} FC_LOG_AND_RETHROW()
+
+
+
+
+
 
 BOOST_AUTO_TEST_SUITE_END()
