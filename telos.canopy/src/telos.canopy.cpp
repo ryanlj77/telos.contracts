@@ -12,6 +12,7 @@ canopy::canopy(name self, name code, datastream<const char*> ds) : contract(self
 canopy::~canopy() {}
 
 void canopy::buydisk(name payer, name recipient, asset tlos_amount) {
+    
     require_auth(payer);
     eosio_assert(is_account(recipient), "Recipient account does not exist");
     eosio_assert(tlos_amount.symbol == symbol("TLOS", 4), "Only TLOS can be used to purchase DISK");
@@ -20,7 +21,7 @@ void canopy::buydisk(name payer, name recipient, asset tlos_amount) {
     users users(get_self(), get_self().value);
     auto u = users.find(payer.value);
     eosio_assert(u != users.end(), "Payer account has no Canopy balance");
-
+    
     users.modify(u, same_payer, [&](auto& row) {
         row.tlos_balance -= tlos_amount;
         row.disk_balance += asset(int64_t(tlos_amount.amount), NATIVE_SYM); //NOTE: buying at 10000 DISK / TLOS for easy testing
@@ -164,7 +165,7 @@ void canopy::process_transfer(name to, asset amt) {
 
 }
 
-void canopy::process_bill(name from, name to, asset bill) {
+void canopy::process_bill(name username) {
     
     users users(get_self(), get_self().value);
     auto u = users.get(from.value, "User has no balance to pay for storage");
@@ -183,13 +184,11 @@ void canopy::process_bill(name from, name to, asset bill) {
 
 }
 
-asset canopy::calc_bill(uint16_t chunks, uint32_t last_bill_time) {
+asset canopy::calc_bill(int64_t per_sec_rate, uint32_t last_bill_time) {
 
-    //TODO: revise billing calculation to prevent missed billing time
-    int64_t days_since_last_bill = int64_t((now() - last_bill_time) / DAY_IN_SEC);
-    int64_t raw_bill = (uint32_t(chunks) * days_since_last_bill);
+    int64_t bill = int64_t((now() - last_bill_time) * per_sec_rate);
 
-    return asset(raw_bill, NATIVE_SYM);
+    return asset(bill, NATIVE_SYM);
 }
 
 extern "C" {

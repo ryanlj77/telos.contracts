@@ -24,6 +24,8 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     const symbol NATIVE_SYM = symbol("DISK", 0);
 
+    const int64_t PER_SEC_RATE = 1;
+
     const uint32_t DAY_IN_SEC = 86400;
 
     enum provider_status : uint8_t {
@@ -133,12 +135,13 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
     [[eosio::action]]
     void activatenode(name provider_name);
 
+
     //Functions
 
     void process_transfer(name to, asset amt);
 
-    void process_bill(name from, name to, asset bill);
+    asset calc_bill(int64_t per_sec_rate, uint32_t last_bill_time);
 
-    asset calc_bill(uint16_t chunks, uint32_t last_bill_time);
+    void process_bill(name username);
 
 };
