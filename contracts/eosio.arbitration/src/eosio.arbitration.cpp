@@ -9,6 +9,8 @@
 
 arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds), configs(_self, _self.value)
 {
+	//TODO: the current state of the arbitration config table is causing issues with updating the contract.
+	// I may need to change this table back if I can't find a suitable way of resolving this problem.
 	_config = configs.exists() ? configs.get() : get_default_config();
 }
 
@@ -101,7 +103,14 @@ void arbitration::unregnominee(name nominee)
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
 
-	//TODO: assert nominee is on leaderboard?
+	if(now() >= board.begin_time && now() <= board.end_time){
+		auto it = std::find_if(board.candidates.begin(), board.candidates.end(), [&](auto& candidate) {
+			return candidate.member == nominee;
+		});
+		check(it != board.candidates.end(), 
+			"nominee must call candrmvlead before unregistering");
+	}
+	
 	check(now() < board.begin_time, "Cannot unregister while election is in progress");
 
 	nominees.erase(nom_itr);
@@ -288,8 +297,7 @@ void arbitration::endelection(name nominee)
 	}
 	else
 	{
-		for (auto i = nominees.begin(); i != nominees.end(); i = nominees.erase(i))
-			;
+		for (auto i = nominees.begin(); i != nominees.end(); i = nominees.erase(i));
 		_config.auto_start_election = false;
 		//print("\nThere aren't enough seats available or candidates to start a new election.\nUse init action to start a new election.");
 	}
@@ -310,17 +318,16 @@ void arbitration::filecase(name claimant, string claim_link)
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto case_id = casefiles.available_primary_key();
 	vector<name> arbs;
-	vector<name> respondants;
+	name respondant;
 	vector<uint8_t> lang_codes;
 	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
 	vector<uint64_t> acc_claims;
-	vector<name> claimants = { claimant };
 
 	casefiles.emplace(claimant, [&](auto &row) {
 		row.case_id = case_id;
 		row.case_status = CASE_SETUP;
-		row.claimants = claimants;
-		row.respondants = respondants;
+		row.claimant = claimant;
+		row.respondant = respondant;
 		row.arbitrators = arbs;
 		row.required_langs = lang_codes;
 		row.unread_claims = unr_claims;
@@ -335,14 +342,16 @@ void arbitration::filecase(name claimant, string claim_link)
 void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant)
 {
 	require_auth(claimant);
-	//TODO: case should be in setup state.
-	//check(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14");
 	validate_ipfs_url(claim_link);
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto cf = casefiles.get(case_id, "Case Not Found");
+
 	check(cf.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
-	check(is_claimant(claimant, cf.claimants), "not in list of claimants for casefile");
+
+	check(claimant == cf.claimant, "you are not the claimant of this case.");
+	auto claim_it = get_claim_at(claim_link, cf.unread_claims);
+	check(claim_it != cf.unread_claims.end(), "ipfs hash exists in another claim");
 
 	claim new_claim = claim{uint64_t(0), claim_link, ""};
 	auto new_claims = cf.unread_claims;
@@ -360,23 +369,13 @@ void arbitration::removeclaim(uint64_t case_id, string claim_hash, name claimant
 	auto cf = casefiles.get(case_id, "Case Not Found");
 	check(cf.case_status == CASE_SETUP, "Claims cannot be removed after CASE_SETUP is complete");
 	check(cf.unread_claims.size() > 0, "No claims to remove");
-	check(is_claimant(claimant, cf.claimants), "Not in list of claimants for casefile");
+	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
 	vector<claim> new_claims = cf.unread_claims;
 
-	bool found = false;
-	auto itr = new_claims.begin();
-	while (itr != new_claims.end())
-	{
-		if (itr->claim_summary == claim_hash)
-		{
-			new_claims.erase(itr);
-			found = true;
-			break;
-		}
-		itr++;
-	}
-	check(found, "Claim Hash not found in casefile");
+	auto claim_it = get_claim_at(claim_hash, new_claims);
+	check(claim_it != new_claims.end(), "Claim Hash not found in casefile");
+	new_claims.erase(claim_it);
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.unread_claims = new_claims;
@@ -392,11 +391,11 @@ void arbitration::shredcase(uint64_t case_id, name claimant)
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto c_itr = casefiles.find(case_id);
 	check(c_itr != casefiles.end(), "Case Not Found");
-	check(is_claimant(claimant, c_itr->claimants), "not in list of claimants for casefile");
-
-	//TODO: erase all claims for case as well
-
+	check(claimant == c_itr->claimant, "you are not the claimant of this case.");
 	check(c_itr->case_status == CASE_SETUP, "cases can only be shredded during CASE_SETUP");
+
+	// NOTE: Shredding the case doesn't require deleting any claims from table.
+	// This is because addclaim only adds claims to the unread vector and not the table.
 
 	casefiles.erase(c_itr);
 }
@@ -407,7 +406,7 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 	auto cf = casefiles.get(case_id, "Case Not Found");
 	check(cf.case_status == CASE_SETUP, "Cases can only be readied during CASE_SETUP");
 	check(cf.unread_claims.size() >= 1, "Cases must have atleast one claim");
-	check(is_claimant(claimant, cf.claimants), "not in list of claimants for casefile");
+	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = AWAITING_ARBS;
@@ -419,7 +418,6 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 
 #pragma region Case_Progression
 
-//TODO: assignment logic
 void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 {
 	require_auth(permission_level("eosio.arb"_n, "assign"_n));
@@ -461,19 +459,9 @@ void arbitration::dismissclaim(uint64_t case_id, name assigned_arb, string claim
 	assert_string(memo, std::string("memo must be greater than 0 and less than 255"));
 	vector<claim> new_claims = cf.unread_claims;
 
-	bool found = false;
-	auto itr = new_claims.begin();
-	while (itr != new_claims.end())
-	{
-		if (itr->claim_summary == claim_hash)
-		{
-			new_claims.erase(itr);
-			found = true;
-			break;
-		}
-		itr++;
-	}
-	check(found, "Claim Hash not found in casefile");
+	auto claim_it = get_claim_at(claim_hash, new_claims);
+	check(claim_it != new_claims.end(), "Claim Hash not found in casefile");
+	new_claims.erase(claim_it);
 
 	casefiles.modify(cf, same_payer, [&](auto &cf) {
 		cf.unread_claims = new_claims;
@@ -484,7 +472,7 @@ void arbitration::dismissclaim(uint64_t case_id, name assigned_arb, string claim
 void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class)
 {
 	require_auth(assigned_arb);
-	validate_ipfs_url(claim_hash); //TODO: necessary?
+	validate_ipfs_url(claim_hash);
 	validate_ipfs_url(decision_link);
 
 	casefiles_table casefiles(get_self(), get_self().value);
@@ -496,18 +484,21 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	auto new_claim_id = claims.available_primary_key();
 
 	vector<claim> new_unread_claims = cf.unread_claims;
-	//TODO: remove claim from vector
+
+	auto claim_it = get_claim_at(claim_hash, new_unread_claims);
+	check(claim_it != new_unread_claims.end(), "Claim Hash not found in casefile");
+	new_unread_claims.erase(claim_it);
 
 	vector<uint64_t> new_accepted_claims = cf.accepted_claims;
-	//TODO: add filled claim to accepted claim vector
-
+	new_accepted_claims.emplace_back(new_claim_id);
+	
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.unread_claims = new_unread_claims;
 		row.accepted_claims = new_accepted_claims;
 		row.last_edit = now();
 	});
 
-	claims.emplace(assigned_arb, [&](auto &row) { //TODO: should arb pay for emplacement?
+	claims.emplace(get_self(), [&](auto &row) { //TODO: should arb pay for emplacement? //NO!
 		row.claim_id = new_claim_id;
 		row.claim_summary = claim_hash;
 		row.decision_link = decision_link;
@@ -523,7 +514,8 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	auto cf = casefiles.get(case_id, "Case not found with given Case ID");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
 
-	//TODO: check assigned_arb is arb in casefile
+	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
+	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = ++cf.case_status;
@@ -607,20 +599,15 @@ void arbitration::newarbstatus(uint8_t new_status, name arbitrator)
 
 #pragma endregion Arb_Actions
 
-#pragma region Helpers
+#pragma region Helpersƒ
 
-bool arbitration::is_claimant(name claimant, vector<name> list)
+typedef arbitration::claim claim;
+
+vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim> claims)
 {
-	auto itr = list.begin();
-	while (itr != list.end())
-	{
-		if (*itr == claimant)
-		{
-			return true;
-		}
-		itr++;
-	}
-	return false;
+	return std::find_if(claims.begin(), claims.end(), [&](auto& claim) {
+		return claim.claim_summary == hash;
+	});
 }
 
 void arbitration::validate_ipfs_url(string ipfs_url)

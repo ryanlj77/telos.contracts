@@ -119,7 +119,6 @@ public:
 
   #pragma region Case_Setup
 
-
   //NOTE: filing a case doesn't require a respondent
   [[eosio::action]]
   void filecase(name claimant, string claim_link);
@@ -171,9 +170,6 @@ public:
 
   [[eosio::action]] //TODO: change rationale to full recusal doc?
   void recuse(uint64_t case_id, string rationale, name assigned_arb);
-
-  [[eosio::action]]
-  void fix();
 
   [[eosio::action]]
   void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?
@@ -236,8 +232,6 @@ public:
 
   #pragma endregion System Structs
 
-protected:
-
   #pragma region Tables and Structs
 
 
@@ -291,12 +285,12 @@ protected:
    * @scope get_self().value
    * @key case_id
    */
-  struct[[eosio::table]] casefile {
+  struct [[eosio::table]] casefile {
     uint64_t case_id;
     uint8_t case_status;
 
-    vector<name> claimants;
-    vector<name> respondants; //NOTE: empty for no respondant
+    name claimant;
+    name respondant; //NOTE: empty for no respondant
     vector<name> arbitrators;
     vector<uint8_t> required_langs;
 
@@ -308,12 +302,18 @@ protected:
     uint32_t last_edit;
 
     uint64_t primary_key() const { return case_id; }
+	uint64_t by_claimant() const { return claimant.value; }
+	uint128_t by_uuid() const {
+		uint128_t claimant_id = static_cast<uint128_t>(claimant.value);
+		uint128_t respondant_od = static_cast<uint128_t>(respondant.value);
+		return (claimant_id << 64) || respondant;
+	}
     EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
-      (claimants)(respondants)(arbitrators)(required_langs)
+      (claimant)(respondant)(arbitrators)(required_langs)
       (unread_claims)(accepted_claims)(case_ruling)
       (arb_comment)(last_edit))
   };
-
+ 
   /**
    * Singleton for global config settings.
    * @scope singleton scope (get_self().value)
@@ -355,6 +355,8 @@ protected:
     EOSLIB_SERIALIZE(joinder, (join_id)(cases)(join_time)(joined_by))
   };
 
+protected:
+
   typedef multi_index<name("nominees"), nominee> nominees_table;
 
   typedef multi_index<name("arbitrators"), arbitrator> arbitrators_table;
@@ -373,9 +375,6 @@ protected:
 
   #pragma region Helpers
 
-
-  bool is_claimant(name claimant, vector<name> list);
-
   void validate_ipfs_url(string ipfs_url);
   
   config get_default_config();
@@ -387,7 +386,17 @@ protected:
   void add_arbitrator(arbitrators_table &arbitrators, name arb_name, std::string credential_link);
 
   void assert_string(string to_check, string error_msg);
- 
+
+  vector<claim>::iterator get_claim_at(const string claim_hash, vector<claim> claims);
+
+  void del_claim_at(const string claim_hash, vector<claim> claims);
+  
+  template <typename T, typename func>
+  void map(vector<T>& arr, func&& handler) {
+	  for(auto it = arr.begin(); it != arr.end(); ++it){
+		  handler(it);
+	  }	
+  }
 
   #pragma endregion Helpers
 
