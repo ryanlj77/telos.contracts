@@ -59,7 +59,7 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
    produce_blocks(1);
    produce_block(fc::seconds(start_election + election_duration));
    produce_blocks(1);
-   regarb(test_voters[0], "12345678901234567890123456789012345678901234567890123");
+   regarb(test_voters[0], "12345678901234567890123456789012345678901234567890123123465");
    endelection(test_voters[0]);
    produce_blocks(1);
 
@@ -157,7 +157,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    name dropout = test_voters[2];
    name noncandidate = test_voters[3];
 
-   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1/");
+   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1123456/");
 
    // candidates cannot register without an election
    regarb(candidate, credentials);
@@ -449,7 +449,7 @@ BOOST_FIXTURE_TEST_CASE( full_election, eosio_arb_tester ) try {
    name candidate3 = test_voters[2];
    name noncandidate = test_voters[3];
 
-   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1/");
+   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1123456/");
 
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){
@@ -622,7 +622,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    name candidate2 = test_voters[1];
    name candidate3 = test_voters[2];
 
-   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1/");
+   std::string credentials = std::string("/ipfs/53CharacterLongHashToSatisfyIPFSHashCondition1123456/");
 
    // register and verifiy integrity of candidate info
    for(int i = 0; i <= 2; i++){

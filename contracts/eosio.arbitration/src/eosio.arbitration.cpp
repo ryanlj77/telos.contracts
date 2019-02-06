@@ -9,8 +9,6 @@
 
 arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds), configs(_self, _self.value)
 {
-	//TODO: the current state of the arbitration config table is causing issues with updating the contract.
-	// I may need to change this table back if I can't find a suitable way of resolving this problem.
 	_config = configs.exists() ? configs.get() : get_default_config();
 }
 
@@ -102,7 +100,8 @@ void arbitration::unregnominee(name nominee)
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
 	
-	check(now() < board.begin_time, "Cannot unregister while election is in progress");
+	if (_config.auto_start_election) 
+		check(now() < board.begin_time, "Cannot unregister while election is in progress");
 
 	nominees.erase(nom_itr);
 }
@@ -409,13 +408,13 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 
 #pragma region Case_Progression
 
-void addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_to_assign)
+void arbitration::addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_to_assign)
 {
 	require_auth(assigned_arb);
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto cf = casefiles.get(case_id, "Case Not Found");
 
-	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), cf.arbitrators);
+	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_it != cf.arbitrators.end(), "arbitrator isn't assigned to this case_id");
 
 	/* RATIONALE: If the following validations pass, the trx would be committed irreversible.
@@ -623,7 +622,8 @@ vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim> cla
 
 void arbitration::validate_ipfs_url(string ipfs_url)
 {
-	check(ipfs_url.length() == 53, "invalid ipfs string, valid schema: /ipfs/<hash>/");
+	//TODO: rewrite this validation to check for cidv0 and cidv1
+	check(ipfs_url.length() == 59, "invalid ipfs string, valid schema: <hash>");
 }
 
 void arbitration::assert_string(string to_check, string error_msg) {
