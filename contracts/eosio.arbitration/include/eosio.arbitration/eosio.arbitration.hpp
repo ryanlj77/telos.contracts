@@ -149,6 +149,9 @@ public:
   void assigntocase(uint64_t case_id, name arb_to_assign);
 
   [[eosio::action]]
+  void addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_to_assign);
+
+  [[eosio::action]]
   void dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo);
 
   //NOTE: moves to evidence_table and assigns ID
@@ -302,18 +305,19 @@ public:
     uint32_t last_edit;
 
     uint64_t primary_key() const { return case_id; }
+
 	uint64_t by_claimant() const { return claimant.value; }
 	uint128_t by_uuid() const {
 		uint128_t claimant_id = static_cast<uint128_t>(claimant.value);
-		uint128_t respondant_od = static_cast<uint128_t>(respondant.value);
-		return (claimant_id << 64) || respondant;
+		uint128_t respondant_id = static_cast<uint128_t>(respondant.value);
+		return (claimant_id << 64) | respondant_id;
 	}
     EOSLIB_SERIALIZE(casefile, (case_id)(case_status)
       (claimant)(respondant)(arbitrators)(required_langs)
       (unread_claims)(accepted_claims)(case_ruling)
       (arb_comment)(last_edit))
   };
- 
+
   /**
    * Singleton for global config settings.
    * @scope singleton scope (get_self().value)
@@ -324,20 +328,19 @@ public:
   //NOTE: initial deposit saved
   struct [[ eosio::table ]] config {
     name publisher;
-    vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value //TODO: just make vector of assets
-
     uint16_t max_elected_arbs;
     uint32_t election_duration;
     uint32_t election_start;
-    bool auto_start_election = false;
-    uint64_t current_ballot_id = 0;
+	vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value //TODO: just make vector of assets
     uint32_t arb_term_length;
-
-    //TODO: response times vector?
+	uint32_t last_time_edited;
+    uint64_t current_ballot_id = 0;
+	bool auto_start_election = false;
 
     uint64_t primary_key() const { return publisher.value; }
-    EOSLIB_SERIALIZE(config, (publisher)(fee_structure)
-    (max_elected_arbs)(election_duration)(election_start)(auto_start_election)(current_ballot_id)(arb_term_length))
+    EOSLIB_SERIALIZE(config, (publisher)
+    (max_elected_arbs)(election_duration)(election_start)(fee_structure)
+	(arb_term_length)(last_time_edited)(current_ballot_id)(auto_start_election))
   };
 
   /**
@@ -390,7 +393,7 @@ protected:
   vector<claim>::iterator get_claim_at(const string claim_hash, vector<claim> claims);
 
   void del_claim_at(const string claim_hash, vector<claim> claims);
-  
+
   template <typename T, typename func>
   void map(vector<T>& arr, func&& handler) {
 	  for(auto it = arr.begin(); it != arr.end(); ++it){

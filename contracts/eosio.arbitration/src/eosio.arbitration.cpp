@@ -26,16 +26,15 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 
 	_config = config {
 		get_self(),		   	//publisher
-		fees,			   	//fee_structure
 		max_elected_arbs,  	//max_elected_arbs
 		election_duration, 	//election_duration
 		election_start,		//election_start
-		_config.auto_start_election,
+		fees,			   	//fee_structure
+		arbitrator_term_length,
+		now(),
 		_config.current_ballot_id,
-		arbitrator_term_length
+		_config.auto_start_election	
 	};
-
-	configs.remove();
 
 	//print("\nSettings Configured: SUCCESS");
 }
@@ -102,14 +101,6 @@ void arbitration::unregnominee(name nominee)
 
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
-
-	if(now() >= board.begin_time && now() <= board.end_time){
-		auto it = std::find_if(board.candidates.begin(), board.candidates.end(), [&](auto& candidate) {
-			return candidate.member == nominee;
-		});
-		check(it != board.candidates.end(), 
-			"nominee must call candrmvlead before unregistering");
-	}
 	
 	check(now() < board.begin_time, "Cannot unregister while election is in progress");
 
@@ -418,6 +409,21 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 
 #pragma region Case_Progression
 
+void addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_to_assign)
+{
+	require_auth(assigned_arb);
+	casefiles_table casefiles(get_self(), get_self().value);
+	auto cf = casefiles.get(case_id, "Case Not Found");
+
+	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), cf.arbitrators);
+	check(arb_it != cf.arbitrators.end(), "arbitrator isn't assigned to this case_id");
+
+	/* RATIONALE: If the following validations pass, the trx would be committed irreversible.
+	Demux service watch from calls to this action, a side effect of this action being call 
+	is to assigntocase N times. */
+}
+
+//TODO: assign more arbitrators by the arbitrators
 void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 {
 	require_auth(permission_level("eosio.arb"_n, "assign"_n));
@@ -435,7 +441,8 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto cf = casefiles.get(case_id, "Case not found with given Case ID");
-	check(cf.arbitrators.size() == size_t(0), "Case already has an assigned arbitrator");
+
+	//check(cf.arbitrators.size() == size_t(0), "Case already has an assigned arbitrator");
 	check(std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb_to_assign) == cf.arbitrators.end(),
 				 "Arbitrator is already assigned to this case");
 
@@ -510,6 +517,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 {
 	require_auth(assigned_arb);
 
+	//TODO: case can't be elevated if there is more then one assigned arbitrator.
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto cf = casefiles.get(case_id, "Case not found with given Case ID");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
@@ -521,6 +529,9 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		row.case_status = ++cf.case_status;
 	});
 }
+
+//TODO: action that is used with multisig to set a case_status to RESOLVED.
+//TODO: action that is used with multisig to set a case_status to ENFORCEMENT 
 
 void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling_link)
 {
@@ -624,13 +635,14 @@ arbitration::config arbitration::get_default_config()
 	vector<int64_t> fees{1000000, 2000000, 3000000};
 	auto c = config {
 		get_self(),  		// publisher
-		fees,		 		// fee_structure
 		uint16_t(21), 		// max_elected_arbs
 		uint32_t(2505600), 	// election_duration
 		uint32_t(604800),	// election_start
-		bool(0),	 		// auto_start_election
+		fees,		 		// fee_structure
+		uint32_t(31536000),  // arb_term_length
+		now(),
 		uint64_t(0), 		// current_ballot_id
-		uint32_t(31536000)  // arb_term_length
+		bool(0),	 		// auto_start_election
 	};
 
 	return c;
@@ -685,7 +697,7 @@ bool arbitration::has_available_seats(arbitrators_table &arbitrators, uint8_t &a
 void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, string credential_link)
 {
 	auto arb = arbitrators.find(arb_name.value);
-
+	//TODO: term expiration and elected time aren't being updated correctly.
 	if (arb == arbitrators.end())
 	{
 		arbitrators.emplace(_self, [&](auto &a) {

@@ -45,13 +45,14 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
       config, 
       mvo()
 		 ("publisher", eosio::chain::name("eosio.arb"))
-         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("max_elected_arbs", max_elected_arbs)
          ("election_duration", election_duration)
          ("election_start", start_election)
-         ("auto_start_election", 0)
-         ("current_ballot_id", 0)
+		 ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("arb_term_length", uint32_t(one_day * 10))
+		 ("last_time_edited", now())
+		 ("current_ballot_id", 0)
+		 ("auto_start_election", 0)
    );
 
    init_election();
@@ -74,13 +75,14 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
       config, 
       mvo()
          ("publisher", eosio::chain::name("eosio.arb"))
-         ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("max_elected_arbs", max_elected_arbs)
          ("election_duration", election_duration)
          ("election_start", start_election)
-         ("auto_start_election", 1)
-         ("current_ballot_id", 1)
+		 ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("arb_term_length", uint32_t(one_day * 10 + 1))
+		 ("last_time_edited", now())
+		 ("current_ballot_id", 1)
+		 ("auto_start_election", 1)
    );
    produce_blocks(1);
    
