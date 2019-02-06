@@ -93,8 +93,10 @@ public:
 
   #pragma endregion Enums
 
-  #pragma region Arb_Elections
+  [[eosio::action]]
+  void injectarbs(vector<name> to_inject);
 
+  #pragma region Arb_Elections
 
   [[eosio::action]]
   void initelection();

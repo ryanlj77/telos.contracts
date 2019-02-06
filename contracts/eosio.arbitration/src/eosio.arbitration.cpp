@@ -7,7 +7,9 @@
 
 #include <eosio.arbitration/eosio.arbitration.hpp>
 
-arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds), configs(_self, _self.value)
+arbitration::arbitration(name s, name code, datastream<const char *> ds) : 
+	eosio::contract(s, code, ds), 
+	configs(_self, _self.value)
 {
 	_config = configs.exists() ? configs.get() : get_default_config();
 }
@@ -17,7 +19,16 @@ arbitration::~arbitration()
 	configs.set(_config, get_self());
 }
 
-void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
+void arbitration::injectarbs(vector<name> to_inject) 
+{
+	arbitrators_table arbitrators(get_self(), get_self().value);
+	for(const auto& arb : to_inject) {
+		add_arbitrator(arbitrators, arb, "");
+	}
+}
+
+void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, 
+	uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
 {
 	require_auth(name("eosio"));
 	check(max_elected_arbs > uint16_t(0), "Arbitrators must be greater than 0");
@@ -132,7 +143,7 @@ void arbitration::candaddlead(name nominee, string credentials_link)
 
 	//print("\nArb Application: SUCCESS");
 }
-
+ 
 void arbitration::candrmvlead(name nominee)
 {
 	require_auth(nominee);
@@ -528,9 +539,11 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		row.case_status = ++cf.case_status;
 	});
 }
+//QUESTION: Should there be a way to roll a case status back?
 
 //TODO: action that is used with multisig to set a case_status to RESOLVED.
-//TODO: action that is used with multisig to set a case_status to ENFORCEMENT 
+//TODO: action that is used with multisig to set a case_status to ENFORCEMENT
+//TODO: action that is used with multisig to set a case_status to DISMISSED 
 
 void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling_link)
 {
@@ -721,4 +734,20 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 
 #pragma endregion Helpers
 
-EOSIO_DISPATCH(arbitration, (setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus))
+EOSIO_DISPATCH(arbitration, (fix)(injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus))
+
+
+//TODO: Use the below structure for dispatching when the transfer handler is implemented.
+
+// extern "C" {
+//     void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+//         if(code == receiver){
+//             switch( action ) {
+//                 EOSIO_DISPATCH_HELPER( rbsb, (play)(pause)(resume)(withdrawal)
+//                                              (reset)(setnewseed)(getseed) );
+//             }
+//         } else if (code == "eosio.token"_n.value && action == "transfer"_n.value) {     
+//             execute_action<rbsb>(eosio::name(receiver), eosio::name(code), &rbsb::transfer_handler);
+//         }
+//     }
+// }
