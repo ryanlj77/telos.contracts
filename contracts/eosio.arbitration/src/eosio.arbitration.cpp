@@ -734,7 +734,7 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 
 #pragma endregion Helpers
 
-EOSIO_DISPATCH(arbitration, (fix)(injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus))
+EOSIO_DISPATCH(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus))
 
 
 //TODO: Use the below structure for dispatching when the transfer handler is implemented.
