@@ -26,8 +26,8 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
     const symbol NATIVE_SYM = symbol("DISK", 0);
 
     const int64_t PER_HR_RATE = 1;
-
     const uint32_t SEC_IN_HR = 3600;
+    const uint32_t BILL_INTERVAL = 3600;
 
     enum provider_status : uint8_t {
         APPLIED, //status until accepted and in compliance
@@ -49,6 +49,13 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         MP4 //video
     };
 
+    //IPFS CIDv1b32 : <mb><version><mc><mh>
+    struct multihash {
+        checksum256 raw_hash;
+        uint8_t hash_function;
+        uint8_t hash_size;
+    };
+
     struct [[eosio::table]] user {
         name account;
         uint8_t status;
@@ -67,6 +74,8 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         uint8_t status;
         string ipfs_endpoint;
         asset disk_balance;
+
+        //TODO: uint32_t last_action_time; //for guaging activity, inactive privders could be kicked or get smaller payment?
 
         uint64_t primary_key() const { return account.value; }
         EOSLIB_SERIALIZE(provider, (account)(status)(ipfs_endpoint)(disk_balance))
