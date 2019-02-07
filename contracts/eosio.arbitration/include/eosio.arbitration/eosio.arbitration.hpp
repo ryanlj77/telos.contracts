@@ -98,34 +98,37 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 #pragma endregion Enums
 
-	[[eosio::action]] void injectarbs(vector<name> to_inject);
+	[[eosio::action]] 
+	void injectarbs(vector<name> to_inject); //TODO: remove production deployment
 
 #pragma region Arb_Elections
 
-	[[eosio::action]] void initelection();
+	[[eosio::action]] 
+	void initelection();
 
-	[[eosio::action]] void regarb(name nominee, string credentials_link); //NOTE: actually regnominee, currently regarb for nonsense governance reasons
+	[[eosio::action]] 
+	void regarb(name nominee, string credentials_link); //NOTE: actually regnominee, currently regarb for nonsense governance reasons
 
-	[[eosio::action]] void unregnominee(name nominee);
+	[[eosio::action]] 
+	void unregnominee(name nominee);
 
 	[[eosio::action]] //TODO: rename?
-		void
-		candaddlead(name nominee, string credentials_link);
+	void candaddlead(name nominee, string credentials_link);
 
 	[[eosio::action]] //TODO: rename?
-		void
-		candrmvlead(name nominee);
+	void candrmvlead(name nominee);
 
 	[[eosio::action]] //TODO: need nominee param?
-		void
-		endelection(name nominee);
+	void endelection(name nominee);
 
 #pragma endregion Arb_Elections
 
 #pragma region Case_Setup
 
+	[[eosio::action]] void withdraw(name owner);
+
 	//NOTE: filing a case doesn't require a respondent
-	[[eosio::action]] void filecase(name claimant, string claim_link, vector<uint8_t> lang_codes);
+	[[eosio::action]] void filecase(name claimant, string claim_link, vector<uint8_t> lang_codes, std::optional<name> respondant);
 
 	//NOTE: adds subsequent claims to a case
 	[[eosio::action]] void addclaim(uint64_t case_id, string claim_link, name claimant);
@@ -149,21 +152,15 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	[[eosio::action]] void dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo);
 
-	//NOTE: moves to evidence_table and assigns ID
 	[[eosio::action]] void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class);
 
 	[[eosio::action]] void advancecase(uint64_t case_id, name assigned_arb);
 
-	//TODO: require rationale?
 	[[eosio::action]] void dismisscase(uint64_t case_id, name assigned_arb, string ruling_link);
 
 	[[eosio::action]] void resolvecase(uint64_t case_id, name assigned_arb, string case_ruling);
 
-	[[eosio::action]] void newcfstatus(uint64_t case_id, uint8_t new_status, name assigned_arb);
-
-	[[eosio::action]] //TODO: change rationale to full recusal doc?
-		void
-		recuse(uint64_t case_id, string rationale, name assigned_arb);
+	[[eosio::action]] void recuse(uint64_t case_id, string rationale, name assigned_arb);
 
 	[[eosio::action]] void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?
 
@@ -173,7 +170,11 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 #pragma region Arb_Actions
 
+	[[eosio::action]] void setlangcodes(name arbitrator, vector<uint8_t> lang_codes);
+
 	[[eosio::action]] void newarbstatus(uint8_t new_status, name arbitrator);
+
+	[[eosio::action]] void deletecase(uint64_t case_id);
 
 #pragma endregion Arb_Actions
 
@@ -277,12 +278,17 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
    */
 	struct [[eosio::table]] casefile
 	{
+		//NOTE: alternative table design. No secondary indices. Scope by claimant. Index by respondant.
+		//pros: easy to track by claimant, no longer need secondary indexes.
+		//cons: limited discoverability, must avoid secondary indexes.
 		uint64_t case_id;
 		uint8_t case_status;
 
 		name claimant;
-		name respondant; //NOTE: empty for no respondant
+		name respondant;
 		vector<name> arbitrators;
+		vector<name> approvals;
+
 		vector<uint8_t> required_langs;
 
 		vector<claim> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
@@ -371,6 +377,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 #pragma endregion Tables and Structs
 
 #pragma region Helpers
+
+	//TODO: helper function that changes casefile ram payer
+
 	config get_default_config();
 
 	void validate_ipfs_url(string ipfs_url);

@@ -19,6 +19,7 @@ arbitration::~arbitration()
 }
 
 //NOTE: TEST ACTION SHOULD BE REMOVED IN PRODUCTION
+//TODO: remove before production deployment
 void arbitration::injectarbs(vector<name> to_inject)
 {
 	require_auth("eosio"_n);
@@ -35,7 +36,7 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 	require_auth(name("eosio"));
 	check(max_elected_arbs > uint16_t(0), "Arbitrators must be greater than 0");
 
-	_config = config{
+	_config = config {
 		get_self(),		   //publisher
 		max_elected_arbs,  //max_elected_arbs
 		election_duration, //election_duration
@@ -44,7 +45,8 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 		arbitrator_term_length,
 		now(),
 		_config.current_ballot_id,
-		_config.auto_start_election};
+		_config.auto_start_election
+	};
 
 	//print("\nSettings Configured: SUCCESS");
 }
@@ -172,7 +174,7 @@ void arbitration::endelection(name nominee)
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
 	check(now() > board.end_time,
-		  std::string("Election hasn't ended. Please check again after the election is over in " + std::to_string(uint32_t(board.end_time - now())) //TODO: convert to minutes for error message?
+		  std::string("Election hasn't ended. Please check again after the election is over in " + std::to_string(uint32_t(board.end_time - now()))
 					  + " seconds")
 			  .c_str());
 
@@ -230,7 +232,7 @@ void arbitration::endelection(name nominee)
 			}
 			else
 			{
-				print("\ncandidate: ", cand_name, " was not found."); //TODO: remove?
+				print("\ncandidate: ", cand_name, " was not found.");
 			}
 		}
 
@@ -309,17 +311,30 @@ void arbitration::endelection(name nominee)
 #pragma endregion Arb_Elections
 
 #pragma region Case_Setup
+void arbitration::withdraw(name owner)
+{
+	require_auth(owner);
 
-//TODO: accept language codes from user.
-void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lang_codes)
+	accounts_table accounts(get_self(), owner.value);
+	const auto &bal = accounts.get(native_sym.code().raw(), "balance does not exist");
+
+	action(permission_level{get_self(), "active"_n}, "eosio.token"_n, "transfer"_n,
+		   make_tuple(get_self(),
+					  owner,
+					  bal.balance,
+					  std::string("eosio.arb withdrawal")))
+		.send();
+
+	accounts.erase(bal);
+}
+
+void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lang_codes, std::optional<name> respondant)
 {
 	require_auth(claimant);
 	validate_ipfs_url(claim_link);
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto case_id = casefiles.available_primary_key();
-	
-	name respondant;
 
 	vector<name> arbs;
 	vector<uint64_t> acc_claims;
@@ -329,7 +344,7 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 		row.case_id = case_id;
 		row.case_status = CASE_SETUP;
 		row.claimant = claimant;
-		row.respondant = respondant;
+		row.respondant = *respondant;
 		row.arbitrators = arbs;
 		row.required_langs = lang_codes;
 		row.unread_claims = unr_claims;
@@ -408,16 +423,14 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
 	//TODO: calculate fee from table of fees in config or whatever
+	//TODO: determing fee structure and flat fees.
 	//sub_balance(claimant, /*amount to subtract*/);
 
-	casefiles.modify(cf, same_payer, [&](auto &row) {
+	casefiles.modify(cf, get_self(), [&](auto &row) {
 		row.case_status = AWAITING_ARBS;
 		row.last_edit = now();
 	});
 }
-
-//TODO: withdraw balance action for users, sub_balance
-//TODO: reclaim ram action for users to get memory back
 
 #pragma endregion Case_Setup
 
@@ -437,7 +450,6 @@ void arbitration::addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_
 	is to assigntocase N times. */
 }
 
-//TODO: assign more arbitrators by the arbitrators
 void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 {
 	require_auth(permission_level("eosio.arb"_n, "assign"_n));
@@ -528,6 +540,8 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	});
 }
 
+//TODO: add a way to add approvals to a casefile for advancement.
+//TODO: appovals vector must be full before advancing a case.
 void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 {
 	require_auth(assigned_arb);
@@ -540,17 +554,17 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
 
+	// if cf.arbitrators.size() < cf.approvals.size() + 1 
+	// then add assigned_arb to approvals
+	// else if cf.arbitrators.size() == cf.approvals.size() + 1
+	// then modify cf case status
+
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = ++cf.case_status;
 	});
 }
+
 //QUESTION: Should there be a way to roll a case status back?
-
-//TODO: action that allows arbitrators to change their languages.
-
-//TODO: action that is used with multisig to set a case_status to RESOLVED.
-//TODO: action that is used with multisig to set a case_status to ENFORCEMENT
-//TODO: action that is used with multisig to set a case_status to DISMISSED
 
 void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling_link)
 {
@@ -567,23 +581,6 @@ void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = DISMISSED;
 		row.case_ruling = ruling_link;
-		row.last_edit = now();
-	});
-}
-
-void arbitration::newcfstatus(uint64_t case_id, uint8_t new_status, name assigned_arb)
-{
-	require_auth(assigned_arb);
-
-	casefiles_table casefiles(get_self(), get_self().value);
-	auto cf = casefiles.get(case_id, "No case found for given case_id");
-	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
-
-	check(arb_case != cf.arbitrators.end(), "Arbitrator isn't assigned to this case.");
-	check(cf.case_status != DISMISSED || cf.case_status != RESOLVED, "Case is already dismissed or resolved");
-
-	casefiles.modify(cf, same_payer, [&](auto &row) {
-		row.case_status = new_status;
 		row.last_edit = now();
 	});
 }
@@ -609,6 +606,27 @@ void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb)
 	});
 }
 
+void arbitration::newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb)
+{
+	//TODO: require auth arbitrator
+	//TODO: check arb is still active
+
+	//multisig?
+
+	//TODO: create new joinder
+}
+
+void arbitration::joincases(uint64_t joinder_id, uint64_t new_case_id, name arb)
+{
+	//TODO: require auth arbitrator
+	//TODO: check arb is still active
+
+	//multisig?
+
+	//TODO: check if joinder exists
+	//TODO: add case_id to existing joinder
+}
+
 #pragma endregion Case_Progression
 
 #pragma region Arb_Actions
@@ -627,10 +645,28 @@ void arbitration::newarbstatus(uint8_t new_status, name arbitrator)
 	});
 }
 
-//TODO: msig action for archiving cases files so that eosio.arb assumes ram cost
+void arbitration::setlangcodes(name arbitrator, vector<uint8_t> lang_codes)
+{
+	require_auth(arbitrator);
+	arbitrators_table arbitrators(get_self(), get_self().value);
+	auto &arb = arbitrators.get(arbitrator.value, "arbitrator not found");
 
-//TODO: msig action to expire case files so that rampayer may be refunded
+	check(now() < arb.term_expiration, "arbitrator term expired");
 
+	arbitrators.modify(arb, same_payer, [&](auto& a) {
+		a.languages = lang_codes;
+	});
+}
+
+//TODO: msig action for deleting actions
+void arbitration::deletecase(uint64_t case_id)
+{
+	//TODO: require_auth2 eosio.arb@major
+
+	//TODO: check that case is either resolved or dismissed
+
+	//TODO: delete action
+}
 #pragma endregion Arb_Actions
 
 #pragma region Helpers
@@ -722,7 +758,6 @@ bool arbitration::has_available_seats(arbitrators_table &arbitrators, uint8_t &a
 void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, string credential_link)
 {
 	auto arb = arbitrators.find(arb_name.value);
-	//TODO: term expiration and elected time aren't being updated correctly.
 	if (arb == arbitrators.end())
 	{
 		arbitrators.emplace(_self, [&](auto &a) {
@@ -776,7 +811,10 @@ extern "C"
 		{
 			switch (action)
 			{
-				EOSIO_DISPATCH_HELPER(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus));
+				EOSIO_DISPATCH_HELPER(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)
+				(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
+				(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(recuse)(newarbstatus)
+				(setlangcodes)(joincases)(newjoinder));
 			}
 		}
 		else if (code == "eosio.token"_n.value && action == "transfer"_n.value)
