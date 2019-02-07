@@ -336,6 +336,10 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto case_id = casefiles.available_primary_key();
 
+	if(respondant) { //TODO: this must be tested properly, its possible that the default value is "valid"
+		check(is_account(*respondant), "respondant must be an account");
+	}
+
 	vector<name> arbs;
 	vector<uint64_t> acc_claims;
 	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
