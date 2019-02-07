@@ -7,9 +7,28 @@
 
 #include "../include/telos.canopy.hpp"
 
-canopy::canopy(name self, name code, datastream<const char*> ds) : contract(self, code, ds) {}
+canopy::canopy(name self, name code, datastream<const char*> ds) : contract(self, code, ds), global(get_self(), get_self().value) {
+    if (!global.exists()) {
 
-canopy::~canopy() {}
+        global_data = global_state{
+            get_self(), //publisher
+            0, //unique_users
+            0, //unique_providers
+            0, //unique_files
+            asset(0, NATIVE_SYM) //provider_bucket
+        }; 
+
+        global.set(global_data, get_self());
+    } else {
+        global_data = global.get();
+    }
+}
+
+canopy::~canopy() {
+    if (global.exists()) {
+        global.set(global_data, global_data.publisher);
+    }
+}
 
 void canopy::buydisk(name payer, name recipient, asset tlos_amount) {
     
@@ -94,19 +113,18 @@ void canopy::acceptfile(checksum256 ipfs_cid, name provider_name, name file_name
 
     //TODO: calc DISK bill, charge requester
     asset pin_bill = asset(int64_t(10), NATIVE_SYM);
-    asset per_diem_bill = asset(int64_t(chunks), NATIVE_SYM);
-    asset total_bill = (pin_bill + per_diem_bill);
+    asset per_hour_bill = asset(int64_t(chunks), NATIVE_SYM);
+    asset total_bill = (pin_bill + per_hour_bill);
 
-    //NOTE: processes inital bill (pin bill + per diem bill)
-    process_bill(req, provider_name, total_bill);
+    //NOTE: processes inital bill (pin bill + per hour bill)
+    process_bill(req);
 
     //NOTE: save metadata
     metadata.emplace(provider_name, [&](auto& row) {
         row.file_name = file_name;
         row.file_ext = 0; //TODO: add real ext later
         row.ipfs_chunks = chunks;
-        row.add_time = now();
-        row.last_charge_time = now();
+        row.pin_time = now();
     });
 
     //NOTE: save file
@@ -152,9 +170,10 @@ void canopy::process_transfer(name to, asset amt) {
     if (u == users.end()) { //User not found, initialize a new user account
         users.emplace(to, [&](auto& row) {
             row.account = to;
+            row.status = NORMAL;
             row.tlos_balance = amt;
             row.disk_balance = asset(0, NATIVE_SYM);
-            row.per_diem = asset(int64_t(0), NATIVE_SYM);
+            row.per_hour_rate = asset(int64_t(0), NATIVE_SYM);
             row.unique_files = uint16_t(0);
         });
     } else { //Add to existing account
@@ -168,26 +187,26 @@ void canopy::process_transfer(name to, asset amt) {
 void canopy::process_bill(name username) {
     
     users users(get_self(), get_self().value);
-    auto u = users.get(from.value, "User has no balance to pay for storage");
-    eosio_assert(u.disk_balance >= bill, "Insufficent DISK to purchase storage");
+    auto u = users.get(username.value, "User has no balance to pay for storage");
 
-    providers providers(get_self(), get_self().value);
-    auto p = providers.get(to.value, "Provider is not registered");
+    asset bill = calc_bill(PER_HR_RATE, u.last_bill_time);
+    eosio_assert(u.disk_balance >= bill, "User has insufficient balance to cover bill");
+    
+    //TODO: need to unpin files for insufficient balance? create a debt? put files in separate table to process unpins?
 
+    //charge bill to account and update last billed time
     users.modify(u, same_payer, [&](auto& row) {
         row.disk_balance -= bill;
+        row.last_bill_time = now();
     });
 
-    providers.modify(p, same_payer, [&](auto& row) {
-        row.disk_balance += bill;
-    });
+    //put bill in provider bucket
+    global_data.provider_bucket += bill;
 
 }
 
-asset canopy::calc_bill(int64_t per_sec_rate, uint32_t last_bill_time) {
-
-    int64_t bill = int64_t((now() - last_bill_time) * per_sec_rate);
-
+asset canopy::calc_bill(int64_t rate, uint32_t last_bill_time) {
+    int64_t bill = int64_t((now() - last_bill_time) / SEC_IN_HR) * rate; //TODO: gameable currently, remainder isn't billed
     return asset(bill, NATIVE_SYM);
 }
 

@@ -10,6 +10,7 @@
 #include <eosiolib/asset.hpp>
 #include <eosiolib/action.hpp>
 #include <eosiolib/transaction.hpp>
+#include <eosiolib/singleton.hpp>
 
 using namespace std;
 using namespace eosio;
@@ -24,9 +25,9 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     const symbol NATIVE_SYM = symbol("DISK", 0);
 
-    const int64_t PER_SEC_RATE = 1;
+    const int64_t PER_HR_RATE = 1;
 
-    const uint32_t DAY_IN_SEC = 86400;
+    const uint32_t SEC_IN_HR = 3600;
 
     enum provider_status : uint8_t {
         APPLIED, //status until accepted and in compliance
@@ -36,22 +37,29 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         EXPELLED //provider is expelled from the service (permanent)
     };
 
+    enum user_status : uint8_t {
+        NORMAL, //normal state
+        IN_CLEANUP //in cleaning process
+    };
+
     enum file_extension : uint8_t {
         MD, //markdown
         TXT, //text
-        MP3,
-        MP4
+        MP3, //audio
+        MP4 //video
     };
 
     struct [[eosio::table]] user {
         name account;
+        uint8_t status;
         asset tlos_balance;
         asset disk_balance; //tokens chargeable by providers
-        asset per_diem; //rate charged per day for requested file storage
+        asset per_hour_rate; //rate charged per hour for requested file storage (calculated from cumulative storage requested by this account and accepted by providers)
         uint16_t unique_files; //number of unique files
+        uint32_t last_bill_time;
 
         uint64_t primary_key() const {return account.value; }
-        EOSLIB_SERIALIZE(user, (account)(tlos_balance)(disk_balance)(per_diem)(unique_files))
+        EOSLIB_SERIALIZE(user, (account)(status)(tlos_balance)(disk_balance)(per_hour_rate)(unique_files)(last_bill_time))
     };
 
     struct [[eosio::table]] provider {
@@ -75,16 +83,35 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         EOSLIB_SERIALIZE(file, (file_name)(payer)(ipfs_cid))
     };
 
-    struct [[eosio::action]] file_meta {
+    struct [[eosio::table]] file_meta {
         name file_name;
         uint8_t file_ext;
         uint16_t ipfs_chunks;
-        uint32_t add_time;
-        uint32_t last_charge_time;
+        uint32_t pin_time;
+
+        //TODO: move billing to per-file basis instead of aggregated by account? could be stored here, since meta is only available when in harddrive
 
         uint64_t primary_key() const { return file_name.value; }
-        EOSLIB_SERIALIZE(file_meta, (file_name)(file_ext)(ipfs_chunks)(add_time)(last_charge_time))
+        EOSLIB_SERIALIZE(file_meta, (file_name)(file_ext)(ipfs_chunks)(pin_time))
     };
+
+    struct [[eosio::table]] global_state {
+        name publisher;
+        uint32_t unique_users;
+        uint16_t unique_providers;
+        uint32_t unique_files;
+        asset provider_bucket;
+
+        //TODO: add DISK_PER_HR?
+
+        uint64_t primary_key() const { return publisher.value; }
+        EOSLIB_SERIALIZE(global_state, (publisher)(unique_users)(unique_providers)(unique_files)(provider_bucket))
+    };
+
+
+    //scope filerequests, harddrive, and fileremovals into same table?
+
+    //make new struct for filerequests and fileremovals, and merge file struct with file_meta (file_with_meta?)
 
     typedef multi_index<name("filerequests"), file,
     indexed_by<name("bypayer"), const_mem_fun<file, uint64_t, &file::by_payer>>,
@@ -96,11 +123,20 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
     indexed_by<name("bycid"), const_mem_fun<file, checksum256, &file::by_cid>>
     > harddrive;
 
+    typedef multi_index<name("fileremovals"), file,
+    indexed_by<name("bypayer"), const_mem_fun<file, uint64_t, &file::by_payer>>,
+    indexed_by<name("bycid"), const_mem_fun<file, checksum256, &file::by_cid>>
+    > file_removals;
+
+    typedef multi_index<name("metadata"), file_meta> metadata; //TODO: add vector of providers? Could divide payment among them
+
     typedef multi_index<name("providers"), provider> providers;
 
     typedef multi_index<name("users"), user> users;
 
-    typedef multi_index<name("metadata"), file_meta> metadata;
+    typedef singleton<name("global"), global_state> globals;
+    globals global;
+    global_state global_data;
 
 
     //Canopy User Actions
@@ -116,6 +152,17 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     [[eosio::action]]
     void rmvfile(name payer, checksum256 ipfs_cid);
+
+    //NOTE: leaves a flag if all files aren't able to be unpinned in time.
+    //NOTE: Flag allows anyone to help clean, and pays 1 DISK per poke (pay from provider bucket or user?)
+    [[eosio::action]]
+    void cleanhouse(name user);
+
+    [[eosio::action]]
+    void helpclean(name helper, name account_to_clean);
+
+    [[eosio::action]]
+    void withdraw(name user, asset tlos_amount);
 
     
     //Canopy Provider Actions
@@ -134,6 +181,12 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
 
     [[eosio::action]]
     void activatenode(name provider_name);
+
+    [[eosio::action]]
+    void suspendnode();
+
+    [[eosio::action]]
+    void expellnode();
 
 
     //Functions

@@ -9,6 +9,25 @@ Telos Canopy incentivizes node operators to run the nodeos Canopy Plugin and Can
 2. buydisk
 3. addfile
 
+## A La Carte Billing
+
+uint32_t last_bill_time;
+asset per_diem_bill;
+
+When user pins or unpins file, calc days of billing * per diem and process charges.
+Then increase per_diem by value of new file being pinned (or decrease if unpinning) and update last_bill_time to now().
+
+uint32_t insufficient_balance_time;
+
+Time point at which user will run out of funds
+update target time with each pin/unpin or update of DISK balance
+have table with sec idx in order of insufficient_balance_time being the soonest
+periodic billing by providers will help keep the table fresh and users being billed correctly and on time
+
+have plugin calculate instead? Could send notifications/warnings to accounts
+
+if user selling DISK back, process all pending charges first. Fail action if attempting to sell enough DISK that would cause an insufficient balance. maybe have a minimum buffer on sellable DISK? maybe have a cleanhouse() action that processing all outstanding charges and unpins everything?
+
 
 ## Stephanie's Model
 
