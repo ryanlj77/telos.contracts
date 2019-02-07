@@ -164,7 +164,7 @@ void arbitration::candrmvlead(name nominee)
 	//print("\nCancel Application: SUCCESS");
 }
 
-void arbitration::endelection(name nominee)
+void arbitration::endelection(name nominee) //NOTE: required eosio.arb@eosio.code
 {
 	require_auth(nominee);
 
@@ -311,7 +311,7 @@ void arbitration::endelection(name nominee)
 #pragma endregion Arb_Elections
 
 #pragma region Case_Setup
-void arbitration::withdraw(name owner)
+void arbitration::withdraw(name owner) //NOTE: requires eosio.arb@eosio.code
 {
 	require_auth(owner);
 
@@ -816,7 +816,7 @@ extern "C"
 			switch (action)
 			{
 				EOSIO_DISPATCH_HELPER(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)
-				(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
+				(candaddlead)(candrmvlead)(endelection)(withdraw)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
 				(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(recuse)(newarbstatus)
 				(setlangcodes)(joincases)(newjoinder));
 			}

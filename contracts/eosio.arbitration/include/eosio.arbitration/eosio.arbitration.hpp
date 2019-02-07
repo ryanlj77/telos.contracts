@@ -316,7 +316,6 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
    * @key table name
    */
 	//TODO: make fee structure a constant?
-	//NOTE: diminishing subsequent response (default) times
 	//NOTE: initial deposit saved
 	struct [[eosio::table]] config
 	{
