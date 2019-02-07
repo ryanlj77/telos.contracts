@@ -7,9 +7,8 @@
 
 #include <eosio.arbitration/eosio.arbitration.hpp>
 
-arbitration::arbitration(name s, name code, datastream<const char *> ds) : 
-	eosio::contract(s, code, ds), 
-	configs(_self, _self.value)
+arbitration::arbitration(name s, name code, datastream<const char *> ds) : eosio::contract(s, code, ds),
+																		   configs(_self, _self.value)
 {
 	_config = configs.exists() ? configs.get() : get_default_config();
 }
@@ -19,31 +18,33 @@ arbitration::~arbitration()
 	configs.set(_config, get_self());
 }
 
-void arbitration::injectarbs(vector<name> to_inject) 
+//NOTE: TEST ACTION SHOULD BE REMOVED IN PRODUCTION
+void arbitration::injectarbs(vector<name> to_inject)
 {
+	require_auth("eosio"_n);
 	arbitrators_table arbitrators(get_self(), get_self().value);
-	for(const auto& arb : to_inject) {
+	for (const auto &arb : to_inject)
+	{
 		add_arbitrator(arbitrators, arb, "");
 	}
 }
 
-void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration, 
-	uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
+void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration,
+							uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
 {
 	require_auth(name("eosio"));
 	check(max_elected_arbs > uint16_t(0), "Arbitrators must be greater than 0");
 
-	_config = config {
-		get_self(),		   	//publisher
-		max_elected_arbs,  	//max_elected_arbs
-		election_duration, 	//election_duration
-		election_start,		//election_start
-		fees,			   	//fee_structure
+	_config = config{
+		get_self(),		   //publisher
+		max_elected_arbs,  //max_elected_arbs
+		election_duration, //election_duration
+		election_start,	//election_start
+		fees,			   //fee_structure
 		arbitrator_term_length,
 		now(),
 		_config.current_ballot_id,
-		_config.auto_start_election	
-	};
+		_config.auto_start_election};
 
 	//print("\nSettings Configured: SUCCESS");
 }
@@ -110,8 +111,8 @@ void arbitration::unregnominee(name nominee)
 
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
-	
-	if (_config.auto_start_election) 
+
+	if (_config.auto_start_election)
 		check(now() < board.begin_time, "Cannot unregister while election is in progress");
 
 	nominees.erase(nom_itr);
@@ -143,7 +144,7 @@ void arbitration::candaddlead(name nominee, string credentials_link)
 
 	//print("\nArb Application: SUCCESS");
 }
- 
+
 void arbitration::candrmvlead(name nominee)
 {
 	require_auth(nominee);
@@ -171,9 +172,9 @@ void arbitration::endelection(name nominee)
 	leaderboards_table leaderboards(name("eosio.trail"), name("eosio.trail").value);
 	auto board = leaderboards.get(bal.reference_id, "Leaderboard doesn't exist");
 	check(now() > board.end_time,
-				 std::string("Election hasn't ended. Please check again after the election is over in " + std::to_string(uint32_t(board.end_time - now())) //TODO: convert to minutes for error message?
-							 + " seconds")
-					 .c_str());
+		  std::string("Election hasn't ended. Please check again after the election is over in " + std::to_string(uint32_t(board.end_time - now())) //TODO: convert to minutes for error message?
+					  + " seconds")
+			  .c_str());
 
 	//sort board candidates by votes
 	auto board_candidates = board.candidates;
@@ -298,7 +299,8 @@ void arbitration::endelection(name nominee)
 	}
 	else
 	{
-		for (auto i = nominees.begin(); i != nominees.end(); i = nominees.erase(i));
+		for (auto i = nominees.begin(); i != nominees.end(); i = nominees.erase(i))
+			;
 		_config.auto_start_election = false;
 		//print("\nThere aren't enough seats available or candidates to start a new election.\nUse init action to start a new election.");
 	}
@@ -308,21 +310,20 @@ void arbitration::endelection(name nominee)
 
 #pragma region Case_Setup
 
-void arbitration::filecase(name claimant, string claim_link)
+//TODO: accept language codes from user.
+void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lang_codes)
 {
 	require_auth(claimant);
-	//check(class_suggestion >= UNDECIDED && class_suggestion <= MISC, "class suggestion must be between 0 and 14");
 	validate_ipfs_url(claim_link);
-
-	//TODO: Remove this in favor of transfer handling and deposit tracking
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	auto case_id = casefiles.available_primary_key();
-	vector<name> arbs;
+	
 	name respondant;
-	vector<uint8_t> lang_codes;
-	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
+
+	vector<name> arbs;
 	vector<uint64_t> acc_claims;
+	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
 
 	casefiles.emplace(claimant, [&](auto &row) {
 		row.case_id = case_id;
@@ -395,9 +396,6 @@ void arbitration::shredcase(uint64_t case_id, name claimant)
 	check(claimant == c_itr->claimant, "you are not the claimant of this case.");
 	check(c_itr->case_status == CASE_SETUP, "cases can only be shredded during CASE_SETUP");
 
-	// NOTE: Shredding the case doesn't require deleting any claims from table.
-	// This is because addclaim only adds claims to the unread vector and not the table.
-
 	casefiles.erase(c_itr);
 }
 
@@ -409,11 +407,17 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 	check(cf.unread_claims.size() >= 1, "Cases must have atleast one claim");
 	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
+	//TODO: calculate fee from table of fees in config or whatever
+	//sub_balance(claimant, /*amount to subtract*/);
+
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = AWAITING_ARBS;
 		row.last_edit = now();
 	});
 }
+
+//TODO: withdraw balance action for users, sub_balance
+//TODO: reclaim ram action for users to get memory back
 
 #pragma endregion Case_Setup
 
@@ -454,7 +458,7 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 
 	//check(cf.arbitrators.size() == size_t(0), "Case already has an assigned arbitrator");
 	check(std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb_to_assign) == cf.arbitrators.end(),
-				 "Arbitrator is already assigned to this case");
+		  "Arbitrator is already assigned to this case");
 
 	vector<name> new_arbs = cf.arbitrators;
 	new_arbs.emplace_back(arb.arb);
@@ -486,7 +490,8 @@ void arbitration::dismissclaim(uint64_t case_id, name assigned_arb, string claim
 	});
 }
 
-void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class)
+void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash,
+							  string decision_link, uint8_t decision_class)
 {
 	require_auth(assigned_arb);
 	validate_ipfs_url(claim_hash);
@@ -508,7 +513,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 
 	vector<uint64_t> new_accepted_claims = cf.accepted_claims;
 	new_accepted_claims.emplace_back(new_claim_id);
-	
+
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.unread_claims = new_unread_claims;
 		row.accepted_claims = new_accepted_claims;
@@ -541,9 +546,11 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 }
 //QUESTION: Should there be a way to roll a case status back?
 
+//TODO: action that allows arbitrators to change their languages.
+
 //TODO: action that is used with multisig to set a case_status to RESOLVED.
 //TODO: action that is used with multisig to set a case_status to ENFORCEMENT
-//TODO: action that is used with multisig to set a case_status to DISMISSED 
+//TODO: action that is used with multisig to set a case_status to DISMISSED
 
 void arbitration::dismisscase(uint64_t case_id, name assigned_arb, string ruling_link)
 {
@@ -620,15 +627,19 @@ void arbitration::newarbstatus(uint8_t new_status, name arbitrator)
 	});
 }
 
+//TODO: msig action for archiving cases files so that eosio.arb assumes ram cost
+
+//TODO: msig action to expire case files so that rampayer may be refunded
+
 #pragma endregion Arb_Actions
 
-#pragma region Helpersƒ
+#pragma region Helpers
 
 typedef arbitration::claim claim;
 
 vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim> claims)
 {
-	return std::find_if(claims.begin(), claims.end(), [&](auto& claim) {
+	return std::find_if(claims.begin(), claims.end(), [&](auto &claim) {
 		return claim.claim_summary == hash;
 	});
 }
@@ -639,23 +650,24 @@ void arbitration::validate_ipfs_url(string ipfs_url)
 	check(ipfs_url.length() == 59, "invalid ipfs string, valid schema: <hash>");
 }
 
-void arbitration::assert_string(string to_check, string error_msg) {
+void arbitration::assert_string(string to_check, string error_msg)
+{
 	check(to_check.length() > 0 && to_check.length() < 255, error_msg.c_str());
 }
 
 arbitration::config arbitration::get_default_config()
 {
 	vector<int64_t> fees{1000000, 2000000, 3000000};
-	auto c = config {
-		get_self(),  		// publisher
-		uint16_t(21), 		// max_elected_arbs
-		uint32_t(2505600), 	// election_duration
-		uint32_t(604800),	// election_start
-		fees,		 		// fee_structure
-		uint32_t(31536000),  // arb_term_length
+	auto c = config{
+		get_self(),			// publisher
+		uint16_t(21),		// max_elected_arbs
+		uint32_t(2505600),  // election_duration
+		uint32_t(604800),   // election_start
+		fees,				// fee_structure
+		uint32_t(31536000), // arb_term_length
 		now(),
-		uint64_t(0), 		// current_ballot_id
-		bool(0),	 		// auto_start_election
+		uint64_t(0), // current_ballot_id
+		bool(0),	 // auto_start_election
 	};
 
 	return c;
@@ -716,6 +728,7 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 		arbitrators.emplace(_self, [&](auto &a) {
 			a.arb = arb_name;
 			a.arb_status = uint16_t(UNAVAILABLE);
+			a.elected_time = now();
 			a.term_expiration = now() + _config.arb_term_length;
 			a.open_case_ids = vector<uint64_t>();
 			a.closed_case_ids = vector<uint64_t>();
@@ -726,28 +739,49 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 	{
 		arbitrators.modify(arb, same_payer, [&](auto &a) {
 			a.arb_status = uint16_t(UNAVAILABLE);
+			a.elected_time = now();
 			a.term_expiration = now() + _config.arb_term_length;
 			a.credentials_link = credential_link;
 		});
 	}
 }
 
+void arbitration::transfer_handler(name from, name to, asset quantity)
+{
+	require_auth(from);
+
+	check(quantity.is_valid(), "Invalid quantity");
+	check(quantity.symbol == symbol("TLOS", 4), "only TLOS tokens are accepted by this contract");
+
+	if (from == get_self())
+		return;
+
+	check(to == get_self(), "to must be self");
+
+	accounts_table accounts(get_self(), from.value);
+	const auto &from_bal = accounts.find(quantity.symbol.code().raw());
+
+	add_balance(from, quantity, get_self());
+
+	print("\nDeposit Complete");
+}
+
 #pragma endregion Helpers
 
-EOSIO_DISPATCH(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus))
-
-
-//TODO: Use the below structure for dispatching when the transfer handler is implemented.
-
-// extern "C" {
-//     void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-//         if(code == receiver){
-//             switch( action ) {
-//                 EOSIO_DISPATCH_HELPER( rbsb, (play)(pause)(resume)(withdrawal)
-//                                              (reset)(setnewseed)(getseed) );
-//             }
-//         } else if (code == "eosio.token"_n.value && action == "transfer"_n.value) {     
-//             execute_action<rbsb>(eosio::name(receiver), eosio::name(code), &rbsb::transfer_handler);
-//         }
-//     }
-// }
+extern "C"
+{
+	void apply(uint64_t receiver, uint64_t code, uint64_t action)
+	{
+		if (code == receiver)
+		{
+			switch (action)
+			{
+				EOSIO_DISPATCH_HELPER(arbitration, (injectarbs)(setconfig)(initelection)(regarb)(unregnominee)(candaddlead)(candrmvlead)(endelection)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)(assigntocase)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(newcfstatus)(recuse)(newarbstatus));
+			}
+		}
+		else if (code == "eosio.token"_n.value && action == "transfer"_n.value)
+		{
+			execute_action<arbitration>(eosio::name(receiver), eosio::name(code), &arbitration::transfer_handler);
+		}
+	}
+}
