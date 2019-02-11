@@ -49,11 +49,14 @@ class [[eosio::contract("telos.canopy")]] canopy : public contract {
         MP4 //video
     };
 
-    //IPFS CIDv1b32 : <mb><version><mc><mh>
+    //IPFS CIDv1b32 : <mb><version><mc><mh> 
     struct multihash {
-        checksum256 raw_hash;
+        uint8_t multibase;
+        uint8_t version;
+        uint8_t multicodec;
         uint8_t hash_function;
         uint8_t hash_size;
+        checksum256 raw_hash;
     };
 
     struct [[eosio::table]] user {
