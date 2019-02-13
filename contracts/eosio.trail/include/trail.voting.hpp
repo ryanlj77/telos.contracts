@@ -17,17 +17,30 @@ using namespace eosio;
 
 #pragma region Structs
 
-//NOTE: vote receipts MUST be scoped by voter
+//@scope voter (easy to loop over for deletion)
 struct [[eosio::table, eosio::contract("eosio.trail")]] vote_receipt {
     uint64_t ballot_id;
-    vector<uint16_t> directions;
-    asset weight;
+    vector<uint16_t> directions; //TODO: change to vector of uint8_t
+    asset weight; //TODO: make vector of weights? directions[i] => weights[i]
     uint32_t expiration;
-
-    //TODO: make vector of weights? directions[i] => weights[i]
 
     uint64_t primary_key() const { return ballot_id; }
     EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
+};
+
+// struct [[eosio::table, eosio::contract("eosio.trail")]] temp_receipt {
+//     uint64_t ballot_id;
+//     vector<uint16_t> directions; //TODO: change to vector of uint8_t
+//     asset weight; //TODO: make vector of weights? directions[i] => weights[i]
+//     uint32_t expiration;
+//     uint64_t primary_key() const { return ballot_id; }
+//     EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
+// };
+
+enum candidate_status : uint8_t {
+    REGISTERED, //0
+    RUNNING, //1
+    RESIGN //2
 };
 
 struct candidate {
@@ -37,20 +50,30 @@ struct candidate {
     uint8_t status;
 };
 
-//NOTE: ballots MUST be scoped by name("eosio.trail").value
+//@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] ballot {
-    uint64_t ballot_id;
-    uint8_t table_id;
-    uint64_t reference_id;
+    uint64_t ballot_id; //TODO: change to ballot_name?
+    uint8_t table_id; //TODO: change to table_name
+    uint64_t reference_id; //TODO: rename local_ballot_name?
 
     uint64_t primary_key() const { return ballot_id; }
     EOSLIB_SERIALIZE(ballot, (ballot_id)(table_id)(reference_id))
 };
 
-//NOTE: proposals MUST be scoped by name("eosio.trail").value
+enum proposal_status : uint8_t {
+    UNDECIDED, //0
+    PASSED, //1
+    FAILED, //2
+    RESERVED_PROP_1, //3 reserved for development
+    RESERVED_PROP_2 //4 //reserved for development
+};
+
+//@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] proposal {
-    uint64_t prop_id;
+    uint64_t prop_id; //TODO: change to prop_name
     name publisher;
+    //TODO: string prop_title;
+    //TODO: string description; //recommend markdown
     string info_url;
     
     asset no_count;
@@ -60,8 +83,8 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] proposal {
 
     uint32_t begin_time;
     uint32_t end_time;
-    uint16_t cycle_count;
-    uint8_t status; // 0 = OPEN, 1 = PASS, 2 = FAIL
+    uint16_t cycle_count; //TODO: remove if wps cycles change
+    uint8_t status; //TODO: rename prop_status?
 
     uint64_t primary_key() const { return prop_id; }
     EOSLIB_SERIALIZE(proposal, (prop_id)(publisher)(info_url)
@@ -69,10 +92,20 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] proposal {
         (begin_time)(end_time)(cycle_count)(status))
 };
 
-//NOTE: elections MUST be scoped by name("eosio.trail").value
+enum election_status : uint8_t {
+    CAMPAIGN, //0
+    VOTING_OPEN, //1
+    VOTING_CLOSED, //2
+    RESERVED_ELEC_1, //3 reserved for development
+    RESERVED_ELEC_2 //4 //reserved for development
+};
+
+//@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] election {
-    uint64_t election_id;
+    uint64_t election_id; //TODO: change to election_name
     name publisher;
+    //TODO: string election_title;
+    //TODO: string description; //recommend markdown
     string info_url;
 
     vector<candidate> candidates;
@@ -81,6 +114,7 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] election {
     
     uint32_t begin_time;
     uint32_t end_time;
+    //TODO: uint8_t election_status;
 
     uint64_t primary_key() const { return election_id; }
     EOSLIB_SERIALIZE(election, (election_id)(publisher)(info_url)
@@ -88,20 +122,30 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] election {
         (begin_time)(end_time))
 };
 
-//NOTE: elections MUST be scoped by name("eosio.trail").value
+enum leaderboard_status : uint8_t {
+    SETUP, //0
+    BOARD_OPEN, //1
+    BOARD_CLOSED, //2
+    RESERVED_BOARD_1, //3
+    RESERVED_BOARD_2 //4
+};
+
+//@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] leaderboard {
-    uint64_t board_id;
+    uint64_t board_id; //TODO: change to board_name;
     name publisher;
+    //TODO: string board_title;
+    //TODO: string desciption; //recommend markdown
     string info_url;
 
     vector<candidate> candidates;
     uint32_t unique_voters;
     symbol voting_symbol;
-    uint8_t available_seats;
+    uint8_t available_seats; //TODO: rename available_slots?
 
     uint32_t begin_time;
     uint32_t end_time;
-    uint8_t status;
+    uint8_t status; //TODO: rename board_status?
 
     uint64_t primary_key() const { return board_id; }
     EOSLIB_SERIALIZE(leaderboard, (board_id)(publisher)(info_url)
@@ -110,16 +154,18 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] leaderboard {
 };
 
 /**
- * NOTE: totals vector mappings:
+ * totals vector mappings:
  *     totals[0] => total proposals
  *     totals[1] => total elections
  *     totals[2] => total leaderboards
+ *     totals[3] => total polls
  */
+//TODO: consider renaming to globals
 struct [[eosio::table("environment"), eosio::contract("eosio.trail")]] env {
     name publisher;
-    vector<uint64_t> totals;
-    uint32_t time_now;
-    uint64_t last_ballot_id;
+    vector<uint64_t> totals; //TODO: change to vector of table names?
+    uint32_t time_now; //TODO: remove?
+    uint64_t last_ballot_id; //TODO: remove?
 
     uint64_t primary_key() const { return publisher.value; }
     EOSLIB_SERIALIZE(env, (publisher)(totals)(time_now)(last_ballot_id))
@@ -153,14 +199,19 @@ struct [[eosio::table("environment"), eosio::contract("eosio.trail")]] env {
 //typedef multi_index<name("proxies"), proxy_id> proxies_table; //TODO: necessary? 
 
 typedef multi_index<name("ballots"), ballot> ballots_table;
+//typedef multi_index<name("tempballots"), ballot> temp_ballots;
 
 typedef multi_index<name("proposals"), proposal> proposals_table;
+//typedef multi_index<name("tempprops"), proposal> temp_proposals;
 
 typedef multi_index<name("elections"), election> elections_table;
+//typedef multi_index<name("tempelecs"), election> temp_elections;
 
 typedef multi_index<name("leaderboards"), leaderboard> leaderboards_table;
+//typedef multi_index<name("tempboards"), leaderboard> temp_leaderboards;
 
 typedef multi_index<name("votereceipts"), vote_receipt> votereceipts_table;
+//typedef multi_index<name("tempvotes"), vote_receipt> temp_votereceipts;
 
 //typedef multi_index<name("proxreceipts"), proxy_receipt> proxyreceipts_table;
 
@@ -181,5 +232,15 @@ bool is_ballot(uint64_t ballot_id) {
 
     return false;
 }
+
+// for when ballots switch to name keys
+// bool is_ballot(name ballot_name) {
+//     ballots ballots(name("eosio.trail"), name("eosio.trail").value);
+//     auto bal_itr = ballots.find(ballot_name.value);
+//     if (bal_itr != ballots.end()) {
+//         return true;
+//     }
+//     return false;
+// }
 
 #pragma endregion Helper_Functions

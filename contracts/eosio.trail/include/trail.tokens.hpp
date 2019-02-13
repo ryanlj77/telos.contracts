@@ -20,11 +20,11 @@ using namespace eosio;
 //TODO: fold into a vector?
 struct token_settings {
     bool is_destructible = false;
-    bool is_proxyable = false; //NOTE: allows proxy system //TODO: implement
-    bool is_burnable = false; //NOTE: can only burn from own balance
+    bool is_proxyable = false; //allows proxy system
+    bool is_burnable = false; //can only burn from own balance
     bool is_seizable = false;
     bool is_max_mutable = false;
-    bool is_transferable = false; //NOTE: allows counerbalances and cb decay
+    bool is_transferable = false; //allows max_receipts adjustment
     bool is_recastable = false;
     bool is_initialized = false;
 
@@ -32,7 +32,7 @@ struct token_settings {
     bool lock_after_initialize = true;
 };
 
-//NOTE: registries MUST be scoped by name("eosio.trail").value
+//@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] registry {
     asset max_supply;
     asset supply;
@@ -42,12 +42,13 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] registry {
     string info_url;
     token_settings settings;
 
-
     uint64_t primary_key() const { return max_supply.symbol.code().raw(); }
-    EOSLIB_SERIALIZE(registry, (max_supply)(supply)(total_voters)(total_proxies)(publisher)(info_url)(settings))
+    EOSLIB_SERIALIZE(registry, (max_supply)(supply)(total_voters)
+        (total_proxies)(publisher)(info_url)(settings))
 };
 
-//NOTE: balances are scoped by symbol.code().raw()
+//TODO: maybe scope by name, pk by sybol.code.raw?
+//@scope symbol.code().raw()
 struct [[eosio::table, eosio::contract("eosio.trail")]] balance {
     name owner;
     asset tokens;
@@ -65,7 +66,7 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] balance {
 //     EOSLIB_SERIALIZE(proxy_balance, (proxied_tokens)(proxy))
 // };
 
-//NOTE: airgrabs are scoped by publisher.value
+//@scope publisher.value
 struct [[eosio::table, eosio::contract("eosio.trail")]] airgrab {
     name recipient;
     asset tokens;
@@ -74,7 +75,8 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] airgrab {
     EOSLIB_SERIALIZE(airgrab, (recipient)(tokens))
 };
 
-//NOTE: counterbalances are scoped by symbol.code().raw()
+//TODO: delete table after migration
+//@scope symbol.code().raw()
 struct [[eosio::table, eosio::contract("eosio.trail")]] counter_balance {
     name owner;
     asset decayable_cb;
@@ -92,6 +94,7 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] counter_balance {
 
 typedef multi_index<name("balances"), balance> balances_table;
 
+//TODO: delete after migration
 typedef multi_index<name("counterbals"), counter_balance> counterbalances_table;
 
 //typedef multi_index<name("proxybals"), proxy_balance> proxy_balances_table;
