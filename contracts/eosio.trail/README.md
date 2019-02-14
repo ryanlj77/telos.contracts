@@ -1,18 +1,18 @@
 # Trail Service User/Developer Guide
 
+Trail Service : A Decentralized On-chain EOS.IO Voting Platform
+
 Trail offers a comprehensive suite of blockchain-based voting services available to any prospective voter or contract developer on the Telos Blockchain Network.
 
 ## Understanding Trail's Role
 
-Trail was designed to allow maximum flexibility for smart contract developers, while at the same time consolidating many of the boilerplate functions of voting contracts into a single service. 
+Trail is designed to allow maximum flexibility for smart contract developers, while at the same time consolidating many of the boilerplate functions of voting contracts into a single service. 
 
-This paradigm essentially means contract writers can leave the "vote counting" up to Trail and instead focus on how they want to interpret the results of their ballot. Through cross-contract table lookup, any contract can view the results of a ballot and then have their contracts act based on those results.
-
-Trail ballots and elections are also stored indefinitely, allowing lookup throughout the entire history of the service. The only exception to this rule are ballots that operate on cycles. Ballots that operate this way will instead show the most recent cycle of the ballot.
+In other words, this means contract writers can leave the "vote counting" up to Trail and instead focus on their campaign and how they want to interpret the results of their ballot. Through cross-contract table lookup, any contract can view the results of a ballot and then have their contracts act based on those results.
 
 ## Ballot Lifecycle
 
-Building a ballot on Trail is simple and gives great flexibility to the developer to build their ballots in a variety of ways. An example ballot and voting contract will be used throughout this guide, and is recommended as an established model for current Trail interface best practices.
+Building a ballot on Trail is simple and offers enough flexibility to run a ballot suited for almost any scenario. An example ballot and voting contract will be used throughout this guide, and is recommended as an established model for current Trail interface best practices.
 
 ### 1. Setting Up Your Contract (Optional)
 

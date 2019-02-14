@@ -17,39 +17,6 @@ using namespace eosio;
 
 #pragma region Structs
 
-//@scope voter (easy to loop over for deletion)
-struct [[eosio::table, eosio::contract("eosio.trail")]] vote_receipt {
-    uint64_t ballot_id;
-    vector<uint16_t> directions; //TODO: change to vector of uint8_t
-    asset weight; //TODO: make vector of weights? directions[i] => weights[i]
-    uint32_t expiration;
-
-    uint64_t primary_key() const { return ballot_id; }
-    EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
-};
-
-// struct [[eosio::table, eosio::contract("eosio.trail")]] temp_receipt {
-//     uint64_t ballot_id;
-//     vector<uint16_t> directions; //TODO: change to vector of uint8_t
-//     asset weight; //TODO: make vector of weights? directions[i] => weights[i]
-//     uint32_t expiration;
-//     uint64_t primary_key() const { return ballot_id; }
-//     EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
-// };
-
-enum candidate_status : uint8_t {
-    REGISTERED, //0
-    RUNNING, //1
-    RESIGN //2
-};
-
-struct candidate {
-    name member;
-    string info_link;
-    asset votes;
-    uint8_t status;
-};
-
 //@scope name("eosio.trail").value
 struct [[eosio::table, eosio::contract("eosio.trail")]] ballot {
     uint64_t ballot_id; //TODO: change to ballot_name?
@@ -90,6 +57,19 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] proposal {
     EOSLIB_SERIALIZE(proposal, (prop_id)(publisher)(info_url)
         (no_count)(yes_count)(abstain_count)(unique_voters)
         (begin_time)(end_time)(cycle_count)(status))
+};
+
+enum candidate_status : uint8_t {
+    REGISTERED, //0
+    RUNNING, //1
+    RESIGN //2
+};
+
+struct candidate {
+    name member;
+    string info_link;
+    asset votes;
+    uint8_t status;
 };
 
 enum election_status : uint8_t {
@@ -153,6 +133,63 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] leaderboard {
         (begin_time)(end_time)(status))
 };
 
+enum poll_status : uint8_t {
+    READYING, //0
+    POLL_OPEN, //1
+    POLL_CLOSED, //2
+    WITHDRAWN //3
+};
+
+struct poll_option {
+    name option_name;
+    asset votes;
+};
+
+//@scope name("eosio.trail").value
+struct [[eosio::table("polls"), eosio::contract("eosio.trail")]] poll {
+    name poll_name;
+    name publisher;
+
+    string poll_title;
+    string description; //recommend markdown if used
+    string info_url;
+
+    vector<poll_option> options;
+    uint32_t unique_voters;
+    symbol voting_symbol;
+    
+    uint32_t begin_time;
+    uint32_t end_time;
+    uint8_t poll_status;
+
+    uint64_t primary_key() const { return poll_name.value; }
+    EOSLIB_SERIALIZE(poll, (poll_name)(publisher)
+        (poll_title)(description)(info_url)
+        (options)(unique_voters)(voting_symbol)
+        (begin_time)(end_time)(poll_status))
+};
+
+//@scope voter (easy to iterate over for deletion)
+struct [[eosio::table, eosio::contract("eosio.trail")]] vote_receipt {
+    uint64_t ballot_id; //TODO: rename to ballot_name
+    vector<uint16_t> directions; //TODO: change to vector<uint8_t> directions
+    asset weight; //TODO: make vector of weights? directions[i] => weights[i]
+    uint32_t expiration;
+
+    uint64_t primary_key() const { return ballot_id; }
+    //TODO: secondary key by_expiration()?
+    EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
+};
+
+// struct [[eosio::table, eosio::contract("eosio.trail")]] temp_receipt {
+//     uint64_t ballot_id;
+//     vector<uint16_t> directions; //TODO: change to vector of uint8_t
+//     asset weight; //TODO: make vector of weights? directions[i] => weights[i]
+//     uint32_t expiration;
+//     uint64_t primary_key() const { return ballot_id; }
+//     EOSLIB_SERIALIZE(vote_receipt, (ballot_id)(directions)(weight)(expiration))
+// };
+
 /**
  * totals vector mappings:
  *     totals[0] => total proposals
@@ -160,15 +197,25 @@ struct [[eosio::table, eosio::contract("eosio.trail")]] leaderboard {
  *     totals[2] => total leaderboards
  *     totals[3] => total polls
  */
-//TODO: consider renaming to globals
+//TODO: replace with globals singleton
 struct [[eosio::table("environment"), eosio::contract("eosio.trail")]] env {
     name publisher;
     vector<uint64_t> totals; //TODO: change to vector of table names?
-    uint32_t time_now; //TODO: remove?
-    uint64_t last_ballot_id; //TODO: remove?
+    uint32_t time_now; //TODO: remove? //TODO: change to max_vote_receipts;
+    uint64_t last_ballot_id; //TODO: remove? change to last_ballot_name?
 
     uint64_t primary_key() const { return publisher.value; }
     EOSLIB_SERIALIZE(env, (publisher)(totals)(time_now)(last_ballot_id))
+};
+
+struct [[eosio::table("globals"), eosio::contract("eosio.trail")]] global {
+    name publisher;
+    vector<uint16_t> ballot_totals;
+    uint16_t max_vote_receipts;
+    bool is_live;
+
+    uint64_t primary_key() const { return publisher.value; }
+    EOSLIB_SERIALIZE(global, (publisher)(ballot_totals)(max_vote_receipts)(is_live))
 };
 
 //NOTE: proxy receipts are scoped by voter (proxy)
@@ -180,7 +227,7 @@ struct [[eosio::table("environment"), eosio::contract("eosio.trail")]] env {
 //     EOSLIB_SERIALIZE(proxy_receipt, (ballot_id)(directions)(weight))
 // };
 
-//TODO: should proxies also be registered voters? does it matter?
+//TODO: should proxies also be registered voters?
 //TODO: scope by proxied token symbol? or proxy name?
 // struct [[eosio::table, eosio::contract("eosio.trail")]] proxy_id {
 //     name proxy;
@@ -210,12 +257,15 @@ typedef multi_index<name("elections"), election> elections_table;
 typedef multi_index<name("leaderboards"), leaderboard> leaderboards_table;
 //typedef multi_index<name("tempboards"), leaderboard> temp_leaderboards;
 
+typedef multi_index<name("polls"), poll> polls;
+
 typedef multi_index<name("votereceipts"), vote_receipt> votereceipts_table;
 //typedef multi_index<name("tempvotes"), vote_receipt> temp_votereceipts;
 
 //typedef multi_index<name("proxreceipts"), proxy_receipt> proxyreceipts_table;
 
 typedef singleton<name("environment"), env> environment_singleton;
+typedef singleton<name("globals"), global> global_singleton;
 
 #pragma endregion Tables
 

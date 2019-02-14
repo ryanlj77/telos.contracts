@@ -19,7 +19,7 @@ using namespace eosio;
 
 //TODO: fold into a vector?
 struct token_settings {
-    bool is_destructible = false;
+    bool is_destructible = false; //TODO: rename to is_unregisterable?
     bool is_proxyable = false; //allows proxy system
     bool is_burnable = false; //can only burn from own balance
     bool is_seizable = false;

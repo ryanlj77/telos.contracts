@@ -16,12 +16,14 @@
 using namespace std;
 using namespace eosio;
 
+//TODO: consider removing accounts table since not tracking liquid balance anymore
+
 #pragma region Structs
 
 struct account {
     asset balance;
 
-    uint64_t primary_key() const { return balance.symbol.raw(); }
+    uint64_t primary_key() const { return balance.symbol.raw(); } //BUG: should be symbol.code.raw?
 };
 
 struct currency_stats {
@@ -29,7 +31,7 @@ struct currency_stats {
     asset max_supply;
     name issuer;
 
-    uint64_t primary_key() const { return supply.symbol.raw(); }
+    uint64_t primary_key() const { return supply.symbol.raw(); } //BUG: should be symbol.code.raw?
 };
 
 struct user_resources {
