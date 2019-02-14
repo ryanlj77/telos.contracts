@@ -17,6 +17,8 @@
 using namespace std;
 using namespace eosio;
 
+#define MIN_VOTE_THRESHOLD 20000000000
+
 class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contract
 {
 
@@ -60,7 +62,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		MISUSED_CR_IP,		 // 7
 		A_TORT,				 // 8
 		BP_PENALTY_REVERSAL, // 9
-		WRONGFUL_ARB_ACT,	// 10
+		WRONGFUL_ARB_ACT,	 // 10
 		ACT_EXEC_RELIEF,	 // 11
 		WP_PROJ_FAILURE,	 // 12
 		TBNOA_BREACH,		 // 13
@@ -69,10 +71,10 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	enum arb_status : uint8_t
 	{
-		AVAILABLE,   // 0
-		UNAVAILABLE, // 1
-		INACTIVE,	// 2
-		SEAT_EXPIRED // 3
+		AVAILABLE,    // 0
+		UNAVAILABLE,  // 1
+		REMOVED,	  // 2
+		SEAT_EXPIRED  // 3
 	};
 
 	enum election_status : uint8_t
@@ -98,18 +100,18 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 #pragma endregion Enums
 
-	[[eosio::action]] 
-	void injectarbs(vector<name> to_inject); //TODO: remove production deployment
+	// [[eosio::action]] 
+	// void injectarbs(vector<name> to_inject); //TODO: remove production deployment
 
 #pragma region Arb_Elections
 
 	[[eosio::action]] 
 	void initelection();
 
-	[[eosio::action]] 
+	[[eosio::action]] //REGCAND
 	void regarb(name nominee, string credentials_link); //NOTE: actually regnominee, currently regarb for nonsense governance reasons
 
-	[[eosio::action]] 
+	[[eosio::action]] //UNREGCAND
 	void unregnominee(name nominee);
 
 	[[eosio::action]] //TODO: rename?
@@ -146,6 +148,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 #pragma region Case_Progression
 
+	//NOTE: action used by respondant to respond to claimants accusation 
+	[[eosio::action]] void respond(uint64_t case_id, string claim_hash, name respondant, string response_link);
+
 	[[eosio::action]] void assigntocase(uint64_t case_id, name arb_to_assign);
 
 	[[eosio::action]] void addarbs(uint64_t case_id, name assigned_arb, uint8_t num_arbs_to_assign);
@@ -162,9 +167,10 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	[[eosio::action]] void recuse(uint64_t case_id, string rationale, name assigned_arb);
 
-	[[eosio::action]] void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); //TODO: add memo for joining?
+	//NOTE: removed from v1, to be implemented in a future version.
+	// [[eosio::action]] void newjoinder(uint64_t base_case_id, uint64_t joining_case_id, name arb); 
 
-	[[eosio::action]] void joincases(uint64_t joinder_id, uint64_t new_case_id, name arb); //TODO: add memo for joining?
+	// [[eosio::action]] void joincases(uint64_t joinder_id, uint64_t new_case_id, name arb);
 
 #pragma endregion Case_Progression
 
@@ -175,12 +181,15 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	[[eosio::action]] void newarbstatus(uint8_t new_status, name arbitrator);
 
 	[[eosio::action]] void deletecase(uint64_t case_id);
-
+	
+	//TODO: deletearb action, removes EXPIRED or REMOVED status arbs from the arbitrators table
 #pragma endregion Arb_Actions
 
 #pragma region BP_Multisig_Actions
 
 	[[eosio::action]] void dismissarb(name arb);
+
+	//TODO: affidavit action, forced recusal of arbitrator from a specified case.
 
 #pragma endregion BP_Multisig_Actions
 
@@ -263,8 +272,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	struct [[eosio::table]] claim
 	{
 		uint64_t claim_id;
-		string claim_summary; //NOTE: ipfs link to claim document
-		string decision_link; //NOTE: ipfs link to decision document
+		string claim_summary; //NOTE: ipfs link to claim document from claimant
+		string decision_link; //NOTE: ipfs link to decision document from arbitrator
+		string response_link; //NOTE: ipfs link to response document from respondant (if any)
 		uint8_t decision_class;
 
 		uint64_t primary_key() const { return claim_id; }
@@ -376,8 +386,6 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 #pragma endregion Tables and Structs
 
 #pragma region Helpers
-
-	//TODO: helper function that changes casefile ram payer
 
 	config get_default_config();
 
