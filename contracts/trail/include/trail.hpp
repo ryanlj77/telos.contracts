@@ -1,6 +1,6 @@
 /**
  * Trail is an EOSIO-based voting service that allows users to create ballots that
- * are voted on by a network of registered voters. It also offers custom token
+ * are voted on by a network of registered voters. Trail also offers custom token
  * features that let any user to create their own voting token and configure settings 
  * to match a wide variety of intended use cases. 
  * 
@@ -35,7 +35,7 @@ class [[eosio::contract("trail")]] trail : public contract {
     struct option {
         name option_name;
         string info;
-        asset votes; //TODO: maybe just an int64_t?
+        asset votes;
     };
 
     enum ballot_status : uint8_t {
@@ -46,6 +46,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         RESERVED_STATUS //4
     };
 
+    //@scope get_self().value
     TABLE ballot {
         name ballot_name;
         name category;
@@ -70,15 +71,15 @@ class [[eosio::contract("trail")]] trail : public contract {
             (begin_time)(end_time)(status))
     };
 
-    //TODO: scope by voting_sym.code().raw() or get_self().value
+    //TODO: scope by voting_sym.code().raw() or get_self().value or name.value
     TABLE vote_receipt {
         name ballot_name;
         vector<name> option_names;
-        asset amount;
-        uint32_t expiration;
+        asset amount; //TODO: keep? could pull from account balance
+        uint32_t expiration; //TODO: keep? could pull from ballot end time
 
         uint64_t primary_key() const { return ballot_name.value; }
-        uint64_t by_exp() const { return expiration; }
+        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? maybe remove sec idx?
         EOSLIB_SERIALIZE(vote_receipt, (ballot_name)(option_names)(amount)(expiration))
     };
 
@@ -140,6 +141,8 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION readyballot(name ballot_name, name publisher, uint32_t end_time);
 
+    ACTION closeballot(name ballot_name, name publisher, uint8_t new_status);
+
     ACTION deleteballot(name ballot_name, name publisher);
 
     ACTION vote(name voter, name ballot_name, name option);
@@ -156,7 +159,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION burn(name publisher, asset amount_to_burn);
 
-    //ACTION transfer();
+    ACTION transfer(name sender, name recipient, asset amount, string memo);
 
     ACTION seize();
 
@@ -168,7 +171,11 @@ class [[eosio::contract("trail")]] trail : public contract {
     //functions
 
     bool is_existing_option(name option_name, vector<option> options);
+    bool is_option_in_receipt(name option_name, vector<name> options_voted);
     int get_option_index(name option_name, vector<option> options);
     asset get_voting_balance(name voter, symbol token_symbol);
-
+    bool has_previous_vote();
+    void unvote_option();
+    void unvote_ballot();
+    void upsert_balance();
 };

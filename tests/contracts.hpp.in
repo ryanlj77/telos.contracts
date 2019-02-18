@@ -32,6 +32,9 @@ struct contracts {
    static std::string          eosio_arb_wast() { return read_wast("${CMAKE_BINARY_DIR}/../contracts/eosio.arbitration/eosio.arbitration.wast"); }
    static std::vector<char>    eosio_arb_abi() { return read_abi("${CMAKE_BINARY_DIR}/../contracts/eosio.arbitration/eosio.arbitration.abi"); }
 
+   static std::vector<char>    new_trail_abi() { return read_abi("${CMAKE_BINARY_DIR}/../contracts/trail/trail.abi"); }
+   static std::vector<uint8_t> new_trail_wasm() { return read_wasm("${CMAKE_BINARY_DIR}/../contracts/trail/trail.wasm"); }
+
    struct util {
       static std::vector<uint8_t> test_api_wasm() { return read_wasm("${CMAKE_SOURCE_DIR}/test_contracts/test_api.wasm"); }
       static std::vector<uint8_t> exchange_wasm() { return read_wasm("${CMAKE_SOURCE_DIR}/test_contracts/exchange.wasm"); }

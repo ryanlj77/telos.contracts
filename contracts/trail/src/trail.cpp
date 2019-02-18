@@ -4,7 +4,7 @@ trail::trail(name self, name code, datastream<const char*> ds) : contract(self, 
 
 trail::~trail() {}
 
-
+//actions
 
 void trail::createballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
     require_auth(publisher);
@@ -30,6 +30,10 @@ void trail::createballot(name ballot_name, name category, name publisher, string
         row.status = SETUP;
     });
 
+}
+
+void trail::setinfo(name ballot_name, name publisher, string title, string description, string info_url) {
+    //TODO: implement
 }
 
 void trail::addoption(name ballot_name, name publisher, name option_name, string option_info) {
@@ -68,6 +72,10 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
 
 }
 
+void trail::deleteballot(name ballot_name, name publisher) {
+    //TODO: implement
+}
+
 void trail::vote(name voter, name ballot_name, name option) {
     require_auth(voter);
 
@@ -75,15 +83,24 @@ void trail::vote(name voter, name ballot_name, name option) {
 
     //check max vote receipts
 
-    //undo previous vote, if applicable
-
     //check ballot exists
     ballots ballots(get_self(), get_self().value);
     auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    check(now() >= bal.begin_time && now() <= bal.end_time, "must vote between ballot's begin and end time");
+    check(bal.status == OPEN, "ballot status is not open for voting");
 
     //check option exists
     int idx = get_option_index(option, bal.options);
     check(idx != -1, "option not found on ballot");
+
+    //check vote receipts
+    vote_receipts votereceipts(get_self(), get_self().value);
+    auto v_itr = votereceipts.find(ballot_name.value);
+
+    if (v_itr != votereceipts.end()) {
+        //check vote for option doesn't already exist
+        check(!is_option_in_receipt(option, v_itr->option_names), "voter has already voted for this option");
+    }
 
     //get voting account
     asset votes = get_voting_balance(voter, bal.voting_symbol);
@@ -93,6 +110,10 @@ void trail::vote(name voter, name ballot_name, name option) {
     ballots.modify(bal, same_payer, [&](auto& row) {
         row.options[idx].votes += votes;
     });
+}
+
+void trail::unvote(name voter, name ballot_name, name option) {
+    //TODO: implement
 }
 
 void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
@@ -156,6 +177,18 @@ void trail::mint(name publisher, name recipient, asset amount_to_mint) {
 
 }
 
+void trail::burn(name publisher, asset amount_to_burn) {
+    //TODO: implement
+}
+
+void trail::transfer(name sender, name recipient, asset amount, string memo) {
+    //TODO: implement
+}
+
+void trail::seize() {
+    //TODO: implement
+}
+
 void trail::open(name owner, symbol token_sym) {
     require_auth(owner);
 
@@ -186,10 +219,21 @@ void trail::close(name owner, symbol token_sym) {
 }
 
 
+//functions
 
 bool trail::is_existing_option(name option_name, vector<option> options) {
     for (option opt : options) {
         if (option_name == opt.option_name) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool trail::is_option_in_receipt(name option_name, vector<name> options_voted) {
+    for (name n : options_voted) {
+        if (option_name == n) {
             return true;
         }
     }
@@ -211,4 +255,22 @@ asset trail::get_voting_balance(name voter, symbol token_symbol) {
     accounts accounts(get_self(), voter.value);
     auto acc = accounts.get(token_symbol.code().raw(), "account with symbol doesn't exist");
     return acc.balance;
+}
+
+extern "C"
+{
+    void apply(uint64_t receiver, uint64_t code, uint64_t action)
+    {
+        if (code == receiver)
+        {
+            switch (action)
+            {
+                EOSIO_DISPATCH_HELPER(trail, (createballot)(setinfo)(addoption)(readyballot)(deleteballot)
+                    (vote)(unvote)(cleanupvotes)(createtoken)(mint)(burn)(transfer)(seize)(open)(close));
+            }
+        }
+        // else if (code == name("eosio").value && action == name("delegatebw").value) {
+        //     execute_action<trail>(eosio::name(receiver), eosio::name(code), &trail::update_votes());
+        // }
+    }
 }
