@@ -17,7 +17,7 @@
 using namespace std;
 using namespace eosio;
 
-#define MIN_VOTE_THRESHOLD 20000000000
+#define MIN_VOTE_THRESHOLD 0//10000000000
 
 class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contract
 {
@@ -278,7 +278,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		uint8_t decision_class;
 
 		uint64_t primary_key() const { return claim_id; }
-		EOSLIB_SERIALIZE(claim, (claim_id)(claim_summary)(decision_link)(decision_class))
+		EOSLIB_SERIALIZE(claim, (claim_id)(claim_summary)(decision_link)(response_link)(decision_class))
 	};
 
 	/**
@@ -301,11 +301,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 		vector<uint8_t> required_langs;
 
-		vector<claim> unread_claims; //TODO: make vector of claims? don't need to save claims to table unless accepted
+		vector<claim> unread_claims;
 		vector<uint64_t> accepted_claims;
-		string case_ruling; //NOTE: ipfs hash to ruling doc
-
-		string arb_comment;
+		string case_ruling;
 		uint32_t last_edit;
 
 		uint64_t primary_key() const { return case_id; }
@@ -317,7 +315,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 			uint128_t respondant_id = static_cast<uint128_t>(respondant.value);
 			return (claimant_id << 64) | respondant_id;
 		}
-		EOSLIB_SERIALIZE(casefile, (case_id)(case_status)(claimant)(respondant)(arbitrators)(required_langs)(unread_claims)(accepted_claims)(case_ruling)(arb_comment)(last_edit))
+		
+		EOSLIB_SERIALIZE(casefile, (case_id)(case_status)(claimant)(respondant)(arbitrators)(approvals)
+		(required_langs)(unread_claims)(accepted_claims)(case_ruling)(last_edit))
 	};
 
 	/**

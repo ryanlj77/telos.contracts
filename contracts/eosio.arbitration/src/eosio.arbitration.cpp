@@ -335,26 +335,24 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 	validate_ipfs_url(claim_link);
 
 	casefiles_table casefiles(get_self(), get_self().value);
-	auto case_id = casefiles.available_primary_key();
 
 	if(respondant) { //TODO: this must be tested properly, its possible that the default value is "valid"
 		check(is_account(*respondant), "respondant must be an account");
 	}
 
-	vector<name> arbs;
-	vector<uint64_t> acc_claims;
 	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
 
 	casefiles.emplace(claimant, [&](auto &row) {
-		row.case_id = case_id;
+		row.case_id = casefiles.available_primary_key();
 		row.case_status = CASE_SETUP;
 		row.claimant = claimant;
 		row.respondant = *respondant;
-		row.arbitrators = arbs;
+		row.arbitrators = {};
+		row.approvals = {};
 		row.required_langs = lang_codes;
 		row.unread_claims = unr_claims;
-		row.accepted_claims = acc_claims;
-		row.arb_comment = "";
+		row.accepted_claims = {};
+		row.case_ruling = std::string("");
 		row.last_edit = now();
 	});
 
@@ -590,6 +588,9 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		case_status++;
 		cf.approvals.clear();
 	}
+
+	//TODO: remove case_id from open_case_ids of arbitrators in the casefile`
+	//TODO: added case to closed_case_ids of arbitrators if case status is resolved or dismissed
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = case_status;
