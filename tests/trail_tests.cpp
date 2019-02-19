@@ -20,41 +20,13 @@ using mvo = fc::mutable_variant_object;
 
 BOOST_AUTO_TEST_SUITE(trail_tests)
 
-BOOST_FIXTURE_TEST_CASE(proposal_flow, trail_tester ) try {
+BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
 
     //make ballot, category proposal
 
     //setinfo
 
     //addoption x3 (yes, no, abstain)
-
-    //ready ballot
-
-    //vote/unvote/revote
-	
-} FC_LOG_AND_RETHROW()
-
-BOOST_FIXTURE_TEST_CASE(election_flow, trail_tester ) try {
-
-    //make ballot, category election
-
-    //setinfo
-
-    //addoption x4 (testaccount1, 2, 3, 4)
-
-    //ready ballot
-
-    //vote/unvote/revote
-	
-} FC_LOG_AND_RETHROW()
-
-BOOST_FIXTURE_TEST_CASE(poll_flow, trail_tester ) try {
-
-    //make ballot, category poll
-
-    //setinfo
-
-    //addoption x3 (option1, 2, 3)
 
     //ready ballot
 
@@ -71,12 +43,12 @@ BOOST_FIXTURE_TEST_CASE(receipt_cleanup, trail_tester ) try {
     //attempt to vote past max_vote_receipts
 
     //undelegatebw, trigger cleanup votes
-    
+
     //revote
 	
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(delete_ballot, trail_tester ) try {
+BOOST_FIXTURE_TEST_CASE(cancel_ballot, trail_tester ) try {
 
     //make ballot
     

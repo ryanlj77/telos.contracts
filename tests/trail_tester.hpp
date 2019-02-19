@@ -62,7 +62,7 @@ class trail_tester : public tester
 		deploy_trail_contract();
 		produce_blocks(2);
 
-        //init trail
+        //init VOTE registry
 		asset max_supply = asset::from_string("10000000000.0000 VOTE");
 		string info_url = "Telos Governance Registry";
         settings _settings = {
@@ -73,7 +73,7 @@ class trail_tester : public tester
             bool is_max_mutable = false;
             bool is_transferable = false;
         };
-        create_trail_token( N(trailservice), max_supply, _settings, info_url);
+        newtoken(N(trailservice), max_supply, _settings, info_url);
 		produce_blocks();
 
 		std::cout << "=======================END SETUP==============================" << std::endl;

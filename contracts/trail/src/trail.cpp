@@ -6,7 +6,7 @@ trail::~trail() {}
 
 //actions
 
-void trail::newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
+void trail::newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, uint8_t max_votable_options, symbol voting_sym) {
     require_auth(publisher);
 
     ballots ballots(get_self(), get_self().value);
@@ -24,6 +24,7 @@ void trail::newballot(name ballot_name, name category, name publisher, string ti
         row.info_url = info_url;
         row.options = blank_options;
         row.unique_voters = 0;
+        row.max_votable_options = max_votable_options;
         row.voting_symbol = voting_sym;
         row.begin_time = 0;
         row.end_time = 0;
@@ -83,36 +84,37 @@ void trail::deleteballot(name ballot_name, name publisher) {
 void trail::vote(name voter, name ballot_name, name option) {
     require_auth(voter);
 
-    //attempt to clean up an old vote
+    //attempt to clean up at least 2 old votes
 
-    //check max vote receipts
-
-    //check ballot exists
+    //get ballot
     ballots ballots(get_self(), get_self().value);
     auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
     check(now() >= bal.begin_time && now() <= bal.end_time, "must vote between ballot's begin and end time");
     check(bal.status == OPEN, "ballot status is not open for voting");
 
+    //get account
+    accounts accounts(get_self(), voter.value);
+    auto acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
+    check(acc.num_votes < MAX_VOTE_RECEIPTS, "reached max concurrent votes for voting token");
+    check(acc.balance.amount > int64_t(0), "cannot vote with a balance of 0");
+
     //check option exists
     int idx = get_option_index(option, bal.options);
     check(idx != -1, "option not found on ballot");
 
-    //check vote receipts
-    vote_receipts votereceipts(get_self(), get_self().value);
-    auto v_itr = votereceipts.find(ballot_name.value);
+    //get vote receipts
+    votes votes(get_self(), voter.value);
+    auto v_itr = votes.find(ballot_name.value);
 
-    if (v_itr != votereceipts.end()) {
+    if (v_itr != votes.end()) {
         //check vote for option doesn't already exist
         check(!is_option_in_receipt(option, v_itr->option_names), "voter has already voted for this option");
+        check(v_itr->option_names.size() + 1 <= bal.max_votable_options, "already voted for max number of options allowed by ballot");
     }
-
-    //get voting account
-    asset votes = get_voting_balance(voter, bal.voting_symbol);
-    check(votes.amount > int64_t(0), "cannot vote with a balance of 0");
 
     //update ballot
     ballots.modify(bal, same_payer, [&](auto& row) {
-        row.options[idx].votes += votes;
+        row.options[idx].votes += acc.balance;
     });
 }
 
@@ -121,12 +123,14 @@ void trail::unvote(name voter, name ballot_name, name option) {
 }
 
 void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
-    vote_receipts votereceipts(get_self(), get_self().value);
-    //auto by_exp = votereceipts.get_index<name("byexp")>();
+    votes votes(get_self(), voter.value);
+    //auto by_exp = votes.get_index<name("byexp")>();
 
     //get exp by lowest value
 
-    //delete oldest receipt if expired
+    //delete oldest receipt if expired, decrement count
+
+    //repeat until count = 0
 }
 
 

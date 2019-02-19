@@ -32,12 +32,6 @@ class [[eosio::contract("trail")]] trail : public contract {
     const uint32_t MIN_CLOSE_LENGTH = 259200; //3 days
     const uint16_t MAX_VOTE_RECEIPTS = 21; //TODO: move to token registry?
 
-    struct option {
-        name option_name;
-        string info; //TODO: remove? ballot info could explain each option
-        asset votes;
-    };
-
     enum ballot_status : uint8_t {
         SETUP, //0
         OPEN, //1
@@ -45,6 +39,23 @@ class [[eosio::contract("trail")]] trail : public contract {
         ARCHIVED, //3
         RESERVED_STATUS //4
     };
+
+    struct option {
+        name option_name;
+        string info; //TODO: remove? ballot info could explain each option
+        asset votes;
+    };
+
+    struct token_settings {
+        bool is_destructible = false;
+        bool is_proxyable = false;
+        bool is_burnable = false;
+        bool is_seizable = false;
+        bool is_max_mutable = false;
+        bool is_transferable = false;
+    };
+
+
 
     //@scope get_self().value
     TABLE ballot {
@@ -58,6 +69,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
         vector<option> options;
         uint32_t unique_voters;
+        uint8_t max_votable_options;
         symbol voting_symbol;
 
         uint32_t begin_time;
@@ -67,38 +79,8 @@ class [[eosio::contract("trail")]] trail : public contract {
         uint64_t primary_key() const { return ballot_name.value; }
         EOSLIB_SERIALIZE(ballot, (ballot_name)(category)(publisher)
             (title)(description)(info_url)
-            (options)(unique_voters)(voting_symbol)
+            (options)(unique_voters)(max_votable_options)(voting_symbol)
             (begin_time)(end_time)(status))
-    };
-
-    //TODO: scope name.value
-    TABLE vote_receipt {
-        name ballot_name;
-        vector<name> option_names;
-        asset amount;
-        uint32_t expiration; //TODO: keep? could pull from ballot end time
-
-        uint64_t primary_key() const { return ballot_name.value; }
-        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? maybe remove sec idx?
-        EOSLIB_SERIALIZE(vote_receipt, (ballot_name)(option_names)(amount)(expiration))
-    };
-
-    //@scope name.value
-    TABLE account {
-        asset balance;
-        uint16_t num_votes;
-
-        uint64_t primary_key() const { return balance.symbol.code().raw(); }
-        EOSLIB_SERIALIZE(account, (balance)(num_votes))
-    };
-
-    struct token_settings {
-        bool is_destructible = false;
-        bool is_proxyable = false;
-        bool is_burnable = false;
-        bool is_seizable = false;
-        bool is_max_mutable = false;
-        bool is_transferable = false;
     };
 
     //@scope get_self().value
@@ -118,7 +100,30 @@ class [[eosio::contract("trail")]] trail : public contract {
             (total_voters)(total_proxies)(settings)(info_url))
     };
 
+    //@scope name.value
+    TABLE vote {
+        name ballot_name;
+        vector<name> option_names;
+        asset amount;
+        uint32_t expiration; //TODO: keep? could pull from ballot end time, removes ability to index by exp though
 
+        uint64_t primary_key() const { return ballot_name.value; }
+        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? maybe remove sec idx?
+        EOSLIB_SERIALIZE(vote, (ballot_name)(option_names)(amount)(expiration))
+    };
+
+    //@scope name.value
+    TABLE account {
+        asset balance;
+        uint16_t num_votes;
+
+        uint64_t primary_key() const { return balance.symbol.code().raw(); }
+        EOSLIB_SERIALIZE(account, (balance)(num_votes))
+    };
+
+
+
+    //table defs
 
     typedef multi_index<name("ballots"), ballot> ballots;
 
@@ -126,14 +131,15 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     typedef multi_index<name("accounts"), account> accounts;
 
-    typedef multi_index<name("votereceipts"), vote_receipt,
-        indexed_by<name("byexp"), const_mem_fun<vote_receipt, uint64_t, &vote_receipt::by_exp>>> vote_receipts;
+    typedef multi_index<name("votes"), vote,
+        indexed_by<name("byexp"), const_mem_fun<vote, uint64_t, &vote::by_exp>>> votes;
+
 
 
     //actions
 
     ACTION newballot(name ballot_name, name category, name publisher, 
-        string title, string description, string info_url,
+        string title, string description, string info_url, uint8_t max_votable_options,
         symbol voting_sym);
 
     ACTION setinfo(name ballot_name, name publisher,
@@ -171,6 +177,7 @@ class [[eosio::contract("trail")]] trail : public contract {
     ACTION open(name owner, symbol token_sym);
 
     ACTION close(name owner, symbol token_sym);
+
 
 
     //functions
