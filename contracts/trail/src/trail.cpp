@@ -6,7 +6,7 @@ trail::~trail() {}
 
 //actions
 
-void trail::createballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
+void trail::newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
     require_auth(publisher);
 
     ballots ballots(get_self(), get_self().value);
@@ -72,6 +72,10 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
 
 }
 
+void trail::closeballot(name ballot_name, name publisher, uint8_t new_status) {
+    //TODO: implement
+}
+
 void trail::deleteballot(name ballot_name, name publisher) {
     //TODO: implement
 }
@@ -127,7 +131,7 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
 
 
 
-void trail::createtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
+void trail::newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
     require_auth(publisher);
 
     symbol new_sym = max_supply.symbol;
@@ -181,7 +185,7 @@ void trail::burn(name publisher, asset amount_to_burn) {
     //TODO: implement
 }
 
-void trail::transfer(name sender, name recipient, asset amount, string memo) {
+void trail::send(name sender, name recipient, asset amount, string memo) {
     //TODO: implement
 }
 
@@ -251,26 +255,68 @@ int trail::get_option_index(name option_name, vector<option> options) {
     return -1;
 }
 
+bool trail::has_token_balance(name voter, symbol sym) {
+    accounts accounts(get_self(), voter.value);
+    auto a_itr = accounts.find(sym.code().raw());
+    if (a_itr != accounts.end()) {
+        return true;
+    }
+    return false;
+}
+
 asset trail::get_voting_balance(name voter, symbol token_symbol) {
     accounts accounts(get_self(), voter.value);
     auto acc = accounts.get(token_symbol.code().raw(), "account with symbol doesn't exist");
     return acc.balance;
 }
 
+void trail::update_votes(name voter) {
+    //return if no VOTE balance found, user must call open() first
+    if (!has_token_balance(voter, VOTE_SYM)) {
+        return;
+    }
+
+    //calc balance delta
+
+    //revote for all active VOTE ballots (only inserting the delta)
+
+    //update VOTE balance
+}
+
 extern "C"
 {
     void apply(uint64_t receiver, uint64_t code, uint64_t action)
     {
+        size_t size = action_data_size();
+        constexpr size_t max_stack_buffer_size = 512;
+        void* buffer = nullptr;
+        if( size > 0 ) {
+            buffer = max_stack_buffer_size < size ? malloc(size) : alloca(size);
+            read_action_data(buffer, size);
+        }
+        datastream<const char*> ds((char*)buffer, size);
+
         if (code == receiver)
         {
             switch (action)
             {
-                EOSIO_DISPATCH_HELPER(trail, (createballot)(setinfo)(addoption)(readyballot)(deleteballot)
-                    (vote)(unvote)(cleanupvotes)(createtoken)(mint)(burn)(transfer)(seize)(open)(close));
+                EOSIO_DISPATCH_HELPER(trail, (newballot)(setinfo)(addoption)(readyballot)(closeballot)(deleteballot)
+                    (vote)(unvote)(cleanupvotes)(newtoken)(mint)(burn)(send)(seize)(open)(close));
             }
+
+        } else if (code == name("eosio").value && action == name("undelegatebw").value) {
+
+            struct undelegatebw_args {
+                name from;
+                name receiver;
+                asset unstake_net_quantity;
+                asset unstake_cpu_quantity;
+            };
+            
+            trail trailservice(name(receiver), name(code), ds);
+            auto args = unpack_action_data<undelegatebw_args>();
+            trailservice.update_votes(args.from);
+            //execute_action<trailservice>(eosio::name(receiver), eosio::name(code), &trailservice::update_votes());
         }
-        // else if (code == name("eosio").value && action == name("delegatebw").value) {
-        //     execute_action<trail>(eosio::name(receiver), eosio::name(code), &trail::update_votes());
-        // }
     }
 }

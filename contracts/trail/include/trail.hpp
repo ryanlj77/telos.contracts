@@ -30,11 +30,11 @@ class [[eosio::contract("trail")]] trail : public contract {
     const symbol VOTE_SYM = symbol("VOTE", 0);
     const uint32_t MIN_BALLOT_LENGTH = 86400; //1 day
     const uint32_t MIN_CLOSE_LENGTH = 259200; //3 days
-    const uint16_t MAX_VOTE_RECEIPTS = 21;
+    const uint16_t MAX_VOTE_RECEIPTS = 21; //TODO: move to token registry?
 
     struct option {
         name option_name;
-        string info;
+        string info; //TODO: remove? ballot info could explain each option
         asset votes;
     };
 
@@ -71,11 +71,11 @@ class [[eosio::contract("trail")]] trail : public contract {
             (begin_time)(end_time)(status))
     };
 
-    //TODO: scope by voting_sym.code().raw() or get_self().value or name.value
+    //TODO: scope name.value
     TABLE vote_receipt {
         name ballot_name;
         vector<name> option_names;
-        asset amount; //TODO: keep? could pull from account balance
+        asset amount;
         uint32_t expiration; //TODO: keep? could pull from ballot end time
 
         uint64_t primary_key() const { return ballot_name.value; }
@@ -86,9 +86,10 @@ class [[eosio::contract("trail")]] trail : public contract {
     //@scope name.value
     TABLE account {
         asset balance;
+        uint16_t num_votes;
 
         uint64_t primary_key() const { return balance.symbol.code().raw(); }
-        EOSLIB_SERIALIZE(account, (balance))
+        EOSLIB_SERIALIZE(account, (balance)(num_votes))
     };
 
     struct token_settings {
@@ -110,6 +111,8 @@ class [[eosio::contract("trail")]] trail : public contract {
         token_settings settings;
         string info_url;
 
+        //TODO: maybe track max_vote_receipts here? or maybe in token_settings?
+
         uint64_t primary_key() const { return supply.symbol.code().raw(); }
         EOSLIB_SERIALIZE(registry, (supply)(max_supply)(publisher)
             (total_voters)(total_proxies)(settings)(info_url))
@@ -129,7 +132,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     //actions
 
-    ACTION createballot(name ballot_name, name category, name publisher, 
+    ACTION newballot(name ballot_name, name category, name publisher, 
         string title, string description, string info_url,
         symbol voting_sym);
 
@@ -149,17 +152,19 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION unvote(name voter, name ballot_name, name option);
 
+    //ACTION rebalance(); //TODO: after unstake, require rebalancing before voting again?
+
     ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
 
 
 
-    ACTION createtoken(name publisher, asset max_supply, token_settings settings, string info_url);
+    ACTION newtoken(name publisher, asset max_supply, token_settings settings, string info_url);
 
     ACTION mint(name publisher, name recipient, asset amount_to_mint);
 
     ACTION burn(name publisher, asset amount_to_burn);
 
-    ACTION transfer(name sender, name recipient, asset amount, string memo);
+    ACTION send(name sender, name recipient, asset amount, string memo);
 
     ACTION seize();
 
@@ -173,9 +178,12 @@ class [[eosio::contract("trail")]] trail : public contract {
     bool is_existing_option(name option_name, vector<option> options);
     bool is_option_in_receipt(name option_name, vector<name> options_voted);
     int get_option_index(name option_name, vector<option> options);
-    asset get_voting_balance(name voter, symbol token_symbol);
-    bool has_previous_vote();
-    void unvote_option();
-    void unvote_ballot();
+    asset get_tlos_stake();
     void upsert_balance();
+    bool has_token_balance(name voter, symbol sym);
+    asset get_voting_balance(name voter, symbol token_symbol);
+    void unvote_option();
+    void apply_vote_delta();
+    void unvote_ballot();
+    void update_votes(name voter);
 };

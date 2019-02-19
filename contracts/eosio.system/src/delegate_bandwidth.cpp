@@ -464,9 +464,15 @@ namespace eosiosystem {
       check( unstake_net_quantity >= zero_asset, "must unstake a positive amount" );
       check( unstake_cpu_quantity.amount + unstake_net_quantity.amount > 0, "must unstake a positive amount" );
       check( _gstate.block_num > block_num_network_activation || _gstate.thresh_activated_stake_time > time_point(),
-                    "cannot undelegate bandwidth until the chain is activated (1,000,000 blocks produced)" );
+         "cannot undelegate bandwidth until the chain is activated (1,000,000 blocks produced)" );
 
       changebw( from, receiver, -unstake_net_quantity, -unstake_cpu_quantity, false);
+
+      //forwards undelegatebw to trail for VOTE balance update
+      if (from == receiver) {
+         require_recipient(name("trailservice"));
+      }
+
    } // undelegatebw
 
 

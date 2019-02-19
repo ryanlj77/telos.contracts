@@ -51,6 +51,13 @@ class trail_tester : public tester
 		issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
 		produce_blocks(2);
 
+        //transfer tlos to test accounts
+        transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount2), asset::from_string("200.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
+
         //deploy trail
 		deploy_trail_contract();
 		produce_blocks(2);
@@ -67,11 +74,7 @@ class trail_tester : public tester
             bool is_transferable = false;
         };
         create_trail_token( N(trailservice), max_supply, _settings, info_url);
-		produce_blocks(1);
-
-        //
-
-        //
+		produce_blocks();
 
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
@@ -198,9 +201,9 @@ class trail_tester : public tester
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
 
-	transaction_trace_ptr create_trail_token(name publisher, asset max_supply, token_settings settings, string info_url) {
+	transaction_trace_ptr newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(createtoken), vector<permission_level>{{publisher, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(newtoken), vector<permission_level>{{publisher, config::active_name}},
 			mvo()
 			("publisher", publisher)
 			("max_supply", max_supply)
@@ -213,9 +216,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-    transaction_trace_ptr trail_transfer(name sender, name recipient, asset amount, string memo) {
+    transaction_trace_ptr send(name sender, name recipient, asset amount, string memo) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(transfer), vector<permission_level>{{from, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(send), vector<permission_level>{{from, config::active_name}},
 			mvo()
 			("sender", sender)
 			("recipient", recipient)
@@ -228,9 +231,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr createballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
+	transaction_trace_ptr newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(createballot), vector<permission_level>{{publisher, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(newballot), vector<permission_level>{{publisher, config::active_name}},
 			mvo()
 			("ballot_name", ballot_name)
 			("category", category)
