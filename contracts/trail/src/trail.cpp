@@ -157,7 +157,7 @@ void trail::vote(name voter, name ballot_name, name option) {
     int idx = get_option_index(option, bal.options);
     check(idx != -1, "option not found on ballot");
 
-    //get vote receipts
+    //get votes
     votes votes(get_self(), voter.value);
     auto v_itr = votes.find(ballot_name.value);
 
@@ -174,7 +174,61 @@ void trail::vote(name voter, name ballot_name, name option) {
 }
 
 void trail::unvote(name voter, name ballot_name, name option) {
-    //TODO: implement
+    require_auth(voter);
+
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //get votes
+    votes votes(get_self(), voter.value);
+    auto v = votes.get(ballot_name.value, "vote does not exist for this ballot");
+
+    auto bal_opt_idx = get_option_index(option, bal.options);
+    auto new_voted_options = v.option_names;
+    bool found = false;
+
+    for (auto opt_itr = new_voted_options.begin(); opt_itr < new_voted_options.end(); opt_itr++) {
+        if (*opt_itr == option) {
+            new_voted_options.erase(opt_itr);
+            found = true;
+            break;
+        }
+    }
+
+    //validate
+    check(bal.status == OPEN, "ballot status is not open for voting");
+    check(now() >= bal.begin_time && now() <= bal.end_time, "must unvote between ballot's begin and end time");
+    check(found, "option not found on vote");
+    check(bal_opt_idx != -1, "option not found on ballot");
+
+    if (new_voted_options.size() > 0) {
+
+        auto new_bal_options = bal.options;
+        new_bal_options[bal_opt_idx].votes -= v.amount;
+        
+        //remove option from vote
+        votes.modify(v, same_payer, [&](auto& row) {
+            row.option_names = new_voted_options;
+        });
+
+        //lower option votes by amount
+        ballots.modify(bal, same_payer, [&](auto& row) {
+            row.options = new_bal_options;
+        });
+
+    } else { //unvoted last option
+
+        //erase vote
+        votes.erase(v);
+
+        //decrement bal.unique_voters;
+        ballots.modify(bal, same_payer, [&](auto& row) {
+            row.unique_voters -= 1;
+        });
+
+    }
+
 }
 
 void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
@@ -295,7 +349,24 @@ void trail::send(name sender, name recipient, asset amount, string memo) {
 }
 
 void trail::seize(name publisher, name owner, asset amount_to_seize) {
-    //TODO: implement
+    require_auth(publisher);
+
+    symbol token_sym = amount_to_seize.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //validate
+    check(publisher != owner, "cannot seize tokens from yourself");
+    check(is_account(owner), "owner account doesn't exist");
+    check(amount_to_seize.is_valid(), "invalid amount");
+    check(amount_to_seize.amount > 0, "must seize positive amount");
+    check(amount_to_seize.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+
+    //sub amount from owner
+    //add amount to publisher
+
 }
 
 void trail::open(name owner, symbol token_sym) {

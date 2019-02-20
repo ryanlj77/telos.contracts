@@ -164,6 +164,8 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
 
+    //ACTION cleanhouse(name voter, symbol voting_sym);
+
 
 
     ACTION newtoken(name publisher, asset max_supply, token_settings settings, string info_url);
@@ -189,10 +191,10 @@ class [[eosio::contract("trail")]] trail : public contract {
     int get_option_index(name option_name, vector<option> options);
     bool has_token_balance(name voter, symbol sym);
     void update_votes(name voter);
+    void unvote_option();
     
     asset get_tlos_stake();
     void upsert_balance();
-    void unvote_option();
     void apply_vote_delta();
     void unvote_ballot();
     
