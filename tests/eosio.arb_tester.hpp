@@ -131,11 +131,14 @@ public:
 
     //NOTE: Case Setup
 
-    transaction_trace_ptr filecase(name claimant, string claim_link) {
+    transaction_trace_ptr filecase(name claimant, string claim_link, vector <uint8_t> lang_codes, optional<name> respondant ) {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(filecase), vector<permission_level>{{claimant, config::active_name}}, mvo()
             ("claimant", claimant)
-            ("claim_link", claim_link)));
+            ("claim_link", claim_link)
+            ("lang_code", lang_codes)
+            ("respondant", respondant)
+            ));
         set_transaction_headers(trx);
         trx.sign(get_private_key(claimant, "active"), control->get_chain_id());
         return push_transaction(trx);

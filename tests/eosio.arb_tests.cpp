@@ -2,6 +2,8 @@
 #include <eosio/testing/tester.hpp>
 #include <eosio/chain/abi_serializer.hpp>
 #include <eosio/chain/wast_to_wasm.hpp>
+//#include <eosio.arbitration/eosio.arbitration.hpp>
+
 
 #include <Runtime/Runtime.h>
 #include <iomanip>
@@ -605,6 +607,7 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
    uint16_t 
       max_elected_arbs = 2;
 
+
    // setup config
    setconfig ( max_elected_arbs, start_election, election_duration, arbitrator_term_length, fees);
    produce_blocks(1);
@@ -752,6 +755,44 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
+
+    // choose 3 claimants
+    vector<name> claimants = { test_voters[0],test_voters[1],test_voters[2]  };
+    name claimant1 = test_voters[0];
+    name claimant2 = test_voters[1];
+    name claimant3 = test_voters[2];
+
+    // specify claim link
+    string claim_link = "http://google.com";
+
+    // Lang codes
+    vector<uint8_t>
+        langcodes = {uint8_t(0)};
+
+    // file 3 cases for 3 separate claimants
+    std::cout<<"File cases" << endl;
+
+    for (auto claimant : claimants){
+        filecase(claimant, claim_link, langcodes  , NULL );
+    }
+
+    //for (int i {0}; i<=2; ++i ){
+    //    filecase(claimant1, claim_link, langcodes  , NULL );
+    //}
+
+    // check cases filed status is CASE_SETUP
+
+    // add claims to the case file
+    // QUESTION:  How do you get case_id to file claim?
+
+    // remove claim and confirm
+
+
+
+
+
+
+
 
 } FC_LOG_AND_RETHROW()
 
