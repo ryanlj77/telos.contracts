@@ -335,7 +335,7 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 	validate_ipfs_url(claim_link);
 
 	casefiles_table casefiles(get_self(), get_self().value);
-
+	print("respondant: ", *respondant);
 	if(respondant) { //TODO: this must be tested properly, its possible that the default value is "valid"
 		check(is_account(*respondant), "respondant must be an account");
 	}
@@ -425,8 +425,7 @@ void arbitration::readycase(uint64_t case_id, name claimant)
 	check(cf.unread_claims.size() >= 1, "Cases must have atleast one claim");
 	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
-	//TODO: determing fee structure and flat fees.
-	//sub_balance(claimant, /*amount to subtract*/);
+	sub_balance(claimant, asset(_config.fee_structure[0], native_sym));
 
 	casefiles.modify(cf, get_self(), [&](auto &row) {
 		row.case_status = AWAITING_ARBS;
@@ -547,7 +546,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	auto claim_it = get_claim_at(claim_hash, new_unread_claims);
 	check(claim_it != new_unread_claims.end(), "Claim Hash not found in casefile");
 	new_unread_claims.erase(claim_it);
-
+	uint64_t new_claim_id = claims.available_primary_key();
 	vector<uint64_t> new_accepted_claims = cf.accepted_claims;
 	new_accepted_claims.emplace_back(new_claim_id);
 
@@ -558,7 +557,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	});
 
 	claims.emplace(get_self(), [&](auto &row) {
-		row.claim_id = claims.available_primary_key();;
+		row.claim_id = new_claim_id;
 		row.claim_summary = claim_hash;
 		row.decision_link = decision_link;
 		row.decision_class = decision_class;
@@ -580,12 +579,13 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	check(approval_it == cf.arbitrators.end(), "arbitrator has already approved advancing this case");
 
 	auto case_status = cf.case_status;
+	auto approvals = cf.approvals;
 
-	if (cf.approvals.size() + 1 < cf.arbitrators.size()) {
-		cf.approvals.emplace_back(assigned_arb);
+	if (approvals.size() + 1 < cf.arbitrators.size()) {
+		approvals.emplace_back(assigned_arb);
 	} else if (cf.approvals.size() + 1 == cf.arbitrators.size()) {
 		case_status++;
-		cf.approvals.clear();
+		approvals.clear();
 	}
 
 	//TODO: remove case_id from open_case_ids of arbitrators in the casefile`
@@ -593,7 +593,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = case_status;
-		row.approvals = cf.approvals;
+		row.approvals = approvals;
 	});
 }
 
@@ -723,7 +723,7 @@ void arbitration::assert_string(string to_check, string error_msg)
 
 arbitration::config arbitration::get_default_config()
 {
-	vector<int64_t> fees{1000000, 2000000, 3000000};
+	vector<int64_t> fees{2000000};
 	auto c = config{
 		get_self(),			// publisher
 		uint16_t(21),		// max_elected_arbs

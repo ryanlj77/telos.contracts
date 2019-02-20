@@ -52,21 +52,21 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	enum claim_class : uint8_t
 	{
-		UNDECIDED,			 // 0
-		LOST_KEY_RECOVERY,   // 1
-		TRX_REVERSAL,		 // 2
-		EMERGENCY_INTER,	 // 3
-		CONTESTED_OWNER,	 // 4
-		UNEXECUTED_RELIEF,   // 5
-		CONTRACT_BREACH,	 // 6
-		MISUSED_CR_IP,		 // 7
-		A_TORT,				 // 8
-		BP_PENALTY_REVERSAL, // 9
-		WRONGFUL_ARB_ACT,	 // 10
-		ACT_EXEC_RELIEF,	 // 11
-		WP_PROJ_FAILURE,	 // 12
-		TBNOA_BREACH,		 // 13
-		MISC				 // 14
+		UNDECIDED			= 1,
+		LOST_KEY_RECOVERY	= 2,
+		TRX_REVERSAL		= 3,
+		EMERGENCY_INTER		= 4,
+		CONTESTED_OWNER		= 5,
+		UNEXECUTED_RELIEF	= 6,
+		CONTRACT_BREACH		= 7,
+		MISUSED_CR_IP		= 8,
+		A_TORT				= 9,
+		BP_PENALTY_REVERSAL	= 10,
+		WRONGFUL_ARB_ACT 	= 11,
+		ACT_EXEC_RELIEF		= 12,
+		WP_PROJ_FAILURE		= 13,
+		TBNOA_BREACH		= 14,
+		MISC				= 15
 	};
 
 	enum arb_status : uint8_t
@@ -333,6 +333,14 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		uint16_t max_elected_arbs;
 		uint32_t election_duration;
 		uint32_t election_start;
+
+		/**
+		 * Vector of fees by claim class, with an offset of 1
+		 * fee_structure[0] 					= initial fee
+		 * fee_structure[UNDECIDED] 			= UNDECIDED fee
+		 * fee_structure[LOST_KEY_RECOVERY]  	= LOST_KEY_RECOVERY fee
+		 *  ...
+		*/
 		vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value //TODO: just make vector of assets
 		uint32_t arb_term_length;
 		uint32_t last_time_edited;
