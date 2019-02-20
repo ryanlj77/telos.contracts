@@ -184,15 +184,16 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     //functions
 
-    bool is_existing_option(name option_name, vector<option> options);
+    bool is_option_in_ballot(name option_name, vector<option> options);
     bool is_option_in_receipt(name option_name, vector<name> options_voted);
     int get_option_index(name option_name, vector<option> options);
+    bool has_token_balance(name voter, symbol sym);
+    void update_votes(name voter);
+    
     asset get_tlos_stake();
     void upsert_balance();
-    bool has_token_balance(name voter, symbol sym);
-    asset get_voting_balance(name voter, symbol token_symbol);
     void unvote_option();
     void apply_vote_delta();
     void unvote_ballot();
-    void update_votes(name voter);
+    
 };

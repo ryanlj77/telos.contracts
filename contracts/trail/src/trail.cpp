@@ -69,7 +69,7 @@ void trail::addoption(name ballot_name, name publisher, name option_name, string
     //validate
     check(bal.publisher == publisher, "only ballot publisher can add options");
     check(bal.status == SETUP, "ballot must be in setup mode to edit");
-    check(is_existing_option(option_name, bal.options) == false, "option is already in ballot");
+    check(is_option_in_ballot(option_name, bal.options) == false, "option is already in ballot");
 
     option new_option = {
         option_name,
@@ -272,7 +272,26 @@ void trail::burn(name publisher, asset amount_to_burn) {
 }
 
 void trail::send(name sender, name recipient, asset amount, string memo) {
-    //TODO: implement
+    require_auth(sender);
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto reg = registries.get(amount.symbol.code().raw(), "registry with symbol not found");
+
+    //validate
+    check(sender != recipient, "cannot send tokens to yourself");
+    check(is_account(recipient), "recipient account doesn't exist");
+    check(amount.is_valid(), "invalid amount");
+    check(amount.amount > 0, "must transfer positive amount");
+    check(amount.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+    check(memo.size() <= 256, "memo has more than 256 bytes");
+
+    //require_recipient(sender);
+    //require_recipient(recipient);
+
+    //sub amount from sender
+    //add amount to recipient
+
 }
 
 void trail::seize(name publisher, name owner, asset amount_to_seize) {
@@ -313,7 +332,7 @@ void trail::close(name owner, symbol token_sym) {
 
 //functions
 
-bool trail::is_existing_option(name option_name, vector<option> options) {
+bool trail::is_option_in_ballot(name option_name, vector<option> options) {
     for (option opt : options) {
         if (option_name == opt.option_name) {
             return true;
@@ -350,12 +369,6 @@ bool trail::has_token_balance(name voter, symbol sym) {
         return true;
     }
     return false;
-}
-
-asset trail::get_voting_balance(name voter, symbol token_symbol) {
-    accounts accounts(get_self(), voter.value);
-    auto acc = accounts.get(token_symbol.code().raw(), "account with symbol doesn't exist");
-    return acc.balance;
 }
 
 void trail::update_votes(name voter) {
