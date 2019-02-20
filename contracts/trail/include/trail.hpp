@@ -35,7 +35,7 @@ class [[eosio::contract("trail")]] trail : public contract {
     enum ballot_status : uint8_t {
         SETUP, //0
         OPEN, //1
-        CLOSED, //2
+        CLOSED, //2 //TODO: need closed status? anything after open is closed
         ARCHIVED, //3
         RESERVED_STATUS //4
     };
@@ -148,6 +148,8 @@ class [[eosio::contract("trail")]] trail : public contract {
     ACTION addoption(name ballot_name, name publisher,
         name option_name, string option_info);
 
+    //ACTION rmvoption(name ballot_name, name publisher, name option_name);
+
     ACTION readyballot(name ballot_name, name publisher, uint32_t end_time);
 
     ACTION closeballot(name ballot_name, name publisher, uint8_t new_status);
@@ -172,7 +174,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION send(name sender, name recipient, asset amount, string memo);
 
-    ACTION seize();
+    ACTION seize(name publisher, name owner, asset amount_to_seize);
 
     ACTION open(name owner, symbol token_sym);
 

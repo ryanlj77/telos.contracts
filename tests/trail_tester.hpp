@@ -79,31 +79,7 @@ class trail_tester : public tester
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
 	
-	
 
-    uint32_t now() {
-        return (control->pending_block_time().time_since_epoch().count() / 1000000);
-    }
-
-    string base31 = "abcdefghijklmnopqrstuvwxyz12345";
-
-    string toBase31(uint32_t in) {
-        vector<uint32_t> out = { 0, 0, 0, 0, 0, 0, 0 };
-        uint32_t remainder = in;
-        uint32_t divisor = 0;
-        uint32_t quotient = 0;
-        for (int i = 0; i < out.size(); i++) {
-            divisor = pow(31, out.size() - 1 - i);
-            quotient = remainder / divisor;
-            remainder = remainder - (quotient * divisor);
-            out[i] = quotient;
-        }
-        string output = "aaaaaaa";
-        for (int i = 0; i < out.size(); i++) {
-            output[i] = base31[out[i]];
-        }
-        return output;
-    }
 
    //push action
 
@@ -191,9 +167,9 @@ class trail_tester : public tester
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("registry", data, abi_serializer_max_time);
 	}
 
-    fc::variant get_vote_receipt(account_name voter, name ballot_name) {
-		vector<char> data = get_row_by_account(N(trailservice), voter, N(votereceipts), ballot_name);
-		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("vote_receipt", data, abi_serializer_max_time);
+    fc::variant get_vote(account_name voter, name ballot_name) {
+		vector<char> data = get_row_by_account(N(trailservice), voter, N(votes), ballot_name);
+		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("vote", data, abi_serializer_max_time);
 	}
 
     fc::variant get_voter(account_name voter, symbol sym) {
@@ -201,35 +177,7 @@ class trail_tester : public tester
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
 
-	transaction_trace_ptr newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
-		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(newtoken), vector<permission_level>{{publisher, config::active_name}},
-			mvo()
-			("publisher", publisher)
-			("max_supply", max_supply)
-			("settings", settings)
-            ("info_url", info_url)
-			)
-		);
-		set_transaction_headers(trx);
-		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
-		return push_transaction( trx );
-	}
-
-    transaction_trace_ptr send(name sender, name recipient, asset amount, string memo) {
-		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(send), vector<permission_level>{{from, config::active_name}},
-			mvo()
-			("sender", sender)
-			("recipient", recipient)
-			("amount", amount)
-            ("memo", memo)
-			)
-		);
-		set_transaction_headers(trx);
-		trx.sign(get_private_key(sender, "active"), control->get_chain_id());
-		return push_transaction( trx );
-	}
+	//ballots
 
 	transaction_trace_ptr newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
 		signed_transaction trx;
@@ -249,7 +197,225 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
+	transaction_trace_ptr setinfo(name ballot_name, name publisher, string title, string description, string info_url) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(setinfo), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("ballot_name", ballot_name)
+			("publisher", publisher)
+			("title", title)
+			("description", description)
+			("info_url", info_url)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr addoption(name ballot_name, name publisher, name option_name, string option_info) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(addoption), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("ballot_name", ballot_name)
+			("publisher", publisher)
+			("option_name", option_name)
+			("option_info", option_info)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr readyballot(name ballot_name, name publisher, uint32_t end_time) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(readyballot), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("ballot_name", ballot_name)
+			("publisher", publisher)
+			("end_time", end_time)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr closeballot(name ballot_name, name publisher, uint8_t new_status) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(closeballot), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("ballot_name", ballot_name)
+			("publisher", publisher)
+			("new_status", new_status)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr deleteballot(name ballot_name, name publisher) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(deleteballot), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("ballot_name", ballot_name)
+			("publisher", publisher)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr vote(name voter, name ballot_name, name option) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(vote), vector<permission_level>{{voter, config::active_name}},
+			mvo()
+			("voter", voter)
+			("ballot_name", ballot_name)
+			("option", option)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(voter, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr unvote(name voter, name ballot_name, name option) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(unvote), vector<permission_level>{{voter, config::active_name}},
+			mvo()
+			("voter", voter)
+			("ballot_name", ballot_name)
+			("option", option)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(voter, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(cleanupvotes), vector<permission_level>{{voter, config::active_name}},
+			mvo()
+			("voter", voter)
+			("count", count)
+			("voting_sym", voting_sym)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(voter, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	//tokens
+
+	transaction_trace_ptr newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(newtoken), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("publisher", publisher)
+			("max_supply", max_supply)
+			("settings", settings)
+            ("info_url", info_url)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr mint(name publisher, name recipient, asset amount_to_mint) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(mint), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("publisher", publisher)
+			("recipient", recipient)
+			("amount_to_mint", amount_to_mint)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr burn(name publisher, asset amount_to_burn) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(burn), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("publisher", publisher)
+			("amount_to_burn", amount_to_burn)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+    transaction_trace_ptr send(name sender, name recipient, asset amount, string memo) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(send), vector<permission_level>{{sender, config::active_name}},
+			mvo()
+			("sender", sender)
+			("recipient", recipient)
+			("amount", amount)
+            ("memo", memo)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(sender, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr seize(name publisher, name owner, asset amount_to_seize) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(seize), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("publisher", publisher)
+			("owner", owner)
+			("amount_to_seize", amount_to_seize)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr open(name owner, symbol token_sym) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(open), vector<permission_level>{{owner, config::active_name}},
+			mvo()
+			("owner", owner)
+			("token_sym", token_sym)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(owner, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr close(name owner, symbol token_sym) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(close), vector<permission_level>{{owner, config::active_name}},
+			mvo()
+			("owner", owner)
+			("token_sym", token_sym)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(owner, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+	
+
     //utilities
+
+	uint32_t now() {
+        return (control->pending_block_time().time_since_epoch().count() / 1000000);
+    }
 
 	void dump_trace(transaction_trace_ptr trace_ptr) {
 		std::cout << std::endl << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;

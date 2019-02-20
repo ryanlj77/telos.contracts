@@ -6,12 +6,19 @@ trail::~trail() {}
 
 //actions
 
-void trail::newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, uint8_t max_votable_options, symbol voting_sym) {
+void trail::newballot(name ballot_name, name category, name publisher, 
+    string title, string description, string info_url, 
+    uint8_t max_votable_options, symbol voting_sym) 
+{
     require_auth(publisher);
 
+    //check ballot doesn't already exist
     ballots ballots(get_self(), get_self().value);
     auto b = ballots.find(ballot_name.value);
     check(b == ballots.end(), "ballot name already exists");
+    check(max_votable_options > 0, "max votable options must be greater than 0");
+
+    //check category is in supported list
 
     vector<option> blank_options;
 
@@ -34,15 +41,34 @@ void trail::newballot(name ballot_name, name category, name publisher, string ti
 }
 
 void trail::setinfo(name ballot_name, name publisher, string title, string description, string info_url) {
-    //TODO: implement
+    require_auth(publisher);
+
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //validate
+    check(bal.publisher == publisher, "only ballot publisher can set info");
+    check(bal.status == SETUP, "ballot must be in setup mode to edit");
+
+    ballots.modify(bal, same_payer, [&](auto& row) {
+        row.title = title;
+        row.description = description;
+        row.info_url = info_url;
+    });
+
 }
 
 void trail::addoption(name ballot_name, name publisher, name option_name, string option_info) {
     require_auth(publisher);
 
+    //get ballot
     ballots ballots(get_self(), get_self().value);
     auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //validate
     check(bal.publisher == publisher, "only ballot publisher can add options");
+    check(bal.status == SETUP, "ballot must be in setup mode to edit");
     check(is_existing_option(option_name, bal.options) == false, "option is already in ballot");
 
     option new_option = {
@@ -52,17 +78,21 @@ void trail::addoption(name ballot_name, name publisher, name option_name, string
     };
 
     ballots.modify(bal, same_payer, [&](auto& row) {
-        row.options.emplace_back(new_option);
+        row.options.emplace_back(new_option); //TODO: maybe push_back()?
     });
 }
 
 void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
     require_auth(publisher);
 
+    //get ballot
     ballots ballots(get_self(), get_self().value);
     auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //validate
     check(bal.publisher == publisher, "only ballot publisher can ready ballot");
     check(bal.options.size() >= 2, "ballot must have at least 2 options");
+    check(bal.status == SETUP, "ballot must be in setup mode to edit");
     check(end_time - now() >= MIN_BALLOT_LENGTH, "ballot must be open for at least 1 day");
 
     ballots.modify(bal, same_payer, [&](auto& row) {
@@ -74,11 +104,36 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
 }
 
 void trail::closeballot(name ballot_name, name publisher, uint8_t new_status) {
-    //TODO: implement
+    require_auth(publisher);
+
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //validate
+    check(bal.publisher == publisher, "only ballot publisher can ready ballot");
+    check(bal.status == OPEN, "ballot must be in open mode to close");
+    check(bal.end_time < now(), "must be past ballot end time to close");
+
+    ballots.modify(bal, same_payer, [&](auto& row) {
+        row.status = CLOSED;
+    });
 }
 
 void trail::deleteballot(name ballot_name, name publisher) {
-    //TODO: implement
+    require_auth(publisher);
+
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //validate
+    check(bal.publisher == publisher, "only ballot publisher can ready ballot");
+    check(bal.status != OPEN, "cannot delete while voting is in progress");
+
+    //TODO: add exception for polls 
+
+    ballots.erase(bal);
 }
 
 void trail::vote(name voter, name ballot_name, name option) {
@@ -144,6 +199,7 @@ void trail::newtoken(name publisher, asset max_supply, token_settings settings, 
     registries registries(get_self(), get_self().value);
     auto reg = registries.find(new_sym.code().raw());
     check(reg == registries.end(), "registry with symbol not found");
+    check(new_sym.code().raw() != symbol("TLOS", 4).code().raw(), "the TLOS symbol is restricted to avoid confusion with the system token");
 
     registries.emplace(publisher, [&](auto& row){
         row.supply = asset(0, new_sym);
@@ -163,15 +219,19 @@ void trail::mint(name publisher, name recipient, asset amount_to_mint) {
 
     symbol token_sym = amount_to_mint.symbol;
 
-    //check registry exists
+    //get registry
     registries registries(get_self(), get_self().value);
     auto reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-    check(reg.publisher == publisher, "only registry publisher can mint new tokens");
-    check(reg.supply + amount_to_mint <= reg.max_supply, "cannot mint tokens beyond max_supply");
 
-    //check account balance exists
+    //get account
     accounts accounts(get_self(), recipient.value);
     auto acc = accounts.get(token_sym.code().raw(), "account balance not found");
+
+    //validate
+    check(reg.publisher == publisher, "only registry publisher can mint new tokens");
+    check(reg.supply + amount_to_mint <= reg.max_supply, "cannot mint tokens beyond max_supply");
+    check(amount_to_mint > asset(0, token_sym), "must mint a positive amount");
+    check(amount_to_mint.is_valid(), "invalid amount");
 
     //update recipient balance
     accounts.modify(acc, same_payer, [&](auto& row) {
@@ -186,21 +246,43 @@ void trail::mint(name publisher, name recipient, asset amount_to_mint) {
 }
 
 void trail::burn(name publisher, asset amount_to_burn) {
-    //TODO: implement
+    require_auth(publisher);
+
+    symbol token_sym = amount_to_burn.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //get account
+    accounts accounts(get_self(), publisher.value);
+    auto acc = accounts.get(token_sym.code().raw(), "account balance not found");
+
+    //validate
+    check(reg.publisher == publisher, "only registry publisher can burn tokens");
+    check(reg.supply - amount_to_burn >= asset(0, token_sym), "cannot burn more tokens than exist");
+    check(acc.balance >= amount_to_burn, "cannot burn more tokens than owned");
+    check(amount_to_burn > asset(0, token_sym), "must burn a positive amount");
+    check(amount_to_burn.is_valid(), "invalid amount");
+
+    //update publisher balance
+    accounts.modify(acc, same_payer, [&](auto& row) {
+        row.balance -= amount_to_burn;
+    });
 }
 
 void trail::send(name sender, name recipient, asset amount, string memo) {
     //TODO: implement
 }
 
-void trail::seize() {
+void trail::seize(name publisher, name owner, asset amount_to_seize) {
     //TODO: implement
 }
 
 void trail::open(name owner, symbol token_sym) {
     require_auth(owner);
 
-    //check registry exists
+    //get registry
     registries registries(get_self(), get_self().value);
     auto reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
 
@@ -218,9 +300,11 @@ void trail::open(name owner, symbol token_sym) {
 void trail::close(name owner, symbol token_sym) {
     require_auth(owner);
 
-    //check account exists and is empty
+    //get account
     accounts accounts(get_self(), owner.value);
     auto acc = accounts.get(token_sym.code().raw(), "account balance doesn't exist");
+
+    //validate
     check(acc.balance == asset(0, token_sym), "cannot close an account still holding tokens");
 
     accounts.erase(acc);
