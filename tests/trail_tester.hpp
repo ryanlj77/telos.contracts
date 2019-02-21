@@ -76,6 +76,8 @@ class trail_tester : public tester
         newtoken(N(trailservice), max_supply, _settings, info_url);
 		produce_blocks();
 
+		//give VOTE tokens to test accounts
+
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
 	

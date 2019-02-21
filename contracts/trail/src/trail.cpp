@@ -232,14 +232,22 @@ void trail::unvote(name voter, name ballot_name, name option) {
 }
 
 void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
+    
+    //sort votes by expiration, lowest first
     votes votes(get_self(), voter.value);
-    //auto by_exp = votes.get_index<name("byexp")>();
+    auto sorted_votes = votes.get_index<name("byexp")>();
+    auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
 
-    //get exp by lowest value
+    //deletes expired votes, skips active votes
+    while (count > 0 || sv_itr != sorted_votes.end()) {
+        if (sv_itr->expiration > now()) { //expired
+            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
+            count--;
+        } else { //active
+            sv_itr++;
+        }
+    }
 
-    //delete oldest receipt if expired, decrement count
-
-    //repeat until count = 0
 }
 
 
@@ -414,13 +422,14 @@ bool trail::is_option_in_ballot(name option_name, vector<option> options) {
 }
 
 bool trail::is_option_in_receipt(name option_name, vector<name> options_voted) {
-    for (name n : options_voted) {
-        if (option_name == n) {
-            return true;
-        }
-    }
+    return std::find(options_voted.begin(), options_voted.end(), option_name) != options_voted.end();
 
-    return false;
+    // for (name n : options_voted) {
+    //     if (option_name == n) {
+    //         return true;
+    //     }
+    // }
+    // return false;
 }
 
 int trail::get_option_index(name option_name, vector<option> options) {

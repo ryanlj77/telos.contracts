@@ -5,6 +5,7 @@
  * to match a wide variety of intended use cases. 
  * 
  * @author Craig Branscom
+ * @contract trailservice
  * @copyright
  */
 
@@ -13,6 +14,7 @@
 #include <eosiolib/singleton.hpp>
 #include <eosiolib/dispatcher.hpp>
 #include <string>
+#include <algorithm>
 
 using namespace eosio;
 using namespace std;
@@ -37,7 +39,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         OPEN, //1
         CLOSED, //2 //TODO: need closed status? anything after open is closed
         ARCHIVED, //3
-        RESERVED_STATUS //4
+        RESERVED_STATUS //4 //RESOLVING?
     };
 
     struct option {
@@ -108,7 +110,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         uint32_t expiration; //TODO: keep? could pull from ballot end time, removes ability to index by exp though
 
         uint64_t primary_key() const { return ballot_name.value; }
-        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? maybe remove sec idx?
+        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? //static_cast<uint64_t>
         EOSLIB_SERIALIZE(vote, (ballot_name)(option_names)(amount)(expiration))
     };
 
@@ -165,6 +167,8 @@ class [[eosio::contract("trail")]] trail : public contract {
     ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
 
     //ACTION cleanhouse(name voter, symbol voting_sym);
+
+    //ACTION archive(name ballot_name);
 
 
 
