@@ -27,6 +27,22 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ~trail();
 
+
+    //system defs
+
+    struct user_resources {
+        name owner;
+        asset net_weight;
+        asset cpu_weight;
+        int64_t ram_bytes = 0;
+
+        uint64_t primary_key()const { return owner.value; }
+        EOSLIB_SERIALIZE( user_resources, (owner)(net_weight)(cpu_weight)(ram_bytes) )
+    };
+
+    typedef eosio::multi_index<name("userres"), user_resources> user_resources_table;
+
+
     //definitions
 
     const symbol VOTE_SYM = symbol("VOTE", 0);
@@ -162,13 +178,13 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION unvote(name voter, name ballot_name, name option);
 
-    //ACTION rebalance(); //TODO: after unstake, require rebalancing before voting again?
+    ACTION rebalance(name voter); //TODO: after unstake, require rebalancing before voting again?
 
     ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
 
-    //ACTION cleanhouse(name voter, symbol voting_sym);
+    ACTION cleanhouse(name voter, symbol voting_sym);
 
-    //ACTION archive(name ballot_name);
+    //ACTION archive(name ballot_name); //TODO: change to reqarchive()?
 
 
 
@@ -196,10 +212,10 @@ class [[eosio::contract("trail")]] trail : public contract {
     bool has_token_balance(name voter, symbol sym);
     void update_votes(name voter);
     void unvote_option();
+    asset get_staked_tlos(name owner);
+    bool applied_rebalance(name ballot_name, asset delta, vector<name> options_to_rebalance);
     
-    asset get_tlos_stake();
     void upsert_balance();
-    void apply_vote_delta();
-    void unvote_ballot();
+    void apply_delta();
     
 };

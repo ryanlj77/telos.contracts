@@ -58,6 +58,9 @@ class trail_tester : public tester
         transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
         transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
 
+		//stake tlos to test accounts
+		delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+
         //deploy trail
 		deploy_trail_contract();
 		produce_blocks(2);
@@ -77,8 +80,8 @@ class trail_tester : public tester
 		produce_blocks();
 
 		//give VOTE tokens to test accounts
+		rebalance(N(testaccount1));
 
-		
 
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
@@ -104,6 +107,10 @@ class trail_tester : public tester
 		act.data = abi_ser.variant_to_binary(action_type_name, data, abi_serializer_max_time);
 		return base_tester::push_action(std::move(act), uint64_t(signer));
 	}
+
+	//system
+
+
 
     //eosio.token 
 
@@ -180,8 +187,6 @@ class trail_tester : public tester
 		vector<char> data = get_row_by_account(N(trailservice), voter, N(accounts), sym);
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
-
-	//ballots
 
 	transaction_trace_ptr newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
 		signed_transaction trx;
@@ -294,6 +299,18 @@ class trail_tester : public tester
 			("voter", voter)
 			("ballot_name", ballot_name)
 			("option", option)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(voter, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr rebalance(name voter) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(rebalance), vector<permission_level>{{voter, config::active_name}},
+			mvo()
+			("voter", voter)
 			)
 		);
 		set_transaction_headers(trx);

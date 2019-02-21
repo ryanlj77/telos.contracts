@@ -273,6 +273,50 @@ void trail::unvote(name voter, name ballot_name, name option) {
 
 }
 
+void trail::rebalance(name voter) {
+
+    /*currently rebalances only apply to TLOS/VOTE
+    action will fail if it can't rebalance all votes within max trx time (currently capped at 21) */
+
+    //get current tlos stake, convert to VOTE
+    auto current_stake = get_staked_tlos(voter);
+    auto vote_stake = asset(current_stake.amount, VOTE_SYM);
+
+    //get current VOTE account
+    accounts accounts(get_self(), voter.value);
+    auto acc = accounts.get(VOTE_SYM.code().raw());
+
+    //calc vote delta (new - old)
+    asset delta = vote_stake - acc.balance;
+
+    //start at beginning of votes table
+    votes votes(get_self(), voter.value);
+    auto v_itr = votes.begin();
+
+    //updates all relevant votes with rebalance delta
+    while (v_itr != votes.end()) {
+
+        bool did_rebalance = applied_rebalance(v_itr->ballot_name, delta, v_itr->option_names);
+
+        if (did_rebalance) {
+            
+            //update vote
+            votes.modify(v_itr, same_payer, [&](auto& row) {
+                row.amount += delta;
+            });
+
+        } else {
+            v_itr++;
+        }
+    }
+
+    //update account with new balance
+    accounts.modify(acc, same_payer, [&](auto& row) {
+        row.balance = vote_stake;
+    });
+
+}
+
 void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     
     //sort votes by expiration, lowest first
@@ -285,6 +329,24 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
         if (sv_itr->expiration > now()) { //expired
             sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
             count--;
+        } else { //active
+            sv_itr++;
+        }
+    }
+
+}
+
+void trail::cleanhouse(name voter, symbol voting_sym) {
+
+    //sort votes by expiration, lowest first
+    votes votes(get_self(), voter.value);
+    auto sorted_votes = votes.get_index<name("byexp")>();
+    auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
+
+    //deletes all expired votes, skips active votes
+    while (sv_itr != sorted_votes.end()) {
+        if (sv_itr->expiration > now()) { //expired
+            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
         } else { //active
             sv_itr++;
         }
@@ -506,6 +568,43 @@ void trail::update_votes(name voter) {
     //update VOTE balance
 }
 
+asset trail::get_staked_tlos(name owner) {
+    user_resources_table userres(name("eosio"), owner.value);
+    auto r = userres.find(owner.value);
+
+    int64_t amount = 0;
+
+    if (r != userres.end()) {
+        auto res = *r;
+        amount = (res.cpu_weight.amount + res.net_weight.amount);
+    }
+    
+    return asset(amount, symbol("TLOS", 4));
+}
+
+bool trail::applied_rebalance(name ballot_name, asset delta, vector<name> options_to_rebalance) {
+    ballots ballots(get_self(), get_self().value);
+    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //if expired or not VOTE, skip
+    if (bal.voting_symbol != VOTE_SYM || now() > bal.end_time) {
+        return false;
+    }
+
+    //loop over options_to_rebalance, rebalance each
+    for (auto i = options_to_rebalance.begin(); i < options_to_rebalance.end(); i++) {
+        
+        auto bal_opt_idx = get_option_index(*i, bal.options);
+
+        //apply rebalance to ballot
+        ballots.modify(bal, same_payer, [&](auto& row) {
+            row.options[bal_opt_idx].votes -= delta;
+        });
+    }
+
+    return true;
+}
+
 extern "C"
 {
     void apply(uint64_t receiver, uint64_t code, uint64_t action)
@@ -524,7 +623,8 @@ extern "C"
             switch (action)
             {
                 EOSIO_DISPATCH_HELPER(trail, (newballot)(setinfo)(addoption)(readyballot)(closeballot)(deleteballot)
-                    (vote)(unvote)(cleanupvotes)(newtoken)(mint)(burn)(send)(seize)(open)(close));
+                    (vote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)
+                    (newtoken)(mint)(burn)(send)(seize)(open)(close));
             }
 
         } else if (code == name("eosio").value && action == name("undelegatebw").value) {
