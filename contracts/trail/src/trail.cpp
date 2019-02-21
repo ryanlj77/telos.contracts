@@ -139,7 +139,7 @@ void trail::deleteballot(name ballot_name, name publisher) {
 void trail::vote(name voter, name ballot_name, name option) {
     require_auth(voter);
 
-    //attempt to clean up at least 2 old votes
+    //TODO: attempt to clean up at least 2 old votes
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
@@ -161,16 +161,49 @@ void trail::vote(name voter, name ballot_name, name option) {
     votes votes(get_self(), voter.value);
     auto v_itr = votes.find(ballot_name.value);
 
-    if (v_itr != votes.end()) {
-        //check vote for option doesn't already exist
+    if (v_itr != votes.end()) { //vote for ballot exists
+        
+        //validate
         check(!is_option_in_receipt(option, v_itr->option_names), "voter has already voted for this option");
         check(v_itr->option_names.size() + 1 <= bal.max_votable_options, "already voted for max number of options allowed by ballot");
-    }
 
-    //update ballot
-    ballots.modify(bal, same_payer, [&](auto& row) {
-        row.options[idx].votes += acc.balance;
-    });
+        //add votes to ballot option
+        ballots.modify(bal, same_payer, [&](auto& row) {
+            row.options[idx].votes += acc.balance;
+        });
+
+        //update vote with new option name
+        votes.modify(v_itr, same_payer, [&](auto& row) {
+            row.option_names.emplace_back(option);
+        });
+
+    } else { //vote doesn't already exist
+
+        //validate
+
+
+        vector<name> new_option_names = {option};
+
+        //emplace new vote
+        votes.emplace(voter, [&](auto& row) {
+            row.ballot_name = ballot_name;
+            row.option_names = new_option_names;
+            row.amount = acc.balance;
+            row.expiration = bal.end_time;
+        });
+        
+        //add votes to ballot option
+        ballots.modify(bal, same_payer, [&](auto& row) {
+            row.options[idx].votes += acc.balance;
+            row.unique_voters += 1;
+        });
+
+        //update num_votes on account
+        accounts.modify(acc, same_payer, [&](auto& row) {
+            row.num_votes += 1;
+        });
+
+    }
 }
 
 void trail::unvote(name voter, name ballot_name, name option) {
@@ -183,6 +216,10 @@ void trail::unvote(name voter, name ballot_name, name option) {
     //get votes
     votes votes(get_self(), voter.value);
     auto v = votes.get(ballot_name.value, "vote does not exist for this ballot");
+
+    //get account
+    accounts accounts(get_self(), voter.value);
+    auto acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
 
     auto bal_opt_idx = get_option_index(option, bal.options);
     auto new_voted_options = v.option_names;
@@ -202,7 +239,7 @@ void trail::unvote(name voter, name ballot_name, name option) {
     check(found, "option not found on vote");
     check(bal_opt_idx != -1, "option not found on ballot");
 
-    if (new_voted_options.size() > 0) {
+    if (new_voted_options.size() > 0) { //votes for ballot still remain
 
         auto new_bal_options = bal.options;
         new_bal_options[bal_opt_idx].votes -= v.amount;
@@ -225,6 +262,11 @@ void trail::unvote(name voter, name ballot_name, name option) {
         //decrement bal.unique_voters;
         ballots.modify(bal, same_payer, [&](auto& row) {
             row.unique_voters -= 1;
+        });
+
+        //decrement num_votes on account
+        accounts.modify(acc, same_payer, [&](auto& row) {
+            row.num_votes -= 1;
         });
 
     }

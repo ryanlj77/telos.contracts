@@ -78,6 +78,8 @@ class trail_tester : public tester
 
 		//give VOTE tokens to test accounts
 
+		
+
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
 	

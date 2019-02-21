@@ -34,7 +34,7 @@ BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
 	
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(receipt_cleanup, trail_tester ) try {
+BOOST_FIXTURE_TEST_CASE(vote_cleanup, trail_tester ) try {
 
     //make ballots x 21
 
