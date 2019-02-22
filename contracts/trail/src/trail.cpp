@@ -638,7 +638,7 @@ extern "C"
             
             trail trailservice(name(receiver), name(code), ds);
             auto args = unpack_action_data<undelegatebw_args>();
-            trailservice.update_votes(args.from);
+            //trailservice.update_votes(args.from);
             //execute_action<trailservice>(eosio::name(receiver), eosio::name(code), &trailservice::update_votes());
         }
     }

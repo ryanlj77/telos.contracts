@@ -9,6 +9,7 @@
 #include <math.h>
 
 #include <fc/variant_object.hpp>
+#include "test_symbol.hpp"
 
 #include <contracts.hpp>
 
@@ -28,8 +29,18 @@ class trail_tester : public tester
   public:
 	abi_serializer abi_ser;
 	abi_serializer token_ser;
+	abi_serializer system_ser;
 
 	vector<name> test_voters;
+
+	struct token_settings {
+        bool is_destructible = false;
+        bool is_proxyable = false;
+        bool is_burnable = false;
+        bool is_seizable = false;
+        bool is_max_mutable = false;
+        bool is_transferable = false;
+    };
 
 	trail_tester()
 	{
@@ -43,44 +54,40 @@ class trail_tester : public tester
         create_accounts({N(testaccount1), N(testaccount2), N(testaccount3), N(testaccount4), N(testaccount5)});
         produce_blocks(2);
 
-        //deploy eosio.token
-		deploy_token_contract();
+		//deploy and init system contract
+		deploy_system_contract();
+
+		//deploy eosio.token
+		//deploy_token_contract();
 
         //init eosio.token
-		create(N(eosio), asset::from_string("10000000000.0000 TLOS"));
-		issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
+		//create(N(eosio), asset::from_string("10000000000.0000 TLOS"));
+		//issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
 		produce_blocks(2);
 
         //transfer tlos to test accounts
-        transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
-        transfer(N(eosio), N(testaccount2), asset::from_string("200.0000 TLOS"), "initial fund");
-        transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
-        transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
-        transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
+        //transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
+        //transfer(N(eosio), N(testaccount2), asset::from_string("200.0000 TLOS"), "initial fund");
+        //transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
+        //transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
+        //transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
 
 		//stake tlos to test accounts
-		delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+		//delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
 
         //deploy trail
-		deploy_trail_contract();
+		//deploy_trail_contract();
 		produce_blocks(2);
 
         //init VOTE registry
 		asset max_supply = asset::from_string("10000000000.0000 VOTE");
 		string info_url = "Telos Governance Registry";
-        settings _settings = {
-            bool is_destructible = false;
-            bool is_proxyable = false;
-            bool is_burnable = false;
-            bool is_seizable = false;
-            bool is_max_mutable = false;
-            bool is_transferable = false;
-        };
-        newtoken(N(trailservice), max_supply, _settings, info_url);
+        token_settings vote_settings; 
+        //newtoken(N(trailservice), max_supply, vote_settings, info_url);
 		produce_blocks();
 
 		//give VOTE tokens to test accounts
-		rebalance(N(testaccount1));
+		//rebalance(N(testaccount1));
 
 
 		std::cout << "=======================END SETUP==============================" << std::endl;
@@ -110,7 +117,41 @@ class trail_tester : public tester
 
 	//system
 
+	void deploy_system_contract(bool call_init = true) {
+        set_code(N(eosio), contracts::system_wasm());
+		set_abi(N(eosio), contracts::system_abi().data());
 
+		// if (call_init) {
+		// 	base_tester::push_action(config::system_account_name, N(init),
+		// 										config::system_account_name,  mutable_variant_object()
+		// 										("version", 0)
+		// 										("core", CORE_SYM_STR)
+		// 	);
+      	// }
+
+		{
+			const auto &accnt = control->db().get<account_object, by_name>(N(eosio));
+			abi_def abi;
+			BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
+			system_ser.set_abi(abi, abi_serializer_max_time);
+		}
+    }
+
+	transaction_trace_ptr delegatebw(name from, name receiver, asset stake_net_quantity, asset stake_cpu_quantity, bool transfer) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(eosio), N(delegatebw), vector<permission_level>{{from, config::active_name}},
+			mvo()
+			("from", from)
+			("receiver", receiver)
+			("stake_net_quantity", stake_net_quantity)
+			("stake_cpu_quantity", stake_cpu_quantity)
+			("transfer", transfer)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(from, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
 
     //eosio.token 
 
@@ -184,7 +225,7 @@ class trail_tester : public tester
 	}
 
     fc::variant get_voter(account_name voter, symbol sym) {
-		vector<char> data = get_row_by_account(N(trailservice), voter, N(accounts), sym);
+		vector<char> data = get_row_by_account(N(trailservice), voter, N(accounts), sym.to_symbol_code().value);
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
 
@@ -340,7 +381,13 @@ class trail_tester : public tester
 			mvo()
 			("publisher", publisher)
 			("max_supply", max_supply)
-			("settings", settings)
+			("settings", mvo()
+				("is_destructible", settings.is_destructible)
+				("is_proxyable", settings.is_proxyable)
+				("is_burnable", settings.is_burnable)
+				("is_seizable", settings.is_seizable)
+				("is_max_mutable", settings.is_max_mutable)
+				("is_transferable", settings.is_transferable))
             ("info_url", info_url)
 			)
 		);

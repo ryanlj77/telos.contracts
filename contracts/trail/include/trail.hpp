@@ -184,7 +184,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION cleanhouse(name voter, symbol voting_sym);
 
-    //ACTION archive(name ballot_name); //TODO: change to reqarchive()?
+    //ACTION archive(name ballot_name); //TODO: change to reqarchive()? //TODO: require a TLOS transfer to archive?
 
 
 

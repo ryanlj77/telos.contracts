@@ -22,6 +22,8 @@ BOOST_AUTO_TEST_SUITE(trail_tests)
 
 BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
 
+    std::cout << "=======================BEGIN BALLOT_FLOW==============================" << std::endl;
+
     //make ballot, category proposal
 
     //setinfo
@@ -31,6 +33,8 @@ BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
     //ready ballot
 
     //vote/unvote/revote
+
+    std::cout << "=======================END BALLOT_FLOW==============================" << std::endl;
 	
 } FC_LOG_AND_RETHROW()
 
@@ -48,22 +52,4 @@ BOOST_FIXTURE_TEST_CASE(vote_cleanup, trail_tester ) try {
 	
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(cancel_ballot, trail_tester ) try {
-
-    //make ballot
-    
-    //delete ballot
-
-    //make again
-
-    //setinfo
-
-    //addoption x3 (option1, 2, 3)
-
-    //ready ballot
-
-    //attempt deletiong during voting
-
-    //delete after end time
-	
-} FC_LOG_AND_RETHROW()
+BOOST_AUTO_TEST_SUITE_END()
