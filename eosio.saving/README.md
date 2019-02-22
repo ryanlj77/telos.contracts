@@ -48,6 +48,10 @@ TODO: show permissions here
 
 	`sub_id` the unique id of the submisision to be started.
 
+* `void getdeposit(name owner)`
+
+	The getdeposit action allows the proposer (`owner`) of the submission that has passed the necessary threshold to reclaim the TLOS held under the account name `owner` in the `deposits` table. Calling getdeposit transfers any funds held under the owner's account name to their account.
+	
 * `void claim(uint64_t sub_id)`
 
 	The claim action allows the proposer of the submission with `sub_id` to claim the `amount` of `TLOS` described in the submission.
@@ -60,11 +64,13 @@ TODO: show permissions here
 
 2. `eosio.saving::openvoting`
 
-3. `eosio.trail` actions
+3. `eosio.saving::getdeposit` (after proposal has passed necessary voting threshold)
+
+4. `eosio.trail` actions
 
 	1. `eosio.trail::regvoter`
 	2. `eosio.trail::castvote`
 
-4. `eosio.saving::claim`
+5. `eosio.saving::claim`
 
-5. Repeat steps 3 and 4 until the number of cycles described in `submit` is reached.
+6. Repeat steps 3 and 4 until the number of cycles described in `submit` is reached.
