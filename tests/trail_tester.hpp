@@ -31,8 +31,6 @@ class trail_tester : public tester
 	abi_serializer token_ser;
 	abi_serializer system_ser;
 
-	vector<name> test_voters;
-
 	struct token_settings {
         bool is_destructible = false;
         bool is_proxyable = false;
@@ -44,7 +42,7 @@ class trail_tester : public tester
 
 	trail_tester()
 	{
-		produce_blocks(2);
+		produce_blocks();
         //make system accounts
 		create_accounts({N(eosio.token), N(eosio.ram), N(eosio.ramfee),
             N(eosio.stake), N(eosio.bpay), N(eosio.vpay),
@@ -54,26 +52,38 @@ class trail_tester : public tester
         create_accounts({N(testaccount1), N(testaccount2), N(testaccount3), N(testaccount4), N(testaccount5)});
         produce_blocks(2);
 
+		//deploy eosio.token
+		deploy_token_contract();
+
+        //init eosio.token
+		create(N(eosio), asset::from_string("10000000000.0000 TLOS"));
+		issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
+		produce_blocks(2);
+
 		//deploy and init system contract
 		deploy_system_contract();
 
-		//deploy eosio.token
-		//deploy_token_contract();
-
-        //init eosio.token
-		//create(N(eosio), asset::from_string("10000000000.0000 TLOS"));
-		//issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
-		produce_blocks(2);
-
         //transfer tlos to test accounts
-        //transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
-        //transfer(N(eosio), N(testaccount2), asset::from_string("200.0000 TLOS"), "initial fund");
-        //transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
-        //transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
-        //transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount2), asset::from_string("200.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
+        transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
+
+		//buyram for test accounts
+		buyram(N(eosio), N(testaccount1), asset::from_string("10.0000 TLOS"));
+		buyram(N(eosio), N(testaccount2), asset::from_string("10.0000 TLOS"));
+		buyram(N(eosio), N(testaccount3), asset::from_string("10.0000 TLOS"));
+		buyram(N(eosio), N(testaccount4), asset::from_string("10.0000 TLOS"));
+		buyram(N(eosio), N(testaccount5), asset::from_string("10.0000 TLOS"));
 
 		//stake tlos to test accounts
-		//delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+		delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+		delegatebw(N(testaccount2), N(testaccount2), asset::from_string("100.0000 TLOS"), asset::from_string("100.0000 TLOS"), false);
+		delegatebw(N(testaccount3), N(testaccount3), asset::from_string("150.0000 TLOS"), asset::from_string("150.0000 TLOS"), false);
+		delegatebw(N(testaccount4), N(testaccount4), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+		delegatebw(N(testaccount5), N(testaccount5), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
+
 
         //deploy trail
 		//deploy_trail_contract();
@@ -121,13 +131,13 @@ class trail_tester : public tester
         set_code(N(eosio), contracts::system_wasm());
 		set_abi(N(eosio), contracts::system_abi().data());
 
-		// if (call_init) {
-		// 	base_tester::push_action(config::system_account_name, N(init),
-		// 										config::system_account_name,  mutable_variant_object()
-		// 										("version", 0)
-		// 										("core", CORE_SYM_STR)
-		// 	);
-      	// }
+		if (call_init) {
+			base_tester::push_action(N(eosio), N(init),
+												N(eosio),  mutable_variant_object()
+												("version", 0)
+												("core", CORE_SYM_STR)
+			);
+      	}
 
 		{
 			const auto &accnt = control->db().get<account_object, by_name>(N(eosio));
@@ -150,6 +160,20 @@ class trail_tester : public tester
 		);
 		set_transaction_headers(trx);
 		trx.sign(get_private_key(from, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr buyram(name payer, name receiver, asset quant) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(eosio), N(buyram), vector<permission_level>{{payer, config::active_name}},
+			mvo()
+			("payer", payer)
+			("receiver", receiver)
+			("quant", quant)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(payer, "active"), control->get_chain_id());
 		return push_transaction( trx );
 	}
 
