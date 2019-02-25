@@ -284,7 +284,7 @@ void trail::rebalance(name voter) {
 
     //get current VOTE account
     accounts accounts(get_self(), voter.value);
-    auto acc = accounts.get(VOTE_SYM.code().raw());
+    auto& acc = accounts.get(VOTE_SYM.code().raw(), "account not found");
 
     //calc vote delta (new - old)
     asset delta = vote_stake - acc.balance;
@@ -321,7 +321,7 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     
     //sort votes by expiration, lowest first
     votes votes(get_self(), voter.value);
-    auto sorted_votes = votes.get_index<name("byexp")>();
+    auto sorted_votes = votes.get_index<name("byexp")>(); 
     auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
 
     //deletes expired votes, skips active votes

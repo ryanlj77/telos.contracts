@@ -40,6 +40,8 @@ class trail_tester : public tester
         bool is_transferable = false;
     };
 
+	const symbol VOTE_SYM = symbol(0, "VOTE");
+
 	trail_tester()
 	{
 		produce_blocks();
@@ -81,24 +83,33 @@ class trail_tester : public tester
 		delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
 		delegatebw(N(testaccount2), N(testaccount2), asset::from_string("100.0000 TLOS"), asset::from_string("100.0000 TLOS"), false);
 		delegatebw(N(testaccount3), N(testaccount3), asset::from_string("150.0000 TLOS"), asset::from_string("150.0000 TLOS"), false);
-		delegatebw(N(testaccount4), N(testaccount4), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
-		delegatebw(N(testaccount5), N(testaccount5), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
-
+		delegatebw(N(testaccount4), N(testaccount4), asset::from_string("200.0000 TLOS"), asset::from_string("200.0000 TLOS"), false);
+		delegatebw(N(testaccount5), N(testaccount5), asset::from_string("250.0000 TLOS"), asset::from_string("250.0000 TLOS"), false);
 
         //deploy trail
-		//deploy_trail_contract();
-		produce_blocks(2);
+		deploy_trail_contract();
+		produce_blocks();
 
         //init VOTE registry
 		asset max_supply = asset::from_string("10000000000.0000 VOTE");
-		string info_url = "Telos Governance Registry";
+		string info_url = "Telos Core Governance Registry";
         token_settings vote_settings; 
-        //newtoken(N(trailservice), max_supply, vote_settings, info_url);
+        newtoken(N(trailservice), max_supply, vote_settings, info_url);
 		produce_blocks();
+		
+		//open VOTE balance for each test account
+		open(N(testaccount1), VOTE_SYM);
+		open(N(testaccount2), VOTE_SYM);
+		open(N(testaccount3), VOTE_SYM);
+		open(N(testaccount4), VOTE_SYM);
+		open(N(testaccount5), VOTE_SYM);
 
 		//give VOTE tokens to test accounts
-		//rebalance(N(testaccount1));
-
+		rebalance(N(testaccount1));
+		rebalance(N(testaccount2));
+		rebalance(N(testaccount3));
+		rebalance(N(testaccount4));
+		rebalance(N(testaccount5));
 
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}

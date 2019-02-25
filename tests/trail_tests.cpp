@@ -24,7 +24,14 @@ BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
 
     std::cout << "=======================BEGIN BALLOT_FLOW==============================" << std::endl;
 
+    const name BALLOT_NAME = name("testballot");
+    const name CATEGORY = name("poll");
+    const string TITLE = "#Ballot Title";
+    const string DESC = "##Description";
+    const string URL = "/ipfs/someipfslink";
+
     //make ballot, category proposal
+    newballot(BALLOT_NAME, CATEGORY, N(testaccount1), TITLE, DESC, URL, VOTE_SYM);
 
     //setinfo
 
