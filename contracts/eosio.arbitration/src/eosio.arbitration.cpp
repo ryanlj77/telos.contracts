@@ -369,12 +369,14 @@ void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant)
 
 	check(cf.case_status == CASE_SETUP, "claims cannot be added after CASE_SETUP is complete.");
 
-	check(claimant == cf.claimant, "you are not the claimant of this case.");
-	auto claim_it = get_claim_at(claim_link, cf.unread_claims);
-	check(claim_it != cf.unread_claims.end(), "ipfs hash exists in another claim");
-
-	claim new_claim = claim{uint64_t(0), claim_link, ""};
 	auto new_claims = cf.unread_claims;
+
+	check(claimant == cf.claimant, "you are not the claimant of this case.");
+	auto claim_it = get_claim_at(claim_link, new_claims);
+	check(claim_it == new_claims.end(), "ipfs hash exists in another claim");
+
+	claim new_claim = claim{ uint64_t(0), claim_link, "" };
+	
 	new_claims.emplace_back(new_claim);
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.unread_claims = new_claims;
@@ -391,7 +393,7 @@ void arbitration::removeclaim(uint64_t case_id, string claim_hash, name claimant
 	check(cf.unread_claims.size() > 0, "No claims to remove");
 	check(claimant == cf.claimant, "you are not the claimant of this case.");
 
-	vector<claim> new_claims = cf.unread_claims;
+	auto new_claims = cf.unread_claims;
 
 	auto claim_it = get_claim_at(claim_hash, new_claims);
 	check(claim_it != new_claims.end(), "Claim Hash not found in casefile");
@@ -449,7 +451,7 @@ void arbitration::respond(uint64_t case_id, string claim_hash, name respondant, 
 	check(cf.respondant == respondant, "must be the respondant of this case_id");
 	check(cf.case_status > AWAITING_ARBS && cf.case_status < DECISION, "case state does NOT allow responses");
 
-	auto& delta_claims = cf.unread_claims;
+	auto delta_claims = cf.unread_claims;
     
 	auto claim_it = get_claim_at(claim_hash, delta_claims);
 	check(claim_it != delta_claims.end(), "claim does not exist in unread claims");
@@ -704,7 +706,7 @@ void arbitration::deletecase(uint64_t case_id)
 
 typedef arbitration::claim claim;
 
-vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim> claims)
+vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim>& claims)
 {
 	return std::find_if(claims.begin(), claims.end(), [&](auto &claim) {
 		return claim.claim_summary == hash;

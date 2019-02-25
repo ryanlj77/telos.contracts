@@ -407,7 +407,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	void assert_string(string to_check, string error_msg);
 
-	vector<claim>::iterator get_claim_at(const string claim_hash, vector<claim> claims);
+	vector<claim>::iterator get_claim_at(string claim_hash, vector<claim>& claims);
 
 	void del_claim_at(const string claim_hash, vector<claim> claims);
 
