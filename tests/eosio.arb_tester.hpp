@@ -102,6 +102,7 @@ public:
         return push_transaction(trx);
     }
 
+
     transaction_trace_ptr init_election() {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(initelection), vector<permission_level>{{N(eosio), config::active_name}}, mvo()));
