@@ -782,22 +782,13 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             eosio_assert_message_is( "invalid ipfs string, valid schema: <hash>" )
     );
 
+    // file 3 cases for 3 separate claimants
     // file case w/o and w respondant
     //std::cout<<"FILE CASES" << endl;
     filecase(claimants[0], claim_links[0], langcodes , {} );
     filecase(claimants[1], claim_links[0], langcodes , respondants[0] );
     filecase(claimants[2], claim_links[0], langcodes , respondants[1] );
     produce_blocks(1);
-
-    // file 3 cases for 3 separate claimants
-    //for (auto claimant : claimants){
-    //    filecase(claimant, claim_link, langcodes  , NULL );
-    //}
-
-    //for (int i {0}; i<=2; ++i ){
-    //    filecase(claimant1, claim_link, langcodes  , NULL );
-    //}
-
 
     // attempt to retrieve case info for first case filed
     auto casef = get_casefile(uint64_t(0));
@@ -810,16 +801,9 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // verify first case filed matches retrieved case
     BOOST_REQUIRE_EQUAL( casef["claimant"].as<name>(), claimants[0] );
-    //BOOST_REQUIRE_EQUAL( casef["respondant"].as<name>(), {} );
-
-    //REQUIRE_MATCHING_OBJECT(casef,
-    //    mvo()
-    //    ("claimant", claimants[0])
-    //);
 
     // verify first case filed status is CASE_SETUP
     BOOST_REQUIRE_EQUAL( casef["case_status"].as_uint64(), CASE_SETUP  );
-
 
     // Check new case file has one unread claims.
     std::cout<<"Unread Claim Count for new case: " << cunread_claims.size() << endl;
@@ -844,9 +828,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     BOOST_REQUIRE_EQUAL(casef["unread_claims"].size(), 4 );
 
 
-    // Retrieve 1st unread claim for first case
+    // Retrieve 1st unread claim for first case and verify info
     auto unread_claim = get_unread_claim(0,0);
-
     REQUIRE_MATCHING_OBJECT (unread_claim,
             mvo()
             ("claim_id",0)
@@ -855,9 +838,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             ("response_link", "")
             ("decision_class", 0)
     )
-    // remove claim and confirm
-    //NOTE: claims can only be removed by a claimant during case setup
-    //[[eosio::action]] void removeclaim(uint64_t case_id, string claim_hash, name claimant);
 
 
     BOOST_REQUIRE_EQUAL(false, get_unread_claim( cid, claim_links[2]).is_null() );
@@ -868,29 +848,25 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 
     // attempt to retrieve case info for last case filed and shred case
+    BOOST_REQUIRE_EQUAL(false, get_casefile(uint64_t(2)).is_null() );
     casef = get_casefile(uint64_t(2));
     cid = casef["case_id"].as_uint64();
-    //cstatus = casef["case_status"];
-    //cunread_claims = casef["unread_claims"];
+    shredcase(cid, claimants[2]);
+    BOOST_REQUIRE_EQUAL(true, get_casefile(uint64_t(2)).is_null() );
 
     //check number of cases after 1 case shredded (should be 3 after shred)
-    shredcase(cid, claimants[2]);
-    casef = get_casefile(uint64_t(2));
-    BOOST_REQUIRE_EQUAL( true, casef.is_null() );
 
-    //cid = casef["case_id"].as_uint64();
+
+    //ready first case filed and verify status changed from CASE_SETUP to AWAITING_ARBS
+    casef = get_casefile(uint64_t(0));
+    cid = casef["case_id"].as_uint64();
+
+    //BOOST_REQUIRE_EQUAL( CASE_SETUP,  casef["case_status"]);
     //cstatus = casef["case_status"];
-    //cunread_claims = casef["unread_claims"];
-    //std::cout<<"Unread Claim Count for new case: " << cunread_claims.size() << endl;
-
-
-
-    //ready case
-    //casef = get_casefile(uint64_t(0));
-    //cid = casef["case_id"].as_uint64();
-    //cstatus = casef["case_status"];
-    //cunread_claims = casef["unread_claims"];
     //readycase(cid, claimants[0]);
+    //BOOST_REQUIRE_EQUAL( AWAITING_ARBS,  casef["case_status"]);
+    //cstatus = casef["case_status"];
+    //cunread_claims = casef["unread_claims"];
 
 
 
