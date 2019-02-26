@@ -757,38 +757,140 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // choose 3 claimants
-    vector<name> claimants = { test_voters[0],test_voters[1],test_voters[2]  };
-    name claimant1 = test_voters[0];
-    name claimant2 = test_voters[1];
-    name claimant3 = test_voters[2];
+    vector<name> claimants = { test_voters[0],test_voters[1],test_voters[2],test_voters[3],test_voters[4],test_voters[6]   };
+    vector<name> respondants = { test_voters[7],test_voters[8],test_voters[9]  };
+    //optional<name> respondant = name(test_voters[0]);
 
     // specify claim link
-    string claim_link = "http://google.com";
-
+    string claim_link_invalid = "http://google.com";
+    vector<string> claim_links = {
+            "ipfs://123456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "ipfs://223456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "ipfs://323456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "ipfs://423456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+    };
     // Lang codes
     vector<uint8_t>
         langcodes = {uint8_t(0)};
 
-    // file 3 cases for 3 separate claimants
-    std::cout<<"File cases" << endl;
 
-    for (auto claimant : claimants){
-        filecase(claimant, claim_link, langcodes  , NULL );
-    }
+    // Test invalid claim link
+    std::cout <<"test invalid claim link" << endl;
+    BOOST_REQUIRE_EXCEPTION(
+            filecase(claimants[0], claim_link_invalid, langcodes, {}  ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is( "invalid ipfs string, valid schema: <hash>" )
+    );
+
+    // file case w/o and w respondant
+    //std::cout<<"FILE CASES" << endl;
+    filecase(claimants[0], claim_links[0], langcodes , {} );
+    filecase(claimants[1], claim_links[0], langcodes , respondants[0] );
+    filecase(claimants[2], claim_links[0], langcodes , respondants[1] );
+    produce_blocks(1);
+
+    // file 3 cases for 3 separate claimants
+    //for (auto claimant : claimants){
+    //    filecase(claimant, claim_link, langcodes  , NULL );
+    //}
 
     //for (int i {0}; i<=2; ++i ){
     //    filecase(claimant1, claim_link, langcodes  , NULL );
     //}
 
-    // check cases filed status is CASE_SETUP
 
-    // add claims to the case file
-    // QUESTION:  How do you get case_id to file claim?
+    // attempt to retrieve case info for first case filed
+    auto casef = get_casefile(uint64_t(0));
+    auto cid = casef["case_id"].as_uint64();
+    auto cstatus = casef["case_status"];
+    auto cunread_claims = casef["unread_claims"];
 
+    std::cout<<"Case_id: " << cid  << endl;
+    std::cout<<"Case_status: " << cstatus << endl;
+
+    // verify first case filed matches retrieved case
+    BOOST_REQUIRE_EQUAL( casef["claimant"].as<name>(), claimants[0] );
+    //BOOST_REQUIRE_EQUAL( casef["respondant"].as<name>(), {} );
+
+    //REQUIRE_MATCHING_OBJECT(casef,
+    //    mvo()
+    //    ("claimant", claimants[0])
+    //);
+
+    // verify first case filed status is CASE_SETUP
+    BOOST_REQUIRE_EQUAL( casef["case_status"].as_uint64(), CASE_SETUP  );
+
+
+    // Check new case file has one unread claims.
+    std::cout<<"Unread Claim Count for new case: " << cunread_claims.size() << endl;
+    BOOST_REQUIRE_EQUAL(casef["unread_claims"].size(), 1 );
+
+    // claimant who filed case is the only one allowed to add additional claims to casefile
+    BOOST_REQUIRE_EXCEPTION(
+            addclaim( cid, claim_links[1], claimants[1]  ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is( "you are not the claimant of this case." )
+    );
+
+
+    // add additional claims to the case file
+    addclaim( cid, claim_links[1], claimants[0]  );
+    addclaim( cid, claim_links[2], claimants[0]  );
+    addclaim( cid, claim_links[3], claimants[0]  );
+    //produce_blocks(1);
+
+    // Check unread claim was added to casefile
+    casef = get_casefile(uint64_t(0));
+    BOOST_REQUIRE_EQUAL(casef["unread_claims"].size(), 4 );
+
+
+    // Retrieve 1st unread claim for first case
+    auto unread_claim = get_unread_claim(0,0);
+
+    REQUIRE_MATCHING_OBJECT (unread_claim,
+            mvo()
+            ("claim_id",0)
+            ("claim_summary", claim_links[0])
+            ("decision_link", "")
+            ("response_link", "")
+            ("decision_class", 0)
+    )
     // remove claim and confirm
+    //NOTE: claims can only be removed by a claimant during case setup
+    //[[eosio::action]] void removeclaim(uint64_t case_id, string claim_hash, name claimant);
+
+
+    BOOST_REQUIRE_EQUAL(false, get_unread_claim( cid, claim_links[2]).is_null() );
+    removeclaim(cid, claim_links[2], claimants[0] );
+    // check to see if claim is removed
+    //get_unread_claim(uint64_t casefile_id, string claim_link)
+    BOOST_REQUIRE_EQUAL(true, get_unread_claim( cid, claim_links[2]).is_null() );
+
+
+    // attempt to retrieve case info for last case filed and shred case
+    casef = get_casefile(uint64_t(2));
+    cid = casef["case_id"].as_uint64();
+    //cstatus = casef["case_status"];
+    //cunread_claims = casef["unread_claims"];
+
+    //check number of cases after 1 case shredded (should be 3 after shred)
+    shredcase(cid, claimants[2]);
+    casef = get_casefile(uint64_t(2));
+    BOOST_REQUIRE_EQUAL( true, casef.is_null() );
+
+    //cid = casef["case_id"].as_uint64();
+    //cstatus = casef["case_status"];
+    //cunread_claims = casef["unread_claims"];
+    //std::cout<<"Unread Claim Count for new case: " << cunread_claims.size() << endl;
 
 
 
+    //ready case
+    //casef = get_casefile(uint64_t(0));
+    //cid = casef["case_id"].as_uint64();
+    //cstatus = casef["case_status"];
+    //cunread_claims = casef["unread_claims"];
+    //readycase(cid, claimants[0]);
 
 
 
@@ -798,9 +900,11 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 BOOST_FIXTURE_TEST_CASE( assign_arbitrator_flow, eosio_arb_tester ) try {
 
+
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {
+
 
 } FC_LOG_AND_RETHROW()
 

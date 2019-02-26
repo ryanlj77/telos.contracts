@@ -30,8 +30,8 @@ public:
         }
     }
 
-    #pragma region Get_Tables
-    
+#pragma region get_tables
+
     fc::variant get_config() {
         vector<char> data = get_row_by_account(N(eosio.arb), N(eosio.arb), N(config), N(config));
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant("config", data, abi_serializer_max_time);
@@ -41,23 +41,51 @@ public:
         vector<char> data = get_row_by_account(N(eosio.arb), N(eosio.arb), N(nominees), nominee_id);
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant("nominee", data, abi_serializer_max_time);
     }
-    
+
     fc::variant get_arbitrator(uint64_t arbitrator_id) {
         vector<char> data = get_row_by_account(N(eosio.arb), N(eosio.arb), N(arbitrators), arbitrator_id);
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant("arbitrator", data, abi_serializer_max_time);
     }
-    
+
     fc::variant get_casefile(uint64_t casefile_id) {
         vector<char> data = get_row_by_account(N(eosio.arb), N(eosio.arb), N(casefiles), casefile_id);
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant("casefile", data, abi_serializer_max_time);
     }
 
-    //TODO: make get_claim
+    fc::variant get_unread_claim(uint64_t casefile_id, uint8_t claim_id) {
+        auto cf = get_casefile(casefile_id);
 
-    #pragma endregion Get_Tables
+        BOOST_REQUIRE_EQUAL(false, cf.is_null());
+        auto unread_claims = cf["unread_claims"].as < vector < mvo > > ();
+        return unread_claims[claim_id];
+        //vector<char> data = get_row_by_accounts(N(eosio.arb),N(eosio.arb), N(unread_claims), casefile_id);
+        //return data.empty()? fc::variant() : abi_ser.binary_to_variant("unread_claim", data, abi_serializer_max_time);
+    }
+
+    fc::variant get_unread_claim(uint64_t casefile_id, string claim_link) {
+        auto cf = get_casefile(casefile_id);
+
+        BOOST_REQUIRE_EQUAL(false, cf.is_null());
+        auto unread_claims = cf["unread_claims"].as < vector < mvo > > ();
+
+        auto it = find_if(unread_claims.begin(), unread_claims.end(), [&](auto c) {
+            return claim_link == c["claim_summary"];
+        });
+        return it == unread_claims.end() ? fc::variant() : *it;
+
+    }
+
+    fc::variant get_claim(uint64_t claim_id) {
+        vector<char> data = get_row_by_account(N(eosio.arb), N(eosio.arb), N(claims), claim_id);
+        return data.empty() ? fc::variant() : abi_ser.binary_to_variant("claim", data, abi_serializer_max_time);
+    }
 
 
-    #pragma region Actions
+
+    #pragma endregion get_tables
+
+
+    #pragma region actions
 
     transaction_trace_ptr setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees) {
         signed_transaction trx;
@@ -129,14 +157,14 @@ public:
         return push_transaction(trx);
     }
 
-    //NOTE: Case Setup
+    //note: case setup
 
     transaction_trace_ptr filecase(name claimant, string claim_link, vector <uint8_t> lang_codes, optional<name> respondant ) {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(filecase), vector<permission_level>{{claimant, config::active_name}}, mvo()
             ("claimant", claimant)
             ("claim_link", claim_link)
-            ("lang_code", lang_codes)
+            ("lang_codes", lang_codes)
             ("respondant", respondant)
             ));
         set_transaction_headers(trx);
@@ -157,7 +185,7 @@ public:
 
     transaction_trace_ptr removeclaim(uint64_t case_id, string claim_hash, name claimant) {
         signed_transaction trx;
-        trx.actions.emplace_back(get_action(N(eosio.arb), N(endelection), vector<permission_level>{{claimant, config::active_name}}, mvo()
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(removeclaim), vector<permission_level>{{claimant, config::active_name}}, mvo()
             ("case_id", case_id)
             ("claim_hash", claim_hash)
             ("claimant", claimant)));
@@ -165,7 +193,7 @@ public:
         trx.sign(get_private_key(claimant, "active"), control->get_chain_id());
         return push_transaction(trx);
     }
-    
+
     transaction_trace_ptr shredcase(uint64_t case_id, name claimant) {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(shredcase), vector<permission_level>{{claimant, config::active_name}}, mvo()
@@ -186,7 +214,7 @@ public:
         return push_transaction(trx);
     }
 
-    //NOTE: Case Progression
+    //note: case progression
 
     transaction_trace_ptr assigntocase(uint64_t case_id, name arb_to_assign) {
         signed_transaction trx;
@@ -215,7 +243,7 @@ public:
         trx.actions.emplace_back(get_action(N(eosio.arb), N(acceptclaim), vector<permission_level>{{assigned_arb, config::active_name}}, mvo()
             ("case_id", case_id)
             ("assigned_arb", assigned_arb)
-            ("claim_hash", claim_hash) 
+            ("claim_hash", claim_hash)
             ("decision_link", decision_link)
             ("decision_class", decision_class)));
         set_transaction_headers(trx);
@@ -266,8 +294,8 @@ public:
         return push_transaction(trx);
     }
 
-    // ! double check permissions on this ! 
-    transaction_trace_ptr dismissarb(name arb) {   
+    // ! double check permissions on this !
+    transaction_trace_ptr dismissarb(name arb) {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(dismissarb), vector<permission_level>{{arb, config::active_name}},
                                             mvo()("arb", arb) ));
@@ -276,7 +304,7 @@ public:
         return push_transaction(trx);
     }
 
-	transaction_trace_ptr fix() {   
+	transaction_trace_ptr fix() {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(fix), vector<permission_level>{{N(eosio.arb), config::active_name}},
                                             mvo() ));
@@ -285,58 +313,63 @@ public:
         return push_transaction(trx);
     }
 
-    #pragma endregion Actions
+    #pragma endregion actions
 
 
-    #pragma region Enums
+    #pragma region enums
 
 
-    enum case_state : uint8_t {
-        CASE_SETUP,         // 0
-        AWAITING_ARBS,      // 1
+    enum case_state : uint8_t
+    {
+        CASE_SETUP,			// 0
+        AWAITING_ARBS,		// 1
         CASE_INVESTIGATION, // 2
-        HEARING,            // 3
-        DELIBERATION,       // 4
-        DECISION,           // 5 NOTE: No more joinders allowed
-        ENFORCEMENT,        // 6
-        RESOLVED,           // 7
-        DISMISSED           // 8 NOTE: Dismissed cases advance and stop here
+        HEARING,			// 3
+        DELIBERATION,		// 4
+        DECISION,			// 5 NOTE: No more joinders allowed
+        ENFORCEMENT,		// 6
+        RESOLVED,			// 7
+        DISMISSED			// 8 NOTE: Dismissed cases advance and stop here
     };
 
-    enum claim_class : uint8_t {
-        UNDECIDED,           // 0
-        LOST_KEY_RECOVERY,   // 1
-        TRX_REVERSAL,        // 2
-        EMERGENCY_INTER,     // 3
-        CONTESTED_OWNER,     // 4
-        UNEXECUTED_RELIEF,   // 5
-        CONTRACT_BREACH,     // 6
-        MISUSED_CR_IP,       // 7
-        A_TORT,              // 8
-        BP_PENALTY_REVERSAL, // 9
-        WRONGFUL_ARB_ACT,    // 10
-        ACT_EXEC_RELIEF,     // 11
-        WP_PROJ_FAILURE,     // 12
-        TBNOA_BREACH,        // 13
-        MISC                 // 14
+    enum claim_class : uint8_t
+    {
+        UNDECIDED			= 1,
+        LOST_KEY_RECOVERY	= 2,
+        TRX_REVERSAL		= 3,
+        EMERGENCY_INTER		= 4,
+        CONTESTED_OWNER		= 5,
+        UNEXECUTED_RELIEF	= 6,
+        CONTRACT_BREACH		= 7,
+        MISUSED_CR_IP		= 8,
+        A_TORT				= 9,
+        BP_PENALTY_REVERSAL	= 10,
+        WRONGFUL_ARB_ACT 	= 11,
+        ACT_EXEC_RELIEF		= 12,
+        WP_PROJ_FAILURE		= 13,
+        TBNOA_BREACH		= 14,
+        MISC				= 15
     };
 
-    enum arb_status : uint8_t {
-        AVAILABLE,   // 0
-        UNAVAILABLE, // 1
-        INACTIVE,    // 2
-        SEAT_EXPIRED // 3
+    enum arb_status : uint8_t
+    {
+        AVAILABLE,    // 0
+        UNAVAILABLE,  // 1
+        REMOVED,	  // 2
+        SEAT_EXPIRED  // 3
     };
 
-    enum election_status : uint8_t {
+    enum election_status : uint8_t
+    {
         OPEN,   // 0
         PASSED, // 1
         FAILED, // 2
         CLOSED  // 3
     };
 
-    enum lang_code : uint8_t {
-        ENGL, //0 English 
+    enum lang_code : uint8_t
+    {
+        ENGL, //0 English
         FRCH, //1 French
         GRMN, //2 German
         KREA, //3 Korean
@@ -344,9 +377,9 @@ public:
         CHNA, //5 Chinese
         SPAN, //6 Spanish
         PGSE, //7 Portuguese
-        SWED //8 Swedish
+        SWED  //8 Swedish
     };
 
-    #pragma endregion Enums
+    #pragma endregion enums
 
 };
