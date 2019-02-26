@@ -26,26 +26,55 @@ BOOST_FIXTURE_TEST_CASE(ballot_flow, trail_tester ) try {
 
     const name BALLOT_NAME = name("testballot");
     const name CATEGORY = name("poll");
-    const string TITLE = "#Ballot Title";
-    const string DESC = "##Description";
-    const string URL = "/ipfs/someipfslink";
+    const string NEW_TITLE = "# New Ballot Title";
+    const string NEW_DESC = "## New Description";
+    const string NEW_URL = "/ipfs/newipfslink";
+    const uint8_t MAX_VOTABLE_OPTIONS = 3;
+    const uint32_t BALLOT_LENGTH = 86400; //1 day in seconds
 
-    //make ballot, category proposal
-    newballot(BALLOT_NAME, CATEGORY, N(testaccount1), TITLE, DESC, URL, VOTE_SYM);
+    const name YES_OPTION = name("yes");
+    const name NO_OPTION = name("no");
+    const name ABSTAIN_OPTION = name("abstain");
+
+    //make ballot poll
+    newballot(BALLOT_NAME, CATEGORY, N(testaccount1), "# Ballot", "## Description", "/ipfs/someipfslink", MAX_VOTABLE_OPTIONS, VOTE_SYM);
+    //check ballot is emplaced
 
     //setinfo
+    setinfo(BALLOT_NAME, N(testaccount1), NEW_TITLE, NEW_DESC, NEW_URL);
+    //check info is changed
 
     //addoption x3 (yes, no, abstain)
+    addoption(BALLOT_NAME, N(testaccount1), YES_OPTION, "Yes");
+    addoption(BALLOT_NAME, N(testaccount1), NO_OPTION, "No");
+    addoption(BALLOT_NAME, N(testaccount1), ABSTAIN_OPTION, "Abstain");
+    //check options are emplaced
 
     //ready ballot
+    readyballot(BALLOT_NAME, N(testaccount1), now() + BALLOT_LENGTH);
+    //check ballot status and times
 
-    //vote/unvote/revote
+    //vote
+    castvote(N(testaccount1), BALLOT_NAME, YES_OPTION);
+    castvote(N(testaccount2), BALLOT_NAME, NO_OPTION);
+    castvote(N(testaccount3), BALLOT_NAME, YES_OPTION);
+    castvote(N(testaccount4), BALLOT_NAME, ABSTAIN_OPTION);
+    castvote(N(testaccount5), BALLOT_NAME, YES_OPTION);
+    //check votes exist, num_votes ware incremented, ballot updated with casted votes
+
+    //unvote
+
+    //revote
+
+    //close ballot
+
+    //cleanupvotes
 
     std::cout << "=======================END BALLOT_FLOW==============================" << std::endl;
 	
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE(vote_cleanup, trail_tester ) try {
+BOOST_FIXTURE_TEST_CASE(scaled_ballot_flow, trail_tester ) try {
 
     //make ballots x 21
 

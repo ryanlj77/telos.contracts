@@ -160,6 +160,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         string title, string description, string info_url, uint8_t max_votable_options,
         symbol voting_sym);
 
+    //TODO: add max_votable_options to params
     ACTION setinfo(name ballot_name, name publisher,
         string title, string description, string info_url);
 
@@ -174,7 +175,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION deleteballot(name ballot_name, name publisher);
 
-    ACTION vote(name voter, name ballot_name, name option);
+    ACTION castvote(name voter, name ballot_name, name option);
 
     ACTION unvote(name voter, name ballot_name, name option);
 
@@ -201,8 +202,6 @@ class [[eosio::contract("trail")]] trail : public contract {
     ACTION open(name owner, symbol token_sym);
 
     ACTION close(name owner, symbol token_sym);
-
-
 
     //functions
 

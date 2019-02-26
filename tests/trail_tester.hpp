@@ -264,7 +264,9 @@ class trail_tester : public tester
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
 
-	transaction_trace_ptr newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, symbol voting_sym) {
+	transaction_trace_ptr newballot(name ballot_name, name category, name publisher, 
+        string title, string description, string info_url, uint8_t max_votable_options,
+        symbol voting_sym) {
 		signed_transaction trx;
 		trx.actions.emplace_back( get_action(N(trailservice), N(newballot), vector<permission_level>{{publisher, config::active_name}},
 			mvo()
@@ -274,6 +276,7 @@ class trail_tester : public tester
 			("title", title)
 			("description", description)
 			("info_url", info_url)
+			("max_votable_options", max_votable_options)
             ("voting_sym", voting_sym)
 			)
 		);
@@ -354,9 +357,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr vote(name voter, name ballot_name, name option) {
+	transaction_trace_ptr castvote(name voter, name ballot_name, name option) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(vote), vector<permission_level>{{voter, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(castvote), vector<permission_level>{{voter, config::active_name}},
 			mvo()
 			("voter", voter)
 			("ballot_name", ballot_name)

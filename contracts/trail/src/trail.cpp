@@ -45,7 +45,7 @@ void trail::setinfo(name ballot_name, name publisher, string title, string descr
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //validate
     check(bal.publisher == publisher, "only ballot publisher can set info");
@@ -64,7 +64,8 @@ void trail::addoption(name ballot_name, name publisher, name option_name, string
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto&
+     bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //validate
     check(bal.publisher == publisher, "only ballot publisher can add options");
@@ -87,7 +88,7 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //validate
     check(bal.publisher == publisher, "only ballot publisher can ready ballot");
@@ -136,20 +137,20 @@ void trail::deleteballot(name ballot_name, name publisher) {
     ballots.erase(bal);
 }
 
-void trail::vote(name voter, name ballot_name, name option) {
+void trail::castvote(name voter, name ballot_name, name option) {
     require_auth(voter);
 
     //TODO: attempt to clean up at least 2 old votes
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
     check(now() >= bal.begin_time && now() <= bal.end_time, "must vote between ballot's begin and end time");
     check(bal.status == OPEN, "ballot status is not open for voting");
 
     //get account
     accounts accounts(get_self(), voter.value);
-    auto acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
+    auto& acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
     check(acc.num_votes < MAX_VOTE_RECEIPTS, "reached max concurrent votes for voting token");
     check(acc.balance.amount > int64_t(0), "cannot vote with a balance of 0");
 
@@ -181,16 +182,16 @@ void trail::vote(name voter, name ballot_name, name option) {
 
         //validate
 
-
-        vector<name> new_option_names = {option};
+        vector<name> new_option_names;
+        new_option_names.emplace_back(option);
 
         //emplace new vote
-        votes.emplace(voter, [&](auto& row) {
-            row.ballot_name = ballot_name;
-            row.option_names = new_option_names;
-            row.amount = acc.balance;
-            row.expiration = bal.end_time;
-        });
+        // votes.emplace(voter, [&](auto& row) {
+        //     row.ballot_name = ballot_name;
+        //     row.option_names = new_option_names;
+        //     row.amount = acc.balance;
+        //     row.expiration = bal.end_time;
+        // });
         
         //add votes to ballot option
         ballots.modify(bal, same_payer, [&](auto& row) {
@@ -623,7 +624,7 @@ extern "C"
             switch (action)
             {
                 EOSIO_DISPATCH_HELPER(trail, (newballot)(setinfo)(addoption)(readyballot)(closeballot)(deleteballot)
-                    (vote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)
+                    (castvote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)
                     (newtoken)(mint)(burn)(send)(seize)(open)(close));
             }
 
