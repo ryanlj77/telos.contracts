@@ -109,7 +109,7 @@ void trail::closeballot(name ballot_name, name publisher, uint8_t new_status) {
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //validate
     check(bal.publisher == publisher, "only ballot publisher can ready ballot");
@@ -186,12 +186,12 @@ void trail::castvote(name voter, name ballot_name, name option) {
         new_option_names.emplace_back(option);
 
         //emplace new vote
-        // votes.emplace(voter, [&](auto& row) {
-        //     row.ballot_name = ballot_name;
-        //     row.option_names = new_option_names;
-        //     row.amount = acc.balance;
-        //     row.expiration = bal.end_time;
-        // });
+        votes.emplace(voter, [&](auto& row) {
+            row.ballot_name = ballot_name;
+            row.option_names = new_option_names;
+            row.amount = acc.balance;
+            row.expiration = bal.end_time;
+        });
         
         //add votes to ballot option
         ballots.modify(bal, same_payer, [&](auto& row) {
@@ -212,15 +212,15 @@ void trail::unvote(name voter, name ballot_name, name option) {
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //get votes
     votes votes(get_self(), voter.value);
-    auto v = votes.get(ballot_name.value, "vote does not exist for this ballot");
+    auto& v = votes.get(ballot_name.value, "vote does not exist for this ballot");
 
     //get account
     accounts accounts(get_self(), voter.value);
-    auto acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
+    auto& acc = accounts.get(bal.voting_symbol.code().raw(), "account balance not found");
 
     auto bal_opt_idx = get_option_index(option, bal.options);
     auto new_voted_options = v.option_names;
@@ -326,8 +326,8 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
 
     //deletes expired votes, skips active votes
-    while (count > 0 || sv_itr != sorted_votes.end()) {
-        if (sv_itr->expiration > now()) { //expired
+    while (count > 0 && sv_itr != sorted_votes.end()) {
+        if (sv_itr->expiration < now()) { //expired
             sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
             count--;
         } else { //active

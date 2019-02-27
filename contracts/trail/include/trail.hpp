@@ -126,7 +126,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         uint32_t expiration; //TODO: keep? could pull from ballot end time, removes ability to index by exp though
 
         uint64_t primary_key() const { return ballot_name.value; }
-        uint64_t by_exp() const { return expiration; } //TODO: need to static cast to uint64_t? //static_cast<uint64_t>
+        uint64_t by_exp() const { return static_cast<uint64_t>(expiration); }
         EOSLIB_SERIALIZE(vote, (ballot_name)(option_names)(amount)(expiration))
     };
 

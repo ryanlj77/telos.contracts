@@ -40,7 +40,34 @@ class trail_tester : public tester
         bool is_transferable = false;
     };
 
+	struct option {
+        name option_name;
+        string info;
+        asset votes;
+    };
+
+	enum ballot_status : uint8_t {
+        SETUP, //0
+        OPEN, //1
+        CLOSED, //2 
+        ARCHIVED, //3
+        RESERVED_STATUS //4 //RESOLVING?
+    };
+
 	const symbol VOTE_SYM = symbol(0, "VOTE");
+	const symbol TLOS_SYM = symbol(4, "TLOS");
+
+	const name BALLOT_NAME = name("testballot");
+	const name CATEGORY = name("poll");
+	const string TITLE = "# Title";
+	const string DESC = "## Description";
+	const string URL = "/ipfs/someipfslink";
+	const uint8_t MAX_VOTABLE_OPTIONS = 3;
+	const uint32_t BALLOT_LENGTH = 86400; //1 day in seconds
+
+	const name YES_NAME = name("yes");
+	const name NO_NAME = name("no");
+	const name ABSTAIN_NAME = name("abstain");
 
 	trail_tester()
 	{
@@ -52,7 +79,7 @@ class trail_tester : public tester
 
         //make test accounts
         create_accounts({N(testaccount1), N(testaccount2), N(testaccount3), N(testaccount4), N(testaccount5)});
-        produce_blocks(2);
+        produce_blocks();
 
 		//deploy eosio.token
 		deploy_token_contract();
@@ -60,10 +87,11 @@ class trail_tester : public tester
         //init eosio.token
 		create(N(eosio), asset::from_string("10000000000.0000 TLOS"));
 		issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 TLOS"), "Initial amount!");
-		produce_blocks(2);
+		produce_blocks();
 
 		//deploy and init system contract
 		deploy_system_contract();
+		produce_blocks();
 
         //transfer tlos to test accounts
         transfer(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"), "initial fund");
@@ -71,6 +99,7 @@ class trail_tester : public tester
         transfer(N(eosio), N(testaccount3), asset::from_string("300.0000 TLOS"), "initial fund");
         transfer(N(eosio), N(testaccount4), asset::from_string("400.0000 TLOS"), "initial fund");
         transfer(N(eosio), N(testaccount5), asset::from_string("500.0000 TLOS"), "initial fund");
+		produce_blocks();
 
 		//buyram for test accounts
 		buyram(N(eosio), N(testaccount1), asset::from_string("10.0000 TLOS"));
@@ -78,6 +107,7 @@ class trail_tester : public tester
 		buyram(N(eosio), N(testaccount3), asset::from_string("10.0000 TLOS"));
 		buyram(N(eosio), N(testaccount4), asset::from_string("10.0000 TLOS"));
 		buyram(N(eosio), N(testaccount5), asset::from_string("10.0000 TLOS"));
+		produce_blocks();
 
 		//stake tlos to test accounts
 		delegatebw(N(testaccount1), N(testaccount1), asset::from_string("50.0000 TLOS"), asset::from_string("50.0000 TLOS"), false);
@@ -85,31 +115,54 @@ class trail_tester : public tester
 		delegatebw(N(testaccount3), N(testaccount3), asset::from_string("150.0000 TLOS"), asset::from_string("150.0000 TLOS"), false);
 		delegatebw(N(testaccount4), N(testaccount4), asset::from_string("200.0000 TLOS"), asset::from_string("200.0000 TLOS"), false);
 		delegatebw(N(testaccount5), N(testaccount5), asset::from_string("250.0000 TLOS"), asset::from_string("250.0000 TLOS"), false);
+		produce_blocks();
 
         //deploy trail
 		deploy_trail_contract();
 		produce_blocks();
 
-        //init VOTE registry
-		asset max_supply = asset::from_string("10000000000.0000 VOTE");
+		//Registry Setup : VOTE,0
+
+        //init registry
+		asset max_supply = asset::from_string("10000000000 VOTE");
 		string info_url = "Telos Core Governance Registry";
         token_settings vote_settings; 
         newtoken(N(trailservice), max_supply, vote_settings, info_url);
 		produce_blocks();
 		
-		//open VOTE balance for each test account
+		//open balance for each test account
 		open(N(testaccount1), VOTE_SYM);
 		open(N(testaccount2), VOTE_SYM);
 		open(N(testaccount3), VOTE_SYM);
 		open(N(testaccount4), VOTE_SYM);
 		open(N(testaccount5), VOTE_SYM);
+		produce_blocks();
 
-		//give VOTE tokens to test accounts
+		//rebalance each account to sync with system stake
 		rebalance(N(testaccount1));
 		rebalance(N(testaccount2));
 		rebalance(N(testaccount3));
 		rebalance(N(testaccount4));
 		rebalance(N(testaccount5));
+		produce_blocks();
+
+		//Ballot Setup
+
+		//create test ballot
+		newballot(BALLOT_NAME, CATEGORY, N(testaccount1), TITLE, DESC, URL, MAX_VOTABLE_OPTIONS, VOTE_SYM);
+		produce_blocks();
+
+		//add options to test ballot
+		addoption(BALLOT_NAME, N(testaccount1), YES_NAME, "Yes");
+		addoption(BALLOT_NAME, N(testaccount1), NO_NAME, "No");
+		addoption(BALLOT_NAME, N(testaccount1), ABSTAIN_NAME, "Abstain");
+		produce_blocks();
+
+		//check ballot emplacement
+		auto test_bal = get_ballot(BALLOT_NAME);
+		BOOST_REQUIRE_EQUAL(false, test_bal.is_null());
+
+		//ballot can be readied as first action of each test suite
 
 		std::cout << "=======================END SETUP==============================" << std::endl;
 	}
@@ -250,17 +303,17 @@ class trail_tester : public tester
 	}
 
 	fc::variant get_registry(symbol sym) {
-		vector<char> data = get_row_by_account(N(trailservice), N(trailservice), N(registries), sym.to_symbol_code());
+		vector<char> data = get_row_by_account(N(trailservice), N(trailservice), N(registries), sym.to_symbol_code().value);
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("registry", data, abi_serializer_max_time);
 	}
 
-    fc::variant get_vote(account_name voter, name ballot_name) {
-		vector<char> data = get_row_by_account(N(trailservice), voter, N(votes), ballot_name);
+    fc::variant get_vote(name voter, name ballot_name) {
+		vector<char> data = get_row_by_account(N(trailservice), voter.value, N(votes), ballot_name.value);
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("vote", data, abi_serializer_max_time);
 	}
 
-    fc::variant get_voter(account_name voter, symbol sym) {
-		vector<char> data = get_row_by_account(N(trailservice), voter, N(accounts), sym.to_symbol_code().value);
+    fc::variant get_balance(name voter, symbol sym) {
+		vector<char> data = get_row_by_account(N(trailservice), voter.value, N(accounts), sym.to_symbol_code().value);
 		return data.empty() ? fc::variant() : abi_ser.binary_to_variant("account", data, abi_serializer_max_time);
 	}
 
