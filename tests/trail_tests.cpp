@@ -196,7 +196,9 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
 	// );
 
     //cleanupvotes
-    cleanupvotes(N(testaccount1), 21, VOTE_SYM);
+    auto trx_pointer = cleanupvotes(N(testaccount1), 21, VOTE_SYM);
+    std::cout << trx_pointer->elapsed.count() << std::endl;
+
     cleanupvotes(N(testaccount2), 21, VOTE_SYM);
     cleanupvotes(N(testaccount3), 21, VOTE_SYM);
     cleanupvotes(N(testaccount4), 21, VOTE_SYM);
@@ -209,7 +211,6 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
     v3 = get_vote(N(testaccount3), BALLOT_NAME);
     v4 = get_vote(N(testaccount4), BALLOT_NAME);
     v5 = get_vote(N(testaccount5), BALLOT_NAME);
-
     BOOST_REQUIRE_EQUAL(true, v1.is_null());
     BOOST_REQUIRE_EQUAL(true, v2.is_null());
     BOOST_REQUIRE_EQUAL(true, v3.is_null());
@@ -220,19 +221,108 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
 	
 } FC_LOG_AND_RETHROW()
 
+
+
 BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
 
     std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN MULTI_BALLOT_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
-    //make ballots x 21
+    //create vectors of names for use in testing
+    vector<name> ballots = {
+        name("ballot1"),
+        name("ballot2"),
+        name("ballot3"),
+        name("ballot4"),
+        name("ballot5"),
+        name("ballot11"),
+        name("ballot12"),
+        name("ballot13"),
+        name("ballot14"),
+        name("ballot15"),
+        name("ballot21"),
+        name("ballot22"),
+        name("ballot23"),
+        name("ballot24"),
+        name("ballot25"),
+        name("ballot31"),
+        name("ballot32"),
+        name("ballot33"),
+        name("ballot34"),
+        name("ballot35"),
+        name("ballot41")
+    };
+    
+    vector<name> voters = {
+        name("testaccount1"),
+        name("testaccount2"),
+        name("testaccount3"),
+        name("testaccount4"),
+        name("testaccount5"),
+    };
 
-    //vote on each
+    vector<name> poll_options = {
+        name("yes"),
+        name("no"),
+        name("abstain")
+    };
 
-    //attempt to vote past max_vote_receipts
+    //fast forward past chain activation time
+    //produce_block(fc::seconds(500000)); //1 million blocks
+    produce_blocks(1000000);
+
+    //make and ready ballots x 21
+    for (int i = 0; i < 21; i++) {
+        newballot(ballots[i], CATEGORY, voters[i % 5], TITLE, DESC, URL, MAX_VOTABLE_OPTIONS, VOTE_SYM);
+        //std::cout << ballots[i] << std::endl;
+		produce_blocks();
+
+        //add options to new ballot
+		addoption(ballots[i], voters[i % 5], YES_NAME, "Yes");
+		addoption(ballots[i], voters[i % 5], NO_NAME, "No");
+		addoption(ballots[i], voters[i % 5], ABSTAIN_NAME, "Abstain");
+        produce_blocks();
+
+        //ready new ballot
+        readyballot(ballots[i], voters[i % 5], now() + 86400);
+        produce_blocks();
+
+        //check emplacement
+        auto bal = get_ballot(ballots[i]);
+        BOOST_REQUIRE_EQUAL(false, bal.is_null());
+
+        //loop over each voter, vote on new ballot
+        for (int j = 0; j < voters.size(); j++) {
+            castvote(voters[j], ballots[i], poll_options[i % 3]);
+            produce_blocks();
+            
+            //check vote was emplaced
+            auto v = get_vote(voters[j], ballots[i]);
+            BOOST_REQUIRE_EQUAL(false, v.is_null());
+            // REQUIRE_MATCHING_OBJECT(v, mvo()
+            //     ("ballot_name", ballots[i])
+            //     ("option_names", vector<name>({name("abstain")}))
+            //     ("amount", "1000000 VOTE")
+            //     ("expiration", bal_end_time)
+            // );
+        }
+
+        //rebalance some accounts
+
+    }
+
+    //ready default ballot (use as 22nd ballot for testing max votes)
+    readyballot(name("testballot"), name("testaccount1"), now() + 86400);
+    produce_blocks();
+
+    //attempt to cast 22nd vote, should fail
+    //castvote(N(testaccount1), BALLOT_NAME, NO_NAME);
+
+    // auto trx_pointer = cleanupvotes(N(testaccount1), 21, VOTE_SYM);
+    // std::cout << trx_pointer->elapsed.count() << std::endl;
 
     //undelegatebw, trigger cleanup votes
-
-    //revote
+    auto trx_pointer = undelegatebw(N(testaccount1), N(testaccount1), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << trx_pointer->elapsed.count() << std::endl;
 
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END MULTI_BALLOT_FLOW <<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	

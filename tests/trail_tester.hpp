@@ -102,11 +102,11 @@ class trail_tester : public tester
 		produce_blocks();
 
 		//buyram for test accounts
-		buyram(N(eosio), N(testaccount1), asset::from_string("10.0000 TLOS"));
-		buyram(N(eosio), N(testaccount2), asset::from_string("10.0000 TLOS"));
-		buyram(N(eosio), N(testaccount3), asset::from_string("10.0000 TLOS"));
-		buyram(N(eosio), N(testaccount4), asset::from_string("10.0000 TLOS"));
-		buyram(N(eosio), N(testaccount5), asset::from_string("10.0000 TLOS"));
+		buyram(N(eosio), N(testaccount1), asset::from_string("100.0000 TLOS"));
+		buyram(N(eosio), N(testaccount2), asset::from_string("100.0000 TLOS"));
+		buyram(N(eosio), N(testaccount3), asset::from_string("100.0000 TLOS"));
+		buyram(N(eosio), N(testaccount4), asset::from_string("100.0000 TLOS"));
+		buyram(N(eosio), N(testaccount5), asset::from_string("100.0000 TLOS"));
 		produce_blocks();
 
 		//stake tlos to test accounts
@@ -164,7 +164,7 @@ class trail_tester : public tester
 
 		//ballot can be readied as first action of each test suite
 
-		std::cout << "=======================END SETUP==============================" << std::endl;
+		std::cout << "======================= END SETUP ==============================" << std::endl;
 	}
 	
 
@@ -220,6 +220,21 @@ class trail_tester : public tester
 			("stake_net_quantity", stake_net_quantity)
 			("stake_cpu_quantity", stake_cpu_quantity)
 			("transfer", transfer)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(from, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
+	transaction_trace_ptr undelegatebw(name from, name receiver, asset unstake_net_quantity, asset unstake_cpu_quantity) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(eosio), N(undelegatebw), vector<permission_level>{{from, config::active_name}},
+			mvo()
+			("from", from)
+			("receiver", receiver)
+			("unstake_net_quantity", unstake_net_quantity)
+			("unstake_cpu_quantity", unstake_cpu_quantity)
 			)
 		);
 		set_transaction_headers(trx);
