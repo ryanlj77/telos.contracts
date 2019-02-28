@@ -24,6 +24,11 @@ using namespace std;
 
 using mvo = fc::mutable_variant_object;
 
+const name claimant = name("claimant");
+const name respondant = name("respondant");
+const name assigner = name("assigner");
+const name non_claimant = name("nonclaimant");
+
 BOOST_AUTO_TEST_SUITE(eosio_arb_tests)
 
 BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
@@ -876,11 +881,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
-	
-	name assigner = name("assigner");
-	name non_claimant = name("nonclaimant");
-	name claimant = name("claimant");
-	name respondant = name("respondant");
 
 	create_accounts({
 		claimant.value, 
@@ -893,7 +893,6 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
 	vector<uint8_t> lang_codes = {0, 1, 2};
 	
-
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	uint64_t current_case_id = 0;
 	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
@@ -931,19 +930,76 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	);
 
 	linkauth(name("eosio.arb"), name("eosio.arb"), name("assigntocase"), name("assign"));
+	produce_blocks();
 
-	assigntocase(current_case_id, name(test_voters[0])); //TODO: missing require signature issue.
+	newarbstatus(AVAILABLE, test_voters[0]);
+	newarbstatus(AVAILABLE, test_voters[1]);
+	newarbstatus(AVAILABLE, test_voters[2]);
+	produce_blocks();
+
+	assigntocase(current_case_id, name(test_voters[0]), assigner); //TODO: missing require signature issue.
 
 	cf = get_casefile(current_case_id);
 	auto case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
-	cout << "case_arbs.size(): " << case_arbs.size() << endl;
-	cout << "case_arbs[0]: " << case_arbs[0].as_string() << endl;
 	BOOST_REQUIRE_EQUAL(case_arbs.size(), 1);
 	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
+
+	//NOTE: Arbitrator calls addarbs, in order to add new arbitrators.
+	addarbs(current_case_id, test_voters[0], 2);
+
+	//NOTE: this assumes that a demux or chain watching service catches the aboves call to addarbs 
+	// and acts according to the arguments in the action
+
+	//NOTE: in this case the service would then call assigntocase twice
+	assigntocase(current_case_id, name(test_voters[1]), assigner);
+	assigntocase(current_case_id, name(test_voters[2]), assigner);
+
+	cf = get_casefile(current_case_id);
+	case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(case_arbs.size(), 3);
+	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[1].as_string(), name(test_voters[1]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[2].as_string(), name(test_voters[2]).to_string());
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
+	create_accounts({
+		claimant.value, 
+		respondant.value, 
+		non_claimant.value,
+		assigner.value
+	});
+	auto tlos_transfer_amount = asset::from_string("400.0000 TLOS");
+	transfer(N(eosio), claimant.value, tlos_transfer_amount, "claimant initial eosio.token balance");
+
+	//balance check from token contract
+	auto balance = get_currency_balance(N(eosio.token), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	//balance check from arb contract
+	transfer(claimant.value, N(eosio.arb), tlos_transfer_amount, "claimant initial eosio.arb balance");
+	balance = get_currency_balance(N(eosio.arb), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	create(N(eosio), asset::from_string("10000000000.0000 PETER"));
+	issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 PETER"), "Initial amount!");
+
+	auto custom_transfer_balance = asset::from_string("400.0000 PETER");
+	transfer(N(eosio), claimant.value, custom_transfer_balance, "claimant initial custom eosio.token balance");
+
+	balance = get_currency_balance(N(eosio.token), symbol(4, "PETER"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, custom_transfer_balance);
+
+	BOOST_REQUIRE_EXCEPTION(
+		transfer(claimant.value, N(eosio.arb), custom_transfer_balance, "claimant initial custom eosio.arb balance"),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("only TLOS tokens are accepted by this contract")
+    );
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {
-
+	
 
 } FC_LOG_AND_RETHROW()
 

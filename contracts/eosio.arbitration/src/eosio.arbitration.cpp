@@ -646,7 +646,8 @@ void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb)
 	assert_string(rationale, std::string("rationale must be greater than 0 and less than 255"));
 
 	vector<name> new_arbs = cf.arbitrators;
-	remove(new_arbs.begin(), new_arbs.end(), assigned_arb);
+	auto arb_it = find(new_arbs.begin(), new_arbs.end(), assigned_arb);
+	new_arbs.erase(arb_it);
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.arbitrators = new_arbs;
