@@ -480,6 +480,19 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
+	transaction_trace_ptr cleanhouse(name voter, symbol voting_sym) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(cleanhouse), vector<permission_level>{{voter, config::active_name}},
+			mvo()
+			("voter", voter)
+			("voting_sym", voting_sym)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(voter, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
 	//tokens
 
 	transaction_trace_ptr newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {

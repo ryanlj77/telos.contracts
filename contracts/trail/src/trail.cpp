@@ -126,10 +126,10 @@ void trail::deleteballot(name ballot_name, name publisher) {
 
     //get ballot
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
     //validate
-    check(bal.publisher == publisher, "only ballot publisher can ready ballot");
+    check(bal.publisher == publisher, "only ballot publisher can delete ballot");
     check(bal.status != OPEN, "cannot delete while voting is in progress");
 
     //TODO: add exception for polls 
@@ -321,9 +321,9 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     //sort votes by expiration, lowest first
     votes votes(get_self(), voter.value);
     auto sorted_votes = votes.get_index<name("byexp")>(); 
-    auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
+    auto sv_itr = sorted_votes.begin();
 
-    //deletes expired votes, skips active votes
+    //deletes expired votes until count reaches 0 or end of table, skips active votes
     while (count > 0 && sv_itr != sorted_votes.end()) {
         if (sv_itr->expiration < now()) { //expired
             //print("\ncleaning vote for ", sv_itr->ballot_name);
@@ -341,7 +341,7 @@ void trail::cleanhouse(name voter, symbol voting_sym) {
     //sort votes by expiration, lowest first
     votes votes(get_self(), voter.value);
     auto sorted_votes = votes.get_index<name("byexp")>();
-    auto sv_itr = sorted_votes.begin(); //TODO: use lower_bound()?
+    auto sv_itr = sorted_votes.begin();
 
     //deletes all expired votes, skips active votes
     while (sv_itr != sorted_votes.end()) {

@@ -300,18 +300,18 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
 
     //make and ready all ballots
     for (int i = 0; i < MAX_VOTES_PER_ACCOUNT; i++) {
-        newballot(ballots[i], CATEGORY, voters[i % 5], TITLE, DESC, URL, MAX_VOTABLE_OPTIONS, VOTE_SYM);
+        newballot(ballots[i], CATEGORY, N(testaccount1), TITLE, DESC, URL, MAX_VOTABLE_OPTIONS, VOTE_SYM);
         //std::cout << ballots[i] << std::endl;
 		produce_blocks();
 
         //add options to new ballot
-		addoption(ballots[i], voters[i % 5], YES_NAME, "Yes");
-		addoption(ballots[i], voters[i % 5], NO_NAME, "No");
-		addoption(ballots[i], voters[i % 5], ABSTAIN_NAME, "Abstain");
+		addoption(ballots[i], N(testaccount1), YES_NAME, "Yes");
+		addoption(ballots[i], N(testaccount1), NO_NAME, "No");
+		addoption(ballots[i], N(testaccount1), ABSTAIN_NAME, "Abstain");
         produce_blocks();
 
         //ready new ballot
-        readyballot(ballots[i], voters[i % 5], now() + 86400);
+        readyballot(ballots[i], N(testaccount1), now() + 86400);
         produce_blocks();
 
         //check emplacement
@@ -429,6 +429,24 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
             //ensures votes were cleaned
             BOOST_REQUIRE_EQUAL(true, vo.is_null());
         }
+    }
+
+    //close ballots
+    for (name b : ballots) {
+        closeballot(b, N(testaccount1), 2);
+        produce_blocks();
+        //ensures ballots were closed
+        auto bal = get_ballot(b);
+        //BOOST_REQUIRE_EQUAL(false, bal.is_null());
+    }
+
+    //deleete old ballots
+    for (name b : ballots) {
+        deleteballot(b, N(testaccount1));
+        produce_blocks();
+        //ensures ballots were closed
+        auto bal = get_ballot(b);
+        BOOST_REQUIRE_EQUAL(true, bal.is_null());
     }
     
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END MULTI_BALLOT_FLOW <<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
