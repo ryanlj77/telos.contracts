@@ -196,13 +196,34 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
 	// );
 
     //cleanupvotes
-    auto trx_pointer = cleanupvotes(N(testaccount1), 21, VOTE_SYM);
-    std::cout << trx_pointer->elapsed.count() << std::endl;
+    auto trx_pointer1 = cleanupvotes(N(testaccount1), 51, VOTE_SYM);
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
 
-    cleanupvotes(N(testaccount2), 21, VOTE_SYM);
-    cleanupvotes(N(testaccount3), 21, VOTE_SYM);
-    cleanupvotes(N(testaccount4), 21, VOTE_SYM);
-    cleanupvotes(N(testaccount5), 21, VOTE_SYM);
+    auto trx_pointer2 = cleanupvotes(N(testaccount2), 51, VOTE_SYM);
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer3 = cleanupvotes(N(testaccount3), 51, VOTE_SYM);
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer4 = cleanupvotes(N(testaccount4), 51, VOTE_SYM);
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer5 = cleanupvotes(N(testaccount5), 51, VOTE_SYM);
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
     produce_blocks();
 
     //check all vote objects have been cleaned
@@ -229,28 +250,36 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
 
     //create vectors of names for use in testing
     vector<name> ballots = {
-        name("ballot1"),
-        name("ballot2"),
-        name("ballot3"),
-        name("ballot4"),
-        name("ballot5"),
-        name("ballot11"),
-        name("ballot12"),
-        name("ballot13"),
-        name("ballot14"),
-        name("ballot15"),
-        name("ballot21"),
-        name("ballot22"),
-        name("ballot23"),
-        name("ballot24"),
-        name("ballot25"),
-        name("ballot31"),
-        name("ballot32"),
-        name("ballot33"),
-        name("ballot34"),
-        name("ballot35"),
-        name("ballot41")
+        // name("ballot1"),
+        // name("ballot2"),
+        // name("ballot3"),
+        // name("ballot4"),
+        // name("ballot5"),
+        // name("ballot11"),
+        // name("ballot12"),
+        // name("ballot13"),
+        // name("ballot14"),
+        // name("ballot15"),
+        // name("ballot21"),
+        // name("ballot22"),
+        // name("ballot23"),
+        // name("ballot24"),
+        // name("ballot25"),
+        // name("ballot31"),
+        // name("ballot32"),
+        // name("ballot33"),
+        // name("ballot34"),
+        // name("ballot35"),
+        // name("ballot41")
     };
+
+    //generate ballot name x MAX_VOTES_PER_ACCOUNT
+    for (int i = 0; i < MAX_VOTES_PER_ACCOUNT; i++) {
+        string temp_name = "ballot" + toBase31(i);
+        name bal_name = eosio::chain::name(temp_name);
+        std::cout << "created " << bal_name << std::endl;
+        ballots.emplace_back(bal_name);
+    }
     
     vector<name> voters = {
         name("testaccount1"),
@@ -266,12 +295,11 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
         name("abstain")
     };
 
-    //fast forward past chain activation time
-    //produce_block(fc::seconds(500000)); //1 million blocks
-    produce_blocks(1000000);
+    //fast forward past chain activation time (testing is set to 1000 blocks)
+    produce_blocks(1000);
 
-    //make and ready ballots x 21
-    for (int i = 0; i < 21; i++) {
+    //make and ready all ballots
+    for (int i = 0; i < MAX_VOTES_PER_ACCOUNT; i++) {
         newballot(ballots[i], CATEGORY, voters[i % 5], TITLE, DESC, URL, MAX_VOTABLE_OPTIONS, VOTE_SYM);
         //std::cout << ballots[i] << std::endl;
 		produce_blocks();
@@ -306,8 +334,6 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
             // );
         }
 
-        //rebalance some accounts
-
     }
 
     //ready default ballot (use as 22nd ballot for testing max votes)
@@ -317,13 +343,94 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
     //attempt to cast 22nd vote, should fail
     //castvote(N(testaccount1), BALLOT_NAME, NO_NAME);
 
-    // auto trx_pointer = cleanupvotes(N(testaccount1), 21, VOTE_SYM);
-    // std::cout << trx_pointer->elapsed.count() << std::endl;
+    std::cout << "executing undelegatebw/rebalances >>>>>" << std::endl;
 
     //undelegatebw, trigger cleanup votes
-    auto trx_pointer = undelegatebw(N(testaccount1), N(testaccount1), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
-    std::cout << trx_pointer->elapsed.count() << std::endl;
+    auto trx_pointer1 = undelegatebw(N(testaccount1), N(testaccount1), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
 
+    auto trx_pointer2 = undelegatebw(N(testaccount2), N(testaccount2), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer3 = undelegatebw(N(testaccount3), N(testaccount3), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer4 = undelegatebw(N(testaccount4), N(testaccount4), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer5 = undelegatebw(N(testaccount5), N(testaccount5), asset::from_string("1.0000 TLOS"), asset::from_string("1.0000 TLOS"));
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    //check votes are rebalanced
+    for (name b : ballots) {
+        for (name v : voters) {
+            auto vo = get_vote(v, b);
+            //ensures votes were not deleted
+            BOOST_REQUIRE_EQUAL(false, vo.is_null());
+        }
+    }
+
+    //fast forward to ballot expirations
+    produce_blocks(172800); //1 day in blocks
+
+    std::cout << "executing cleanupvotes >>>>>" << std::endl;
+
+    //cleanup votes (actually deletes them)
+    auto trx_pointer11 = cleanupvotes(N(testaccount1), 51, VOTE_SYM);
+    std::cout << name("testaccount1") << " charged " << trx_pointer11->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer11->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer11->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer22 = cleanupvotes(N(testaccount2), 51, VOTE_SYM);
+    std::cout << name("testaccount2") << " charged " << trx_pointer22->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer22->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer22->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer33 = cleanupvotes(N(testaccount3), 51, VOTE_SYM);
+    std::cout << name("testaccount3") << " charged " << trx_pointer33->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer33->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer33->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer44 = cleanupvotes(N(testaccount4), 51, VOTE_SYM);
+    std::cout << name("testaccount4") << " charged " << trx_pointer44->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer44->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer44->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer55 = cleanupvotes(N(testaccount5), 51, VOTE_SYM);
+    std::cout << name("testaccount5") << " charged " << trx_pointer55->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer55->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer55->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    //check that votes have been cleaned
+    for (name v : voters) {
+        std::cout << "cleaning votes for " << v << std::endl;
+        for (name b : ballots) {
+            auto vo = get_vote(v, b);
+            //ensures votes were cleaned
+            BOOST_REQUIRE_EQUAL(true, vo.is_null());
+        }
+    }
+    
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END MULTI_BALLOT_FLOW <<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	
 } FC_LOG_AND_RETHROW()

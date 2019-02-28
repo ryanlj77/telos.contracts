@@ -64,6 +64,7 @@ class trail_tester : public tester
 	const string URL = "/ipfs/someipfslink";
 	const uint8_t MAX_VOTABLE_OPTIONS = 3;
 	const uint32_t BALLOT_LENGTH = 86400; //1 day in seconds
+	const int MAX_VOTES_PER_ACCOUNT = 51;
 
 	const name YES_NAME = name("yes");
 	const name NO_NAME = name("no");
@@ -589,6 +590,26 @@ class trail_tester : public tester
 
 	uint32_t now() {
         return (control->pending_block_time().time_since_epoch().count() / 1000000);
+    }
+
+	string base31 = "abcdefghijklmnopqrstuvwxyz12345";
+    string toBase31(uint32_t in) {
+	   vector<uint32_t> out = { 0, 0, 0, 0, 0, 0};
+	   uint32_t remainder = in;
+	   uint32_t divisor = 0;
+	   uint32_t quotient = 0;
+	   for (int i = 0; i < out.size(); i++) {
+		   divisor = pow(31, out.size() - 1 - i);
+		   quotient = remainder / divisor;
+		   remainder = remainder - (quotient * divisor);
+		   out[i] = quotient;
+	   }
+	   string output = "aaaaaaa";
+	   for (int i = 0; i < out.size(); i++) {
+		   output[i] = base31[out[i]];
+	   }
+
+	   return output;
     }
 
 	void dump_trace(transaction_trace_ptr trace_ptr) {

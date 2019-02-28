@@ -277,7 +277,7 @@ void trail::unvote(name voter, name ballot_name, name option) {
 void trail::rebalance(name voter) {
 
     /*currently rebalances only apply to TLOS/VOTE
-    action will fail if it can't rebalance all votes within max trx time (currently capped at 21) */
+    action will fail if it can't rebalance all votes within max trx time (currently capped at 51) */
 
     //get current tlos stake, convert to VOTE
     auto current_stake = get_staked_tlos(voter);
@@ -300,15 +300,13 @@ void trail::rebalance(name voter) {
         bool did_rebalance = applied_rebalance(v_itr->ballot_name, delta, v_itr->option_names);
 
         if (did_rebalance) {
-            
             //update vote
             votes.modify(v_itr, same_payer, [&](auto& row) {
                 row.amount += delta;
             });
-
-        } else {
-            v_itr++;
         }
+
+        v_itr++;
     }
 
     //update account with new balance
@@ -328,6 +326,7 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     //deletes expired votes, skips active votes
     while (count > 0 && sv_itr != sorted_votes.end()) {
         if (sv_itr->expiration < now()) { //expired
+            //print("\ncleaning vote for ", sv_itr->ballot_name);
             sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
             count--;
         } else { //active
@@ -585,23 +584,27 @@ asset trail::get_staked_tlos(name owner) {
 
 bool trail::applied_rebalance(name ballot_name, asset delta, vector<name> options_to_rebalance) {
     ballots ballots(get_self(), get_self().value);
-    auto bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
-    //if expired or not VOTE, skip
+    //if expired or not VOTE, skip (rebalance doesn't erase, only recalcs votes to save CPU)
     if (bal.voting_symbol != VOTE_SYM || now() > bal.end_time) {
         return false;
     }
 
+    auto bal_ops = bal.options;
+
     //loop over options_to_rebalance, rebalance each
     for (auto i = options_to_rebalance.begin(); i < options_to_rebalance.end(); i++) {
-        
+        //get option index on ballot
         auto bal_opt_idx = get_option_index(*i, bal.options);
-
-        //apply rebalance to ballot
-        ballots.modify(bal, same_payer, [&](auto& row) {
-            row.options[bal_opt_idx].votes -= delta;
-        });
+        //update option with vote delta
+        bal_ops[bal_opt_idx].votes += delta;
     }
+
+    //apply rebalance to ballot
+    ballots.modify(bal, same_payer, [&](auto& row) {
+        row.options = bal_ops;
+    });
 
     return true;
 }
@@ -630,17 +633,17 @@ extern "C"
 
         } else if (code == name("eosio").value && action == name("undelegatebw").value) {
 
-            struct undelegatebw_args {
-                name from;
-                name receiver;
-                asset unstake_net_quantity;
-                asset unstake_cpu_quantity;
-            };
+            // struct undelegatebw_args {
+            //     name from;
+            //     name receiver;
+            //     asset unstake_net_quantity;
+            //     asset unstake_cpu_quantity;
+            // };
             
-            trail trailservice(name(receiver), name(code), ds);
-            auto args = unpack_action_data<undelegatebw_args>();
-            //trailservice.update_votes(args.from);
-            //execute_action<trailservice>(eosio::name(receiver), eosio::name(code), &trailservice::update_votes());
+            //trail trailservice(name(receiver), name(code), ds);
+            //auto args = unpack_action_data<undelegatebw_args>();
+            //trailservice.rebalance(args.from);
+            execute_action<trail>(eosio::name(receiver), eosio::name(code), &trail::rebalance);
         }
     }
 }

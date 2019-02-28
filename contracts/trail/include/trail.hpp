@@ -15,6 +15,7 @@
 #include <eosiolib/dispatcher.hpp>
 #include <string>
 #include <algorithm>
+#include <eosiolib/print.hpp>
 
 using namespace eosio;
 using namespace std;
@@ -48,7 +49,7 @@ class [[eosio::contract("trail")]] trail : public contract {
     const symbol VOTE_SYM = symbol("VOTE", 0);
     const uint32_t MIN_BALLOT_LENGTH = 86400; //1 day
     const uint32_t MIN_CLOSE_LENGTH = 259200; //3 days
-    const uint16_t MAX_VOTE_RECEIPTS = 21; //TODO: move to token registry?
+    const uint16_t MAX_VOTE_RECEIPTS = 51; //TODO: move to token registry?
 
     enum ballot_status : uint8_t {
         SETUP, //0
