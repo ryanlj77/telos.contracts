@@ -864,13 +864,15 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     //ready first case filed and verify status changed from CASE_SETUP to AWAITING_ARBS
     casef = get_casefile(uint64_t(0));
     cid = casef["case_id"].as_uint64();
+    BOOST_REQUIRE_EQUAL( CASE_SETUP,  casef["case_status"].as<uint8_t>());
 
-    //BOOST_REQUIRE_EQUAL( CASE_SETUP,  casef["case_status"]);
-    //cstatus = casef["case_status"];
-    //readycase(cid, claimants[0]);
-    //BOOST_REQUIRE_EQUAL( AWAITING_ARBS,  casef["case_status"]);
-    //cstatus = casef["case_status"];
-    //cunread_claims = casef["unread_claims"];
+    transfer(N(eosio), claimants[0], asset::from_string("1000.0000 TLOS"), "");
+    transfer(claimants[0], N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+    readycase(cid, claimants[0]);
+
+    casef = get_casefile(uint64_t(0));
+    BOOST_REQUIRE_EQUAL( AWAITING_ARBS,  casef["case_status"].as<uint8_t>());
+
 
 } FC_LOG_AND_RETHROW()
 
