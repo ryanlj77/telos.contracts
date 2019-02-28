@@ -877,10 +877,17 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
 	
+	name assigner = name("assigner");
 	name non_claimant = name("nonclaimant");
 	name claimant = name("claimant");
 	name respondant = name("respondant");
-	create_accounts({claimant.value, respondant.value, non_claimant.value});
+
+	create_accounts({
+		claimant.value, 
+		respondant.value, 
+		non_claimant.value,
+		assigner.value
+	});
 
 	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
 	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
@@ -898,6 +905,41 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
 
 	readycase(current_case_id, claimant);
+
+	auto cf = get_casefile(current_case_id);
+
+	BOOST_REQUIRE_EQUAL(uint8_t(1), cf["case_status"].as<uint8_t>());
+	
+	updateauth(
+		name("eosio.arb"), 
+		name("assign"), 
+		name("active"), 
+		authority{
+			1,
+			vector<key_weight> {},
+			vector<permission_level_weight> {
+				permission_level_weight {
+					permission_level {
+						assigner.value,
+						N(active)
+					},
+					1
+				}
+			},
+			vector<wait_weight> {}
+		}
+	);
+
+	linkauth(name("eosio.arb"), name("eosio.arb"), name("assigntocase"), name("assign"));
+
+	assigntocase(current_case_id, name(test_voters[0])); //TODO: missing require signature issue.
+
+	cf = get_casefile(current_case_id);
+	auto case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	cout << "case_arbs.size(): " << case_arbs.size() << endl;
+	cout << "case_arbs[0]: " << case_arbs[0].as_string() << endl;
+	BOOST_REQUIRE_EQUAL(case_arbs.size(), 1);
+	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {

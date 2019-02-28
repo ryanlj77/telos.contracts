@@ -513,6 +513,10 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.arbitrators = new_arbs;
+
+		if(cf.case_status == AWAITING_ARBS) {
+			row.case_status = CASE_INVESTIGATION;
+		}
 	});
 }
 
@@ -587,7 +591,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
 
 	auto approval_it = std::find(cf.approvals.begin(), cf.approvals.end(), assigned_arb);
-	check(approval_it == cf.arbitrators.end(), "arbitrator has already approved advancing this case");
+	check(approval_it != cf.arbitrators.end(), "arbitrator has already approved advancing this case");
 
 	auto case_status = cf.case_status;
 	auto approvals = cf.approvals;

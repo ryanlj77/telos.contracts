@@ -275,13 +275,41 @@ public:
 
     transaction_trace_ptr assigntocase(uint64_t case_id, name arb_to_assign) {
         signed_transaction trx;
-        trx.actions.emplace_back(get_action(N(eosio.arb), N(assigntocase), vector<permission_level>{{arb_to_assign, config::active_name}}, mvo()
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(assigntocase), vector<permission_level>{{N(eosio.arb), N(assign)}}, mvo()
             ("case_id", case_id)
             ("arb_to_assign", arb_to_assign)));
         set_transaction_headers(trx);
-        trx.sign(get_private_key(arb_to_assign, "active"), control->get_chain_id());
+        trx.sign(get_private_key(N(eosio.arb), "assign"), control->get_chain_id());
         return push_transaction(trx);
     }
+
+	transaction_trace_ptr updateauth(name account, name permission, name parent, authority auth) {
+		signed_transaction trx;
+		trx.actions.emplace_back(get_action(N(eosio), N(updateauth), vector<permission_level>{{account, config::active_name}},
+			mvo()
+				("account", account)
+				("permission", permission)
+				("parent", parent)
+				("auth", auth)
+		));
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(account, "active"), control->get_chain_id());
+		return push_transaction(trx);
+	}
+
+	transaction_trace_ptr linkauth(name account, name code, name type, name requirement) {
+		signed_transaction trx;
+		trx.actions.emplace_back(get_action(N(eosio), N(linkauth), vector<permission_level>{{account, config::active_name}},
+			mvo()
+				("account", account)
+				("code", code)
+				("type", type)
+				("requirement", requirement)
+		));
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(account, "active"), control->get_chain_id());
+		return push_transaction(trx);
+	}
 
     transaction_trace_ptr dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo) {
         signed_transaction trx;
@@ -361,16 +389,11 @@ public:
         return push_transaction(trx);
     }
 
-	transaction_trace_ptr fix() {
-        signed_transaction trx;
-        trx.actions.emplace_back(get_action(N(eosio.arb), N(fix), vector<permission_level>{{N(eosio.arb), config::active_name}},
-                                            mvo() ));
-        set_transaction_headers(trx);
-        trx.sign(get_private_key(N(eosio.arb), "active"), control->get_chain_id());
-        return push_transaction(trx);
-    }
-
     #pragma endregion actions
+
+	#pragma region native_structs
+
+	#pragma endregion native_structs
 
 
     #pragma region enums
