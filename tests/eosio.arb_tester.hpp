@@ -72,7 +72,6 @@ public:
             return claim_link == c["claim_summary"];
         });
         return it == unread_claims.end() ? fc::variant() : *it;
-
     }
 
     fc::variant get_claim(uint64_t claim_id) {
@@ -80,10 +79,67 @@ public:
         return data.empty() ? fc::variant() : abi_ser.binary_to_variant("claim", data, abi_serializer_max_time);
     }
 
-
-
     #pragma endregion get_tables
 
+	void elect_arbitrators(uint8_t num_arbitrators, uint8_t num_voters) {
+		const symbol vote_sym = symbol(4, "VOTE");
+		const symbol tlos_sym = symbol(4, "TLOS");
+		auto one_day = 86400;
+   		uint32_t start_election = 300, election_duration = 300, arbitrator_term_length = one_day * 10;
+		vector<int64_t> fees = { int64_t(1), int64_t(2), int64_t(3), int64_t(4) };
+		uint16_t max_elected_arbs = 20;
+
+		// setup config
+		setconfig ( max_elected_arbs, start_election, election_duration, arbitrator_term_length, fees);
+		produce_blocks(1);
+
+		init_election();
+		uint32_t expected_begin_time = uint32_t(now() + start_election);
+		uint32_t expected_end_time = expected_begin_time + election_duration;
+
+		auto config = get_config();
+		auto cbid = config["current_ballot_id"].as_uint64();   
+
+		auto ballot = get_ballot(cbid);
+		auto bid = ballot["reference_id"].as_uint64();
+
+		auto leaderboard = get_leaderboard(bid);
+		auto lid = leaderboard["board_id"].as_uint64();
+
+		BOOST_REQUIRE_EQUAL(expected_begin_time, leaderboard["begin_time"].as<uint32_t>());
+   		BOOST_REQUIRE_EQUAL(expected_end_time, leaderboard["end_time"].as<uint32_t>());
+
+		BOOST_REQUIRE_EQUAL(bid, lid);
+   		BOOST_REQUIRE_EQUAL(cbid, lid);
+
+		voter_map(0, num_arbitrators, [&](auto& account) {
+			regarb(account, "ipfs://123456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso");
+			candaddlead(account, "ipfs://123456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso");
+			produce_blocks();
+		});
+
+		produce_block(fc::seconds(300));
+		produce_blocks();
+
+		voter_map(num_arbitrators, num_arbitrators + num_voters, [&](auto& account) {
+			regvoter(account, vote_sym);
+			mirrorcast(account, tlos_sym);
+			for (uint8_t i = 0; i < num_arbitrators; i++) {
+				castvote(account, bid, i);
+			}
+			produce_blocks();
+		});
+
+		produce_block(fc::seconds(300));
+		produce_blocks();
+		
+		endelection(test_voters[0]);
+
+		voter_map(0, num_arbitrators, [&](auto& account) {
+			auto arb = get_arbitrator(account);
+			BOOST_REQUIRE_EQUAL(false, arb.is_null());
+		});
+	}
 
     #pragma region actions
 

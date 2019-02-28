@@ -17,7 +17,10 @@
 using namespace std;
 using namespace eosio;
 
-#define MIN_VOTE_THRESHOLD 0//10000000000
+//NOTE: for the purposes of test integrity this number should be kept at 1.
+// main net value should be 10000000000
+//TODO: refactor unit tests to work with MIN_VOTE_THRESHOLD value
+#define MIN_VOTE_THRESHOLD 1 
 
 class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contract
 {
@@ -30,6 +33,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	arbitration(name s, name code, datastream<const char *> ds);
 
 	~arbitration();
+
+	const uint8_t MAX_UNREAD_CLAIMS = 21;
 
 	[[eosio::action]] void setconfig(uint16_t max_elected_arbs, uint32_t election_duration, uint32_t start_election, uint32_t arbitrator_term_length, vector<int64_t> fees);
 

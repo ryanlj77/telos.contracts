@@ -332,7 +332,7 @@ BOOST_FIXTURE_TEST_CASE( register_unregister_endelection, eosio_arb_tester ) try
    BOOST_REQUIRE_EQUAL(arb["arb_status"].as<uint16_t>(), UNAVAILABLE_STATUS);
    BOOST_REQUIRE_EQUAL(arb["credentials_link"].as<std::string>(), credentials);
 //    BOOST_REQUIRE_EQUAL(arb["term_length"].as<uint32_t>(), expected_term_length);
-   // candidate is not in the candidates table anymore
+//    candidate is not in the candidates table anymore
    BOOST_REQUIRE_EQUAL(true, get_nominee(candidate.value).is_null());
    
    config = get_config();
@@ -789,6 +789,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     filecase(claimants[2], claim_links[0], langcodes , respondants[1] );
     produce_blocks(1);
 
+	//TODO: assert that responant option is working when empty and when not empty
+
     // file 3 cases for 3 separate claimants
     //for (auto claimant : claimants){
     //    filecase(claimant, claim_link, langcodes  , NULL );
@@ -804,6 +806,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     auto cid = casef["case_id"].as_uint64();
     auto cstatus = casef["case_status"];
     auto cunread_claims = casef["unread_claims"];
+
+	//TODO: assert respondant is empty in first case.
 
     std::cout<<"Case_id: " << cid  << endl;
     std::cout<<"Case_status: " << cstatus << endl;
@@ -838,6 +842,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     addclaim( cid, claim_links[2], claimants[0]  );
     addclaim( cid, claim_links[3], claimants[0]  );
     //produce_blocks(1);
+	
+	//TODO: assert that claimant can NOT addclaim with same ipfs string
 
     // Check unread claim was added to casefile
     casef = get_casefile(uint64_t(0));
@@ -892,15 +898,32 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     //cunread_claims = casef["unread_claims"];
     //readycase(cid, claimants[0]);
 
-
-
-
-
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE( assign_arbitrator_flow, eosio_arb_tester ) try {
+BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	
+	name non_claimant = name("nonclaimant");
+	name claimant = name("claimant");
+	name respondant = name("respondant");
+	create_accounts({claimant.value, respondant.value, non_claimant.value});
 
+	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
+	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
+	vector<uint8_t> lang_codes = {0, 1, 2};
+	
 
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	uint64_t current_case_id = 0;
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {

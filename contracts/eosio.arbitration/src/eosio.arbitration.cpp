@@ -53,6 +53,8 @@ void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duratio
 
 #pragma region Arb_Elections
 
+//TODO: update arbitrators status to SEAT_EXPIRED if seat is expired.
+
 void arbitration::initelection()
 {
 	require_auth("eosio"_n);
@@ -220,9 +222,14 @@ void arbitration::endelection(name nominee) //NOTE: required eosio.arb@eosio.cod
 			{
 				auto cand_credential = board_candidates[i].info_link;
 				auto cand_votes = board_candidates[i].votes;
-
-				if (cand_votes < asset(MIN_VOTE_THRESHOLD, cand_votes.symbol))
+				auto threshold_votes = asset(MIN_VOTE_THRESHOLD, cand_votes.symbol);
+				print("\ncand_votes: ", cand_votes);
+				print("\nthreshold_votes: ", threshold_votes);
+				if (cand_votes < threshold_votes) {
+					print("\nskipping candidate: ", cand_name, " because they have no votes");
 					continue;
+				}
+					
 
 				//remove candidates from candidates table / arbitration contract
 				nominees.erase(c);
@@ -239,7 +246,7 @@ void arbitration::endelection(name nominee) //NOTE: required eosio.arb@eosio.cod
 		//add current arbitrators to permission list
 		for (const auto &a : arbitrators)
 		{
-			if (a.arb_status != SEAT_EXPIRED)
+			if (a.arb_status != SEAT_EXPIRED || a.arb_status != REMOVED)
 			{
 				arbs_perms.emplace_back(permission_level_weight{permission_level{a.arb, "active"_n}, 1});
 			}
@@ -279,7 +286,7 @@ void arbitration::endelection(name nominee) //NOTE: required eosio.arb@eosio.cod
 	//and new candidates that registered after past election had started.
 	uint8_t available_seats = 0;
 	auto remaining_candidates = distance(nominees.begin(), nominees.end());
-
+	print("\nremaining_cands: ", remaining_candidates);
 	if (remaining_candidates > 0 && has_available_seats(arbitrators, available_seats))
 	{
 		_config.current_ballot_id = ballots.available_primary_key();
@@ -371,6 +378,7 @@ void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant)
 
 	auto new_claims = cf.unread_claims;
 
+	check(new_claims.size() < MAX_UNREAD_CLAIMS, "case file has reached maximum number of claims");
 	check(claimant == cf.claimant, "you are not the claimant of this case.");
 	auto claim_it = get_claim_at(claim_link, new_claims);
 	check(claim_it == new_claims.end(), "ipfs hash exists in another claim");
@@ -421,6 +429,7 @@ void arbitration::shredcase(uint64_t case_id, name claimant)
 
 void arbitration::readycase(uint64_t case_id, name claimant)
 {
+	require_auth(claimant);
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case Not Found");
 	check(cf.case_status == CASE_SETUP, "Cases can only be readied during CASE_SETUP");
@@ -681,6 +690,14 @@ void arbitration::deletecase(uint64_t case_id)
 	const auto& cf = casefiles.get(case_id, "case file not found");
 	check(cf.case_status >= RESOLVED, "case must either be RESOLVED or DISMISSED");
 	casefiles.erase(cf);
+
+	auto claim_ids = cf.accepted_claims;
+	claims_table claims(get_self(), get_self().value);
+	
+	for(auto& id : claim_ids) {
+		const auto& claim = claims.get(id, "claim not found");
+		claims.erase(claim);
+	}
 }
 
 #pragma endregion Arb_Actions
@@ -734,8 +751,8 @@ arbitration::config arbitration::get_default_config()
 		fees,				// fee_structure
 		uint32_t(31536000), // arb_term_length
 		now(),
-		uint64_t(0), // current_ballot_id
-		bool(0),	 // auto_start_election
+		uint64_t(0), 		// current_ballot_id
+		bool(0),	 		// auto_start_election
 	};
 
 	return c;
@@ -747,12 +764,12 @@ void arbitration::start_new_election(uint8_t available_seats)
 	uint32_t end_time = begin_time + _config.election_duration;
 
 	action(permission_level{get_self(), "active"_n}, "eosio.trail"_n, "regballot"_n,
-		   make_tuple(get_self(),		 // publisher
-					  uint8_t(2),		 // ballot_type (2 == leaderboard)
-					  symbol("VOTE", 4), // voting_symbol
-					  begin_time,		 // begin_time
-					  end_time,			 // end_time
-					  std::string("")	// info_url
+		   make_tuple(get_self(),		 	// publisher
+					  uint8_t(2),		 	// ballot_type (2 == leaderboard)
+					  symbol("VOTE", 4), 	// voting_symbol
+					  begin_time,		 	// begin_time
+					  end_time,			 	// end_time
+					  std::string("")		// info_url
 					  ))
 		.send();
 
