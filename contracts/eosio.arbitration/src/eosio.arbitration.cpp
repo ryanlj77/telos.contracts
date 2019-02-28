@@ -579,6 +579,8 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	});
 }
 
+//TODO: resolvecase action implementation
+
 void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 {
 	require_auth(assigned_arb);
@@ -586,6 +588,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
+	//TODO: check status + 1 != RESOLVED
 
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
@@ -602,9 +605,6 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		case_status++;
 		approvals.clear();
 	}
-
-	//TODO: remove case_id from open_case_ids of arbitrators in the casefile`
-	//TODO: added case to closed_case_ids of arbitrators if case status is resolved or dismissed
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = case_status;

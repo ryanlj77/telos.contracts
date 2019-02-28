@@ -762,9 +762,20 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // choose 3 claimants
-    vector<name> claimants = { test_voters[0],test_voters[1],test_voters[2],test_voters[3],test_voters[4],test_voters[6]   };
-    vector<name> respondants = { test_voters[7],test_voters[8],test_voters[9]  };
-    //optional<name> respondant = name(test_voters[0]);
+    vector<name> claimants = { 
+		test_voters[0],
+		test_voters[1],
+		test_voters[2],
+		test_voters[3],
+		test_voters[4],
+		test_voters[6]   
+	};
+
+    vector<name> respondants = {
+		test_voters[7],
+		test_voters[8],
+		test_voters[9]  
+	};
 
     // specify claim link
     string claim_link_invalid = "http://google.com";
@@ -774,10 +785,9 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             "ipfs://323456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
             "ipfs://423456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
     };
-    // Lang codes
-    vector<uint8_t>
-        langcodes = {uint8_t(0)};
 
+    // Lang codes
+    vector<uint8_t> langcodes = {uint8_t(0)};
 
     // Test invalid claim link
     std::cout <<"test invalid claim link" << endl;
@@ -789,7 +799,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // file 3 cases for 3 separate claimants
     // file case w/o and w respondant
-    //std::cout<<"FILE CASES" << endl;
+
     filecase(claimants[0], claim_links[0], langcodes , {} );
     filecase(claimants[1], claim_links[0], langcodes , respondants[0] );
     filecase(claimants[2], claim_links[0], langcodes , respondants[1] );
@@ -803,8 +813,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 	//TODO: assert respondant is empty in first case.
 
-    std::cout<<"Case_id: " << cid  << endl;
-    std::cout<<"Case_status: " << cstatus << endl;
+    // std::cout<<"Case_id: " << cid  << endl;
+    // std::cout<<"Case_status: " << cstatus << endl;
 
     // verify first case filed matches retrieved case
     BOOST_REQUIRE_EQUAL( casef["claimant"].as<name>(), claimants[0] );
@@ -828,7 +838,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
     addclaim( cid, claim_links[1], claimants[0]  );
     addclaim( cid, claim_links[2], claimants[0]  );
     addclaim( cid, claim_links[3], claimants[0]  );
-    //produce_blocks(1);
+    produce_blocks(1);
 	
 	//TODO: assert that claimant can NOT addclaim with same ipfs string
 
@@ -846,8 +856,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             ("decision_link", "")
             ("response_link", "")
             ("decision_class", 0)
-    )
-
+    );
 
     BOOST_REQUIRE_EQUAL(false, get_unread_claim( cid, claim_links[2]).is_null() );
     removeclaim(cid, claim_links[2], claimants[0] );
@@ -998,9 +1007,50 @@ BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
     );
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {
-	
+BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
+	//TODO: filecase
+	//TODO: addclaims x 3
+	//TODO: transfer funds
+	//TODO: readycase
+	//TODO: assigntocase
 
+	//TODO: respond
+	
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
+	//TODO: rescuse
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( dismiss_case, eosio_arb_tester ) try {
+	//TODO: filecase
+	//TODO: addclaims x 3
+	//TODO: transfer funds
+	//TODO: readycase
+	//TODO: assigntocase
+
+	//TODO: dismisscase
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( accept_dismiss_claims, eosio_arb_tester ) try {
+	//TODO: filecase
+	//TODO: addclaims x 3
+	//TODO: transfer funds
+	//TODO: readycase
+	//TODO: assigntocase
+
+	//TODO: respond
+	//TODO: dismissclaim
+	//TODO: acceptclaim
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
+
+	//TODO: dismissclaim
+	//TODO: acceptclaim
+
+	//TODO: advancecase
+	//TODO: resolvecase
 } FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()
