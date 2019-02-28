@@ -579,7 +579,19 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	});
 }
 
-//TODO: resolvecase action implementation
+void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_ruling) {
+	require_auth(assigned_arb);
+	casefiles_table casefiles(get_self(), get_self().value);
+	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
+
+	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
+	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
+	validate_ipfs_url(case_ruling);
+
+	casefiles.modify(cf, same_payer, [&](auto& row) {
+		row.case_ruling = case_ruling;
+	});
+}
 
 void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 {
@@ -588,7 +600,6 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
-	//TODO: check status + 1 != RESOLVED
 
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
@@ -604,6 +615,10 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	} else if (cf.approvals.size() + 1 == cf.arbitrators.size()) {
 		case_status++;
 		approvals.clear();
+	}
+
+	if (cf.case_status == RESOLVED) {
+		check(cf.case_ruling != string(""), "case_ruling must be set before advancing case to RESOLVED status");
 	}
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {

@@ -168,7 +168,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	[[eosio::action]] void dismisscase(uint64_t case_id, name assigned_arb, string ruling_link);
 
-	[[eosio::action]] void resolvecase(uint64_t case_id, name assigned_arb, string case_ruling);
+	[[eosio::action]] void setruling(uint64_t case_id, name assigned_arb, string case_ruling);
 
 	[[eosio::action]] void recuse(uint64_t case_id, string rationale, name assigned_arb);
 

@@ -297,6 +297,17 @@ public:
 		return push_transaction(trx);
 	}
 
+	transaction_trace_ptr withdraw(name owner) {
+		signed_transaction trx;
+		trx.actions.emplace_back(get_action(N(eosio.arb), N(withdraw), vector<permission_level>{{owner, config::active_name}},
+			mvo()
+				("owner", owner)
+		));
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(owner, "active"), control->get_chain_id());
+		return push_transaction(trx);
+	}
+
 	transaction_trace_ptr linkauth(name account, name code, name type, name requirement) {
 		signed_transaction trx;
 		trx.actions.emplace_back(get_action(N(eosio), N(linkauth), vector<permission_level>{{account, config::active_name}},

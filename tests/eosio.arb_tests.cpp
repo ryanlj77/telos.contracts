@@ -997,6 +997,7 @@ BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
 	auto custom_transfer_balance = asset::from_string("400.0000 PETER");
 	transfer(N(eosio), claimant.value, custom_transfer_balance, "claimant initial custom eosio.token balance");
 
+	//custom balance check from token contract
 	balance = get_currency_balance(N(eosio.token), symbol(4, "PETER"), claimant.value);
 	BOOST_REQUIRE_EQUAL(balance, custom_transfer_balance);
 
@@ -1004,6 +1005,23 @@ BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
 		transfer(claimant.value, N(eosio.arb), custom_transfer_balance, "claimant initial custom eosio.arb balance"),
 		eosio_assert_message_exception,
 		eosio_assert_message_is("only TLOS tokens are accepted by this contract")
+    );
+
+	withdraw(claimant);
+	produce_blocks();
+
+	// token balance check from arb contract, should be 0
+	balance = get_currency_balance(N(eosio.arb), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, asset::from_string("0.0000 TLOS"));
+
+	// token balance check from token contract, should be 400.0000 TLOS
+	balance = get_currency_balance(N(eosio.token), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	BOOST_REQUIRE_EXCEPTION(
+		withdraw(claimant),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("balance does not exist")
     );
 } FC_LOG_AND_RETHROW()
 
@@ -1015,7 +1033,6 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	//TODO: assigntocase
 
 	//TODO: respond
-	
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
