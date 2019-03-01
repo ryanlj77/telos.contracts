@@ -242,8 +242,6 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
 	
 } FC_LOG_AND_RETHROW()
 
-
-
 BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
 
     std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN MULTI_BALLOT_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
@@ -440,7 +438,7 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
         //BOOST_REQUIRE_EQUAL(false, bal.is_null());
     }
 
-    //deleete old ballots
+    //delete old ballots
     for (name b : ballots) {
         deleteballot(b, N(testaccount1));
         produce_blocks();
@@ -450,6 +448,196 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
     }
     
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END MULTI_BALLOT_FLOW <<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
+
+    std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN CUSTOM_TOKEN_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+
+    //init CRAIG token
+    const symbol CRAIG_SYM = symbol(2, "CRAIG"); //heh
+    const asset custom_max_supply = asset::from_string("1000.00 CRAIG");
+    token_settings craig_settings;
+    string info_url = "Craig Token Registry";
+    newtoken(N(testaccount1), custom_max_supply, craig_settings, info_url);
+    produce_blocks();
+
+    //init CRAIG ballot
+    const name CUSTOM_BALLOT_NAME = name("customballot");
+    const name CUSTOM_PUBLISHER = name("testaccount1");
+    const string CUSTOM_TITLE = "Custom Ballot";
+    const string CUSTOM_DESC = "Custom Description";
+    const string CUSTOM_URL = "/ipfs/customipfscid";
+    newballot(CUSTOM_BALLOT_NAME, name("games"), CUSTOM_PUBLISHER, CUSTOM_TITLE, CUSTOM_DESC, CUSTOM_URL, MAX_VOTABLE_OPTIONS, CRAIG_SYM);
+    produce_blocks();
+
+    //addoptions
+    addoption(CUSTOM_BALLOT_NAME, N(testaccount1), YES_NAME, "Yes");
+    addoption(CUSTOM_BALLOT_NAME, N(testaccount1), NO_NAME, "No");
+    addoption(CUSTOM_BALLOT_NAME, N(testaccount1), ABSTAIN_NAME, "Abstain");
+    produce_blocks();
+
+    //ready ballot
+    auto bal_end_time = now() + BALLOT_LENGTH;
+    readyballot(CUSTOM_BALLOT_NAME, N(testaccount1), bal_end_time);
+    produce_blocks();
+
+    //open balance for each test account
+    open(N(testaccount1), CRAIG_SYM);
+    open(N(testaccount2), CRAIG_SYM);
+    open(N(testaccount3), CRAIG_SYM);
+    open(N(testaccount4), CRAIG_SYM);
+    open(N(testaccount5), CRAIG_SYM);
+    produce_blocks();
+
+    //mint CRAIG tokens to test accounts
+    mint(CUSTOM_PUBLISHER, N(testaccount1), asset(10000, CRAIG_SYM));
+    mint(CUSTOM_PUBLISHER, N(testaccount2), asset(10000, CRAIG_SYM));
+    mint(CUSTOM_PUBLISHER, N(testaccount3), asset(10000, CRAIG_SYM));
+    mint(CUSTOM_PUBLISHER, N(testaccount4), asset(10000, CRAIG_SYM));
+    mint(CUSTOM_PUBLISHER, N(testaccount5), asset(10000, CRAIG_SYM));
+    produce_blocks();
+
+    //cast votes
+    castvote(N(testaccount1), CUSTOM_BALLOT_NAME, YES_NAME);
+    castvote(N(testaccount2), CUSTOM_BALLOT_NAME, NO_NAME);
+    castvote(N(testaccount3), CUSTOM_BALLOT_NAME, YES_NAME);
+    castvote(N(testaccount4), CUSTOM_BALLOT_NAME, ABSTAIN_NAME);
+    castvote(N(testaccount5), CUSTOM_BALLOT_NAME, YES_NAME);
+    produce_blocks();
+
+    //get vote objects
+    auto cv1 = get_vote(N(testaccount1), CUSTOM_BALLOT_NAME);
+    auto cv2 = get_vote(N(testaccount2), CUSTOM_BALLOT_NAME);
+    auto cv3 = get_vote(N(testaccount3), CUSTOM_BALLOT_NAME);
+    auto cv4 = get_vote(N(testaccount4), CUSTOM_BALLOT_NAME);
+    auto cv5 = get_vote(N(testaccount5), CUSTOM_BALLOT_NAME);
+
+    //check votes exist and match casted votes
+    REQUIRE_MATCHING_OBJECT(cv1, mvo()
+        ("ballot_name", CUSTOM_BALLOT_NAME)
+        ("option_names", vector<name>({name("yes")}))
+        ("amount", "100.00 CRAIG")
+        ("expiration", bal_end_time)
+	);
+    REQUIRE_MATCHING_OBJECT(cv2, mvo()
+        ("ballot_name", CUSTOM_BALLOT_NAME)
+        ("option_names", vector<name>({name("no")}))
+        ("amount", "100.00 CRAIG")
+        ("expiration", bal_end_time)
+	);
+    REQUIRE_MATCHING_OBJECT(cv3, mvo()
+        ("ballot_name", CUSTOM_BALLOT_NAME)
+        ("option_names", vector<name>({name("yes")}))
+        ("amount", "100.00 CRAIG")
+        ("expiration", bal_end_time)
+	);
+    REQUIRE_MATCHING_OBJECT(cv4, mvo()
+        ("ballot_name", CUSTOM_BALLOT_NAME)
+        ("option_names", vector<name>({name("abstain")}))
+        ("amount", "100.00 CRAIG")
+        ("expiration", bal_end_time)
+	);
+    REQUIRE_MATCHING_OBJECT(cv5, mvo()
+        ("ballot_name", CUSTOM_BALLOT_NAME)
+        ("option_names", vector<name>({name("yes")}))
+        ("amount", "100.00 CRAIG")
+        ("expiration", bal_end_time)
+	);
+
+    //get voting accounts
+    auto ca1 = get_balance(N(testaccount1), CRAIG_SYM);
+    auto ca2 = get_balance(N(testaccount2), CRAIG_SYM);
+    auto ca3 = get_balance(N(testaccount3), CRAIG_SYM);
+    auto ca4 = get_balance(N(testaccount4), CRAIG_SYM);
+    auto ca5 = get_balance(N(testaccount5), CRAIG_SYM);
+    
+    //cehck voting accounts match minted amount, num votes incremented
+    REQUIRE_MATCHING_OBJECT(ca1, mvo()
+        ("balance", "100.00 CRAIG")
+        ("num_votes", 1)
+	);
+    REQUIRE_MATCHING_OBJECT(ca2, mvo()
+        ("balance", "100.00 CRAIG")
+        ("num_votes", 1)
+	);
+    REQUIRE_MATCHING_OBJECT(ca3, mvo()
+        ("balance", "100.00 CRAIG")
+        ("num_votes", 1)
+	);
+    REQUIRE_MATCHING_OBJECT(ca4, mvo()
+        ("balance", "100.00 CRAIG")
+        ("num_votes", 1)
+	);
+    REQUIRE_MATCHING_OBJECT(ca5, mvo()
+        ("balance", "100.00 CRAIG")
+        ("num_votes", 1)
+	);
+
+    //fast forward past ballot end time
+    produce_blocks(172800); //1 day in blocks
+
+    //close ballot
+    closeballot(CUSTOM_BALLOT_NAME, N(testaccount1), 2);
+    produce_blocks();
+
+    //cleanupvotes
+    auto trx_pointer1 = cleanupvotes(N(testaccount1), 51, CRAIG_SYM);
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount1") << " charged " << trx_pointer1->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer2 = cleanupvotes(N(testaccount2), 51, CRAIG_SYM);
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount2") << " charged " << trx_pointer2->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer3 = cleanupvotes(N(testaccount3), 51, CRAIG_SYM);
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount3") << " charged " << trx_pointer3->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer4 = cleanupvotes(N(testaccount4), 51, CRAIG_SYM);
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount4") << " charged " << trx_pointer4->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    auto trx_pointer5 = cleanupvotes(N(testaccount5), 51, CRAIG_SYM);
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->elapsed.count() << " us CPU" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->net_usage << " bytes NET" << std::endl;
+    std::cout << name("testaccount5") << " charged " << trx_pointer5->action_traces[0].account_ram_deltas.begin()->delta << " bytes RAM" << std::endl << std::endl;
+    produce_blocks();
+
+    //check all vote objects have been cleaned
+    cv1 = get_vote(N(testaccount1), CUSTOM_BALLOT_NAME);
+    cv2 = get_vote(N(testaccount2), CUSTOM_BALLOT_NAME);
+    cv3 = get_vote(N(testaccount3), CUSTOM_BALLOT_NAME);
+    cv4 = get_vote(N(testaccount4), CUSTOM_BALLOT_NAME);
+    cv5 = get_vote(N(testaccount5), CUSTOM_BALLOT_NAME);
+    BOOST_REQUIRE_EQUAL(true, cv1.is_null());
+    BOOST_REQUIRE_EQUAL(true, cv2.is_null());
+    BOOST_REQUIRE_EQUAL(true, cv3.is_null());
+    BOOST_REQUIRE_EQUAL(true, cv4.is_null());
+    BOOST_REQUIRE_EQUAL(true, cv5.is_null());
+
+    
+
+    std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END CUSTOM_TOKEN_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(proxy_flow, trail_tester ) try {
+
+    std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN PROXY_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+
+    
+
+    std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END PROXY_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	
 } FC_LOG_AND_RETHROW()
 

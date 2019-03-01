@@ -324,7 +324,7 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
     auto sv_itr = sorted_votes.begin();
 
     //deletes expired votes until count reaches 0 or end of table, skips active votes
-    while (count > 0 && sv_itr != sorted_votes.end()) {
+    while (count > 0 && sv_itr->amount.symbol == voting_sym && sv_itr != sorted_votes.end()) {
         if (sv_itr->expiration < now()) { //expired
             //print("\ncleaning vote for ", sv_itr->ballot_name);
             sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
@@ -336,7 +336,7 @@ void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
 
 }
 
-void trail::cleanhouse(name voter, symbol voting_sym) {
+void trail::cleanhouse(name voter) {
 
     //sort votes by expiration, lowest first
     votes votes(get_self(), voter.value);
@@ -352,6 +352,24 @@ void trail::cleanhouse(name voter, symbol voting_sym) {
         }
     }
 
+}
+
+void trail::archive(name ballot_name, name publisher) {
+    // require_recipient(publisher);
+
+    // //get ballot
+    // ballots ballots(get_self(), get_self().value);
+    // auto& bal = accounts.get(VOTE_SYM.code().raw(), "account not found");
+
+    // //authenticate
+    // check(bal.publisher == publisher, "only ballot publisher can archive a ballot");
+
+    // //TODO: require TLOS transfer?
+
+    // //replace ram payer with Trail
+    // ballots.modify(bal, same_payer, [&](auto& row) {
+    //     row.balance = vote_stake;
+    // });
 }
 
 
@@ -387,11 +405,11 @@ void trail::mint(name publisher, name recipient, asset amount_to_mint) {
 
     //get registry
     registries registries(get_self(), get_self().value);
-    auto reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
 
     //get account
     accounts accounts(get_self(), recipient.value);
-    auto acc = accounts.get(token_sym.code().raw(), "account balance not found");
+    auto& acc = accounts.get(token_sym.code().raw(), "account balance not found");
 
     //validate
     check(reg.publisher == publisher, "only registry publisher can mint new tokens");
@@ -481,6 +499,27 @@ void trail::seize(name publisher, name owner, asset amount_to_seize) {
 
 }
 
+void trail::changemax(name publisher, asset max_supply_delta) {
+    require_auth(publisher);
+
+    symbol token_sym = max_supply_delta.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //validate
+    check(max_supply_delta.is_valid(), "invalid amount");
+    check(max_supply_delta.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+    check(reg.max_supply - max_supply_delta >= asset(0, token_sym), "cannot lower max_supply below zero");
+    check(reg.max_supply - max_supply_delta >= reg.supply, "cannot lower max_supply below circulating supply");
+
+    //change max
+    registries.modify(reg, same_payer, [&](auto& row) {
+        row.max_supply += max_supply_delta;
+    });
+}
+
 void trail::open(name owner, symbol token_sym) {
     require_auth(owner);
 
@@ -492,6 +531,7 @@ void trail::open(name owner, symbol token_sym) {
     accounts accounts(get_self(), owner.value);
     auto acc = accounts.find(token_sym.code().raw());
     check(acc == accounts.end(), "account balance already exists");
+    check(token_sym != symbol("TLOS", 4), "cannot open a TLOS balance here");
 
     //emplace account with zero balance
     accounts.emplace(owner, [&](auto& row){
