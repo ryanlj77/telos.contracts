@@ -24,6 +24,7 @@ using namespace std;
 
 using mvo = fc::mutable_variant_object;
 
+
 BOOST_AUTO_TEST_SUITE(eosio_arb_tests)
 
 BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
@@ -757,9 +758,20 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // choose 3 claimants
-    vector<name> claimants = { test_voters[0],test_voters[1],test_voters[2],test_voters[3],test_voters[4],test_voters[6]   };
-    vector<name> respondants = { test_voters[7],test_voters[8],test_voters[9]  };
-    //optional<name> respondant = name(test_voters[0]);
+    vector<name> claimants = { 
+		test_voters[0],
+		test_voters[1],
+		test_voters[2],
+		test_voters[3],
+		test_voters[4],
+		test_voters[6]   
+	};
+
+    vector<name> respondants = {
+		test_voters[7],
+		test_voters[8],
+		test_voters[9]  
+	};
 
     // specify claim link
     string claim_link_invalid = "http://google.com";
@@ -769,10 +781,9 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             "ipfs://323456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
             "ipfs://423456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
     };
-    // Lang codes
-    vector<uint8_t>
-        langcodes = {uint8_t(0)};
 
+    // Lang codes
+    vector<uint8_t> langcodes = {uint8_t(0)};
 
     // Test invalid claim link
     std::cout <<"test invalid claim link" << endl;
@@ -784,7 +795,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // file 3 cases for 3 separate claimants
     // file case w/o and w respondant
-    //std::cout<<"FILE CASES" << endl;
+
     filecase(claimants[0], claim_links[0], langcodes , {} );
     filecase(claimants[1], claim_links[0], langcodes , respondants[0] );
     filecase(claimants[2], claim_links[0], langcodes , respondants[1] );
@@ -798,8 +809,8 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 	//TODO: assert respondant is empty in first case.
 
-    std::cout<<"Case_id: " << cid  << endl;
-    std::cout<<"Case_status: " << cstatus << endl;
+    // std::cout<<"Case_id: " << cid  << endl;
+    // std::cout<<"Case_status: " << cstatus << endl;
 
     // verify first case filed matches retrieved case
     BOOST_REQUIRE_EQUAL( casef["claimant"].as<name>(), claimants[0] );
@@ -818,12 +829,11 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             eosio_assert_message_is( "you are not the claimant of this case." )
     );
 
-
     // add additional claims to the case file
     addclaim( cid, claim_links[1], claimants[0]  );
     addclaim( cid, claim_links[2], claimants[0]  );
     addclaim( cid, claim_links[3], claimants[0]  );
-    //produce_blocks(1);
+    produce_blocks(1);
 	
 	//TODO: assert that claimant can NOT addclaim with same ipfs string
 
@@ -841,8 +851,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             ("decision_link", "")
             ("response_link", "")
             ("decision_class", 0)
-    )
-
+    );
 
     BOOST_REQUIRE_EQUAL(false, get_unread_claim( cid, claim_links[2]).is_null() );
     removeclaim(cid, claim_links[2], claimants[0] );
@@ -879,23 +888,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
 	
-	name assigner = name("assigner");
-	name non_claimant = name("nonclaimant");
-	name claimant = name("claimant");
-	name respondant = name("respondant");
-
-	create_accounts({
-		claimant.value, 
-		respondant.value, 
-		non_claimant.value,
-		assigner.value
-	});
-
-	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
-	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
-	vector<uint8_t> lang_codes = {0, 1, 2};
-	
-
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	uint64_t current_case_id = 0;
 	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
@@ -910,42 +902,248 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 
 	auto cf = get_casefile(current_case_id);
 
-	BOOST_REQUIRE_EQUAL(uint8_t(1), cf["case_status"].as<uint8_t>());
+	BOOST_REQUIRE_EQUAL(cf["case_status"].as<uint8_t>(), AWAITING_ARBS);
 	
-	updateauth(
-		name("eosio.arb"), 
-		name("assign"), 
-		name("active"), 
-		authority{
-			1,
-			vector<key_weight> {},
-			vector<permission_level_weight> {
-				permission_level_weight {
-					permission_level {
-						assigner.value,
-						N(active)
-					},
-					1
-				}
-			},
-			vector<wait_weight> {}
-		}
-	);
+	produce_blocks();
 
-	linkauth(name("eosio.arb"), name("eosio.arb"), name("assigntocase"), name("assign"));
+	newarbstatus(AVAILABLE, test_voters[0]);
+	newarbstatus(AVAILABLE, test_voters[1]);
+	newarbstatus(AVAILABLE, test_voters[2]);
+	produce_blocks();
 
-	assigntocase(current_case_id, name(test_voters[0])); //TODO: missing require signature issue.
+	assigntocase(current_case_id, name(test_voters[0]), assigner); //TODO: missing require signature issue.
 
 	cf = get_casefile(current_case_id);
+	BOOST_REQUIRE_EQUAL(cf["case_status"].as<uint8_t>(), CASE_INVESTIGATION);
+
 	auto case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
-	cout << "case_arbs.size(): " << case_arbs.size() << endl;
-	cout << "case_arbs[0]: " << case_arbs[0].as_string() << endl;
 	BOOST_REQUIRE_EQUAL(case_arbs.size(), 1);
 	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
+
+	//NOTE: Arbitrator calls addarbs, in order to add new arbitrators.
+	addarbs(current_case_id, test_voters[0], 2);
+
+	//NOTE: this assumes that a demux or chain watching service catches the aboves call to addarbs 
+	// and acts according to the arguments in the action
+
+	//NOTE: in this case the service would then call assigntocase twice
+	assigntocase(current_case_id, name(test_voters[1]), assigner);
+	assigntocase(current_case_id, name(test_voters[2]), assigner);
+
+	cf = get_casefile(current_case_id);
+	case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(case_arbs.size(), 3);
+	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[1].as_string(), name(test_voters[1]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[2].as_string(), name(test_voters[2]).to_string());
+
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE( arbitrator_flow, eosio_arb_tester ) try {
+BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
+	auto tlos_transfer_amount = asset::from_string("400.0000 TLOS");
+	transfer(N(eosio), claimant.value, tlos_transfer_amount, "claimant initial eosio.token balance");
 
+	//balance check from token contract
+	auto balance = get_currency_balance(N(eosio.token), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	//balance check from arb contract
+	transfer(claimant.value, N(eosio.arb), tlos_transfer_amount, "claimant initial eosio.arb balance");
+	balance = get_currency_balance(N(eosio.arb), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	create(N(eosio), asset::from_string("10000000000.0000 PETER"));
+	issue(N(eosio), N(eosio), asset::from_string("1000000000.0000 PETER"), "Initial amount!");
+
+	auto custom_transfer_balance = asset::from_string("400.0000 PETER");
+	transfer(N(eosio), claimant.value, custom_transfer_balance, "claimant initial custom eosio.token balance");
+
+	//custom balance check from token contract
+	balance = get_currency_balance(N(eosio.token), symbol(4, "PETER"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, custom_transfer_balance);
+
+	BOOST_REQUIRE_EXCEPTION(
+		transfer(claimant.value, N(eosio.arb), custom_transfer_balance, "claimant initial custom eosio.arb balance"),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("only TLOS tokens are accepted by this contract")
+    );
+
+	withdraw(claimant);
+	produce_blocks();
+
+	// token balance check from arb contract, should be 0
+	balance = get_currency_balance(N(eosio.arb), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, asset::from_string("0.0000 TLOS"));
+
+	// token balance check from token contract, should be 400.0000 TLOS
+	balance = get_currency_balance(N(eosio.token), symbol(4, "TLOS"), claimant.value);
+	BOOST_REQUIRE_EQUAL(balance, tlos_transfer_amount);
+
+	BOOST_REQUIRE_EXCEPTION(
+		withdraw(claimant),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("balance does not exist")
+    );
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	newarbstatus(AVAILABLE, test_voters[0]);
+	
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	produce_blocks();
+
+	uint64_t current_case_id = 0;
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		respond(current_case_id, claim_link1, bad_actor, response_link1),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("must be the respondant of this case_id")
+    );
+
+	BOOST_REQUIRE_EXCEPTION(
+		respond(current_case_id, claim_link1, respondant, response_link1),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("case status does NOT allow responses at this time")
+    );
+
+	assigntocase(current_case_id, name(test_voters[0]), assigner);
+
+	respond(current_case_id, claim_link1, respondant, response_link1);
+	produce_blocks();
+
+	auto claim = get_unread_claim(current_case_id, claim_link1);
+	BOOST_REQUIRE_EQUAL(false, claim.is_null());
+	BOOST_REQUIRE_EQUAL(claim["claim_summary"].as_string(), claim_link1);
+	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link1);
+
+	respond(current_case_id, claim_link1, respondant, response_link1);
+
+	claim = get_unread_claim(current_case_id, claim_link1);
+	BOOST_REQUIRE_EQUAL(false, claim.is_null());
+	BOOST_REQUIRE_EQUAL(claim["claim_summary"].as_string(), claim_link1);
+	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link1);
+
+	// file case with no respondant
+	filecase(claimant, claim_link1, lang_codes, {});
+
+	current_case_id++;
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	assigntocase(current_case_id, name(test_voters[0]), assigner);
+
+	BOOST_REQUIRE_EXCEPTION(
+		respond(current_case_id, claim_link1, bad_actor, response_link1),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("case_id does not have a respondant")
+    );
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	newarbstatus(AVAILABLE, test_voters[0]);
+	uint64_t current_case_id = 0;
+
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("No case found for given case_id")
+    );
+	
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	produce_blocks();
+	
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Arbitrator isn't selected for this case.")
+    );
+
+	assigntocase(current_case_id, test_voters[0], assigner);
+
+	auto cf = get_casefile(current_case_id);
+	auto assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
+	BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
+	
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", bad_actor),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Arbitrator isn't selected for this case.")
+    );
+
+	recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]);
+	
+	cf = get_casefile(current_case_id);
+	assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 0);
+
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( dismiss_case, eosio_arb_tester ) try {
+	//TODO: filecase
+	//TODO: addclaims x 3
+	//TODO: transfer funds
+	//TODO: readycase
+	//TODO: assigntocase
+
+	//TODO: dismisscase
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( accept_dismiss_claims, eosio_arb_tester ) try {
+	//TODO: filecase
+	//TODO: addclaims x 3
+	//TODO: transfer funds
+	//TODO: readycase
+	//TODO: assigntocase
+
+	//TODO: respond
+	//TODO: dismissclaim
+	//TODO: acceptclaim
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
+	//TODO: dismissclaim
+	//TODO: acceptclaim
+
+	//TODO: advancecase
+	//TODO: resolvecase
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try {
 
 } FC_LOG_AND_RETHROW()
 

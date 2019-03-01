@@ -458,7 +458,7 @@ void arbitration::respond(uint64_t case_id, string claim_hash, name respondant, 
 
 	check(cf.respondant != name(0), "case_id does not have a respondant");
 	check(cf.respondant == respondant, "must be the respondant of this case_id");
-	check(cf.case_status > AWAITING_ARBS && cf.case_status < DECISION, "case state does NOT allow responses");
+	check(cf.case_status == CASE_INVESTIGATION, "case status does NOT allow responses at this time");
 
 	auto delta_claims = cf.unread_claims;
     
@@ -491,7 +491,7 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 	require_auth(permission_level("eosio.arb"_n, "assign"_n));
 
 	arbitrators_table arbitrators(get_self(), get_self().value);
-	const auto& arb = arbitrators.get(arb_to_assign.value, "Arb is not a registered Arbitrator");
+	const auto& arb = arbitrators.get(arb_to_assign.value, "actor is not a registered Arbitrator");
 	check(arb.arb_status == AVAILABLE, "Arb status isn't set to available, Arbitrator is unable to receive new cases");
 
 	vector<uint64_t> new_open_cases = arb.open_case_ids;
@@ -527,8 +527,12 @@ void arbitration::dismissclaim(uint64_t case_id, name assigned_arb, string claim
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found");
+
+	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to dismiss claim while this case file is in this status");
+
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Only an assigned arbitrator can dismiss a claim");
+
 	assert_string(memo, std::string("memo must be greater than 0 and less than 255"));
 	vector<claim> new_claims = cf.unread_claims;
 
@@ -551,8 +555,11 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found");
+
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Only the assigned arbitrator can accept a claim");
+
+	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to dismiss claim while this case file is in this status");
 
 	claims_table claims(get_self(), get_self().value);
 
@@ -560,7 +567,9 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 
 	auto claim_it = get_claim_at(claim_hash, new_unread_claims);
 	check(claim_it != new_unread_claims.end(), "Claim Hash not found in casefile");
+	auto response_link = claim_it->response_link;
 	new_unread_claims.erase(claim_it);
+
 	uint64_t new_claim_id = claims.available_primary_key();
 	vector<uint64_t> new_accepted_claims = cf.accepted_claims;
 	new_accepted_claims.emplace_back(new_claim_id);
@@ -576,6 +585,21 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 		row.claim_summary = claim_hash;
 		row.decision_link = decision_link;
 		row.decision_class = decision_class;
+		row.response_link = response_link;
+	});
+}
+
+void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_ruling) {
+	require_auth(assigned_arb);
+	casefiles_table casefiles(get_self(), get_self().value);
+	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
+
+	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
+	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
+	validate_ipfs_url(case_ruling);
+
+	casefiles.modify(cf, same_payer, [&](auto& row) {
+		row.case_ruling = case_ruling;
 	});
 }
 
@@ -603,8 +627,9 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		approvals.clear();
 	}
 
-	//TODO: remove case_id from open_case_ids of arbitrators in the casefile`
-	//TODO: added case to closed_case_ids of arbitrators if case status is resolved or dismissed
+	if (cf.case_status == RESOLVED) {
+		check(cf.case_ruling != string(""), "case_ruling must be set before advancing case to RESOLVED status");
+	}
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = case_status;
@@ -646,7 +671,8 @@ void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb)
 	assert_string(rationale, std::string("rationale must be greater than 0 and less than 255"));
 
 	vector<name> new_arbs = cf.arbitrators;
-	remove(new_arbs.begin(), new_arbs.end(), assigned_arb);
+	auto arb_it = find(new_arbs.begin(), new_arbs.end(), assigned_arb);
+	new_arbs.erase(arb_it);
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.arbitrators = new_arbs;
