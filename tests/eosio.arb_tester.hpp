@@ -10,6 +10,12 @@ using namespace std;
 class eosio_arb_tester : public eosio_trail_tester {
 public:
 
+	const name claimant = name("claimant");
+	const name respondant = name("respondant");
+	const name bad_actor = name("badactor");
+	const name assigner = name("assigner");
+	const name non_claimant = name("nonclaimant");
+
     abi_serializer abi_ser;
 
     eosio_arb_tester() {
@@ -28,6 +34,37 @@ public:
             BOOST_REQUIRE_EQUAL(abi_serializer::to_abi(accnt.abi, abi), true);
             abi_ser.set_abi(abi, abi_serializer_max_time);
         }
+
+		create_accounts({
+			claimant.value, 
+			respondant.value, 
+			non_claimant.value,
+			assigner.value,
+			bad_actor.value
+		});
+
+		updateauth(
+			name("eosio.arb"), 
+			name("assign"), 
+			name("active"), 
+			authority{
+				1,
+				vector<key_weight> {},
+				vector<permission_level_weight> {
+					permission_level_weight {
+						permission_level {
+							assigner.value,
+							N(active)
+						},
+						1
+					}
+				},
+				vector<wait_weight> {}
+			}
+		);
+
+		linkauth(name("eosio.arb"), name("eosio.arb"), name("assigntocase"), name("assign"));
+		produce_blocks();
     }
 
 #pragma region get_tables
@@ -346,6 +383,18 @@ public:
         trx.sign(get_private_key(assigned_arb, "active"), control->get_chain_id());
         return push_transaction(trx);
     }
+
+	transaction_trace_ptr respond(uint64_t case_id, string claim_hash, name respondant, string response_link) {
+		signed_transaction trx;
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(respond), vector<permission_level>{{respondant, config::active_name}}, mvo()
+            ("case_id", case_id)
+            ("claim_hash", claim_hash)
+            ("respondant", respondant)
+            ("response_link", response_link)));
+        set_transaction_headers(trx);
+        trx.sign(get_private_key(respondant, "active"), control->get_chain_id());
+        return push_transaction(trx);
+	}
 
     transaction_trace_ptr dismisscase(uint64_t case_id, name assigned_arb, string ruling_link) {
         signed_transaction trx;
