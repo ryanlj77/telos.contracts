@@ -16,6 +16,14 @@ public:
 	const name assigner = name("assigner");
 	const name non_claimant = name("nonclaimant");
 
+	const string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
+	const string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
+
+	const string response_link1 = "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn";
+	const string response_link2 = "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy";
+
+	const vector<uint8_t> lang_codes = {0, 1, 2};
+
     abi_serializer abi_ser;
 
     eosio_arb_tester() {

@@ -829,7 +829,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             eosio_assert_message_is( "you are not the claimant of this case." )
     );
 
-
     // add additional claims to the case file
     addclaim( cid, claim_links[1], claimants[0]  );
     addclaim( cid, claim_links[2], claimants[0]  );
@@ -886,10 +885,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
-
-	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
-	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
-	vector<uint8_t> lang_codes = {0, 1, 2};
 	
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	uint64_t current_case_id = 0;
@@ -995,16 +990,7 @@ BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
 
 BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
-
 	newarbstatus(AVAILABLE, test_voters[0]);
-
-	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
-	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
-
-	string response_link1 = "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn";
-	string response_link2 = "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy"; 
-
-	vector<uint8_t> lang_codes = {0, 1, 2};
 	
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	produce_blocks();
@@ -1050,7 +1036,6 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	BOOST_REQUIRE_EQUAL(claim["claim_summary"].as_string(), claim_link1);
 	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link1);
 
-
 	// file case with no respondant
 	filecase(claimant, claim_link1, lang_codes, {});
 
@@ -1075,7 +1060,55 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
-	//TODO: recuse
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	newarbstatus(AVAILABLE, test_voters[0]);
+	uint64_t current_case_id = 0;
+
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("No case found for given case_id")
+    );
+	
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	produce_blocks();
+	
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Arbitrator isn't selected for this case.")
+    );
+
+	assigntocase(current_case_id, test_voters[0], assigner);
+
+	auto cf = get_casefile(current_case_id);
+	auto assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
+	BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
+	
+	BOOST_REQUIRE_EXCEPTION(
+		recuse(current_case_id, "because i'm bias and can't hear this case", bad_actor),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Arbitrator isn't selected for this case.")
+    );
+
+	recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]);
+	
+	cf = get_casefile(current_case_id);
+	assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 0);
+
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( dismiss_case, eosio_arb_tester ) try {
@@ -1101,12 +1134,15 @@ BOOST_FIXTURE_TEST_CASE( accept_dismiss_claims, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
-
 	//TODO: dismissclaim
 	//TODO: acceptclaim
 
 	//TODO: advancecase
 	//TODO: resolvecase
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try {
+
 } FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()

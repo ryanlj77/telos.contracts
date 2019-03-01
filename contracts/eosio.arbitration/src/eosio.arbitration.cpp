@@ -491,7 +491,7 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 	require_auth(permission_level("eosio.arb"_n, "assign"_n));
 
 	arbitrators_table arbitrators(get_self(), get_self().value);
-	const auto& arb = arbitrators.get(arb_to_assign.value, "Arb is not a registered Arbitrator");
+	const auto& arb = arbitrators.get(arb_to_assign.value, "actor is not a registered Arbitrator");
 	check(arb.arb_status == AVAILABLE, "Arb status isn't set to available, Arbitrator is unable to receive new cases");
 
 	vector<uint64_t> new_open_cases = arb.open_case_ids;
