@@ -625,8 +625,6 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     BOOST_REQUIRE_EQUAL(true, cv4.is_null());
     BOOST_REQUIRE_EQUAL(true, cv5.is_null());
 
-    
-
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END CUSTOM_TOKEN_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	
 } FC_LOG_AND_RETHROW()
