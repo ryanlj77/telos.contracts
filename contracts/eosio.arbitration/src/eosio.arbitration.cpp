@@ -559,7 +559,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Only the assigned arbitrator can accept a claim");
 
-	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to dismiss claim while this case file is in this status");
+	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to accept claim while this case file is in this status");
 
 	claims_table claims(get_self(), get_self().value);
 

@@ -24,7 +24,6 @@ using namespace std;
 
 using mvo = fc::mutable_variant_object;
 
-
 BOOST_AUTO_TEST_SUITE(eosio_arb_tests)
 
 BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
@@ -758,19 +757,19 @@ BOOST_FIXTURE_TEST_CASE( tiebreaker, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
     // choose 3 claimants
-    vector<name> claimants = { 
+    vector<name> claimants = {
 		test_voters[0],
 		test_voters[1],
 		test_voters[2],
 		test_voters[3],
 		test_voters[4],
-		test_voters[6]   
+		test_voters[6]
 	};
 
     vector<name> respondants = {
 		test_voters[7],
 		test_voters[8],
-		test_voters[9]  
+		test_voters[9]
 	};
 
     // specify claim link
@@ -828,6 +827,7 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
             eosio_assert_message_exception,
             eosio_assert_message_is( "you are not the claimant of this case." )
     );
+
 
     // add additional claims to the case file
     addclaim( cid, claim_links[1], claimants[0]  );
@@ -888,6 +888,23 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
 	
+	name assigner = name("assigner");
+	name non_claimant = name("nonclaimant");
+	name claimant = name("claimant");
+	name respondant = name("respondant");
+
+	create_accounts({
+		claimant.value, 
+		respondant.value, 
+		non_claimant.value,
+		assigner.value
+	});
+
+	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
+	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
+	vector<uint8_t> lang_codes = {0, 1, 2};
+	
+
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	uint64_t current_case_id = 0;
 	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
@@ -923,7 +940,7 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	//NOTE: Arbitrator calls addarbs, in order to add new arbitrators.
 	addarbs(current_case_id, test_voters[0], 2);
 
-	//NOTE: this assumes that a demux or chain watching service catches the aboves call to addarbs 
+	//NOTE: this assumes that a demux or chain watching service catches the aboves call to addarbs
 	// and acts according to the arguments in the action
 
 	//NOTE: in this case the service would then call assigntocase twice
@@ -993,7 +1010,7 @@ BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
 	newarbstatus(AVAILABLE, test_voters[0]);
-	
+
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	produce_blocks();
 
@@ -1071,10 +1088,10 @@ BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
 		eosio_assert_message_exception,
 		eosio_assert_message_is("No case found for given case_id")
     );
-	
+
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	produce_blocks();
-	
+
 	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
 	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
 	addclaim(current_case_id, claim_link2, claimant);
@@ -1098,7 +1115,7 @@ BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
 	auto assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
 	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
 	BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
-	
+
 	BOOST_REQUIRE_EXCEPTION(
 		recuse(current_case_id, "because i'm bias and can't hear this case", bad_actor),
 		eosio_assert_message_exception,
@@ -1106,7 +1123,7 @@ BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
     );
 
 	recuse(current_case_id, "because i'm bias and can't hear this case", test_voters[0]);
-	
+
 	cf = get_casefile(current_case_id);
 	assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
 	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 0);
@@ -1114,25 +1131,202 @@ BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( dismiss_case, eosio_arb_tester ) try {
-	//TODO: filecase
-	//TODO: addclaims x 3
-	//TODO: transfer funds
-	//TODO: readycase
+
+    //TODO: filecase
+    elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+    newarbstatus(AVAILABLE, test_voters[0]);
+    uint64_t current_case_id = 0;
+
+    filecase(claimant, claim_links[0], lang_codes, respondant);
+    produce_blocks();
+
+    //TODO: addclaims x 3
+
+    addclaim(current_case_id, claim_links[1], claimant);
+    addclaim(current_case_id, claim_links[2], claimant);
+    addclaim(current_case_id, claim_links[3], claimant);
+    auto cf = get_casefile(current_case_id);
+    BOOST_REQUIRE_EQUAL( cf["unread_claims"].size() , uint8_t(4)  );
+
+    //TODO: transfer funds
+    transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+    transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+    //TODO: readycase
+    readycase(current_case_id, claimant);
+    cf = get_casefile(current_case_id);
+    BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), AWAITING_ARBS);
+    produce_blocks();
+
+    BOOST_REQUIRE_EXCEPTION(
+            dismisscase(current_case_id, bad_actor, ruling_links[0]   ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is("Arbitrator isn't selected for this case")
+    );
+
+
 	//TODO: assigntocase
+    //cf = get_casefile(current_case_id);
+    auto assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 0);
+    assigntocase(current_case_id, test_voters[0], assigner);
+
+    cf = get_casefile(current_case_id);
+    std::cout << "Case status: " << cf["case_status"].as_string() << endl;
+    BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), CASE_INVESTIGATION );
+    assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+    BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
+    BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
 
 	//TODO: dismisscase
+	std::cout << "Case status: " << cf["case_status"].as_string() << endl;
+    //[[eosio::action]] void dismisscase(uint64_t case_id, name assigned_arb, string ruling_link);
+
+    BOOST_REQUIRE_EXCEPTION(
+            dismisscase(current_case_id, bad_actor, ruling_links[0]   ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is("Arbitrator isn't selected for this case")
+    );
+
+
+    dismisscase(current_case_id, test_voters[0], ruling_links[0]   );
+    produce_blocks();
+
+    cf = get_casefile(current_case_id);
+    BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), DISMISSED );
+    BOOST_REQUIRE_EXCEPTION(
+            dismisscase(current_case_id, test_voters[0], ruling_links[0]   ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is("Case is already dismissed or complete")
+    );
+
+
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( accept_dismiss_claims, eosio_arb_tester ) try {
-	//TODO: filecase
-	//TODO: addclaims x 3
-	//TODO: transfer funds
-	//TODO: readycase
-	//TODO: assigntocase
+    //TODO: filecase
+    elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+    newarbstatus(AVAILABLE, test_voters[0]);
+    uint64_t current_case_id = 0;
+
+    filecase(claimant, claim_links[0], lang_codes, respondant);
+    produce_blocks();
+
+    //TODO: addclaims x 3
+
+    addclaim(current_case_id, claim_links[1], claimant);
+    addclaim(current_case_id, claim_links[2], claimant);
+    addclaim(current_case_id, claim_links[3], claimant);
+    auto cf = get_casefile(current_case_id);
+    BOOST_REQUIRE_EQUAL( cf["unread_claims"].size() , uint8_t(4)  );
+
+    BOOST_REQUIRE_EXCEPTION(
+            dismissclaim(current_case_id, claimant, claim_links[0], "The claim is not valid.  Dismissed" ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is("unable to dismiss claim while this case file is in this status")
+    );
+
+    //TODO: transfer funds
+    transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+    transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+    //TODO: readycase
+    readycase(current_case_id, claimant);
+    cf = get_casefile(current_case_id);
+    BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), AWAITING_ARBS);
+    produce_blocks();
+
+    BOOST_REQUIRE_EXCEPTION(
+            dismissclaim(current_case_id, claimant, claim_links[0], "The claim is not valid.  Dismissed" ),
+            eosio_assert_message_exception,
+            eosio_assert_message_is("unable to dismiss claim while this case file is in this status")
+    );
+
+
+    //TODO: assigntocase
+    //cf = get_casefile(current_case_id);
+    auto assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+    BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 0);
+    assigntocase(current_case_id, test_voters[0], assigner);
+
+    cf = get_casefile(current_case_id);
+    std::cout << "Case status: " << cf["case_status"].as_string() << endl;
+    BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), CASE_INVESTIGATION );
+    assigned_arbs = cf["arbitrators"].as<vector<fc::variant>>();
+    BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
+    BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
 
 	//TODO: respond
+	respond(current_case_id, claim_links[0], respondant, response_links[0]);
+    produce_blocks();
+
+    auto claim = get_unread_claim(current_case_id, claim_links[0]);
+    BOOST_REQUIRE_EQUAL(false, claim.is_null());
+
+    REQUIRE_MATCHING_OBJECT (claim,
+            mvo()
+    ("claim_id",0)
+    ("claim_summary", claim_links[0])
+    ("decision_link", "")
+    ("response_link", response_links[0])
+    ("decision_class", 0)
+    );
+
+
+    respond(current_case_id, claim_links[1], respondant, response_links[1]);
+    produce_blocks();
+
+    claim = get_unread_claim(current_case_id, claim_links[1]);
+    BOOST_REQUIRE_EQUAL(false, claim.is_null());
+
+    REQUIRE_MATCHING_OBJECT (claim,
+            mvo()
+    ("claim_id",0)
+    ("claim_summary", claim_links[1])
+    ("decision_link", "")
+    ("response_link", response_links[1])
+    ("decision_class", 0)
+    );
+
+
 	//TODO: dismissclaim
+    //[[eosio::action]] void dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo);
+
+
+    claim = get_unread_claim(current_case_id, claim_links[0]);
+    BOOST_REQUIRE_EQUAL(false, claim.is_null());
+
+    BOOST_REQUIRE_EXCEPTION(
+        dismissclaim(current_case_id, bad_actor, claim_links[0], "The claim is not valid.  Dismissed" ),
+        eosio_assert_message_exception,
+        eosio_assert_message_is("Only an assigned arbitrator can dismiss a claim")
+    );
+
+    dismissclaim(current_case_id, test_voters[0], claim_links[0], "The claim is not valid.  Dismissed" );
+
+    claim = get_unread_claim(current_case_id, claim_links[0]);
+    BOOST_REQUIRE_EQUAL(true, claim.is_null());
+
+
 	//TODO: acceptclaim
+	//TODO:: acceptclaim with out of range decision_class
+    //[[eosio::action]] void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class);
+    acceptclaim(current_case_id, test_voters[0], claim_links[1], ruling_links[1], A_TORT   );
+
+    // check claim was removed from unread claims
+    claim = get_unread_claim(current_case_id, claim_links[1]);
+    BOOST_REQUIRE_EQUAL(true, claim.is_null());
+
+    //check accept claim(s) were moved into claim table
+    /*REQUIRE_MATCHING_OBJECT (claim,
+                mvo()
+    ("claim_id",0)
+    ("claim_summary", claim_links[1])
+    ("decision_link", ruling_links[1])
+    ("response_link", response_links[1])
+    ("decision_class", A_TORT )
+    );
+    */
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
