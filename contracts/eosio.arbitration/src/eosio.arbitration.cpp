@@ -492,6 +492,7 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 
 	arbitrators_table arbitrators(get_self(), get_self().value);
 	const auto& arb = arbitrators.get(arb_to_assign.value, "actor is not a registered Arbitrator");
+	check(arb.arb_status != REMOVED, "Arbitrator has been removed.");
 	check(arb.arb_status == AVAILABLE, "Arb status isn't set to available, Arbitrator is unable to receive new cases");
 
 	vector<uint64_t> new_open_cases = arb.open_case_ids;
@@ -559,6 +560,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Only the assigned arbitrator can accept a claim");
 
+	check(decision_class > UNDECIDED && decision_class <= MISC, "decision_class must be a valid [1 - 15]");
 	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to dismiss claim while this case file is in this status");
 
 	claims_table claims(get_self(), get_self().value);
@@ -664,6 +666,9 @@ void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb)
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "No case found for given case_id");
+
+	//TODO: check if assign_arb is an arbitrator
+	//TODO: check if case_state is > AWAITING_ARB AND case_state < RESOLVED
 
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case.");

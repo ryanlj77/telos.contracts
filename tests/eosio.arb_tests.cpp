@@ -985,7 +985,21 @@ BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
+	//TODO: setup case
 
+	//TODO: assign 3 to 5 arbitrators
+
+	//TODO: advance case with all arbitrators
+
+	//TODO: check if case_state is 1 greater than before
+	
+	//TODO: advance case with a bad actor
+
+	//TODO: advance case to resolve and see this error case_ruling must be set before advancing case to RESOLVED status
+
+	//TODO: setruling with ipfs link
+
+	//TODO: advance case to resolve, should pass
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
@@ -1029,12 +1043,12 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	BOOST_REQUIRE_EQUAL(claim["claim_summary"].as_string(), claim_link1);
 	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link1);
 
-	respond(current_case_id, claim_link1, respondant, response_link1);
+	respond(current_case_id, claim_link1, respondant, response_link2);
 
 	claim = get_unread_claim(current_case_id, claim_link1);
 	BOOST_REQUIRE_EQUAL(false, claim.is_null());
 	BOOST_REQUIRE_EQUAL(claim["claim_summary"].as_string(), claim_link1);
-	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link1);
+	BOOST_REQUIRE_EQUAL(claim["response_link"].as_string(), response_link2);
 
 	// file case with no respondant
 	filecase(claimant, claim_link1, lang_codes, {});
@@ -1045,7 +1059,6 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	addclaim(current_case_id, claim_link2, claimant);
 	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
 
-	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
 	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
 
 	readycase(current_case_id, claimant);
@@ -1097,7 +1110,7 @@ BOOST_FIXTURE_TEST_CASE( recuse_arb, eosio_arb_tester ) try {
 	BOOST_REQUIRE_EQUAL(assigned_arbs.size(), 1);
 	BOOST_REQUIRE_EQUAL(assigned_arbs[0].as_string(), test_voters[0].to_string());
 	
-	BOOST_REQUIRE_EXCEPTION(
+	BOOST_REQUIRE_EXCEPTION( //TODO: should fail with "actor isn't an arbitrator"
 		recuse(current_case_id, "because i'm bias and can't hear this case", bad_actor),
 		eosio_assert_message_exception,
 		eosio_assert_message_is("Arbitrator isn't selected for this case.")
@@ -1141,7 +1154,34 @@ BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
 	//TODO: resolvecase
 } FC_LOG_AND_RETHROW()
 
-BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try {
+BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try { //TODO: for peter
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	newarbstatus(AVAILABLE, test_voters[0]);
+	BOOST_REQUIRE_EQUAL(AVAILABLE, get_arbitrator(test_voters[0])["arb_status"].as<uint8_t>());
+
+	dismissarb(test_voters[0]);
+
+	BOOST_REQUIRE_EQUAL(REMOVED, get_arbitrator(test_voters[0])["arb_status"].as<uint8_t>());
+	uint64_t current_case_id = 0;
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	produce_blocks();
+	
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION( //TODO: should fail with "actor isn't an arbitrator"
+		assigntocase(current_case_id, test_voters[0], assigner),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Arbitrator has been removed.")
+    );
 
 } FC_LOG_AND_RETHROW()
 

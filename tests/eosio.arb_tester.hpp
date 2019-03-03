@@ -459,13 +459,14 @@ public:
         return push_transaction(trx);
 	}
 
-    // ! double check permissions on this !
     transaction_trace_ptr dismissarb(name arb) {
         signed_transaction trx;
-        trx.actions.emplace_back(get_action(N(eosio.arb), N(dismissarb), vector<permission_level>{{arb, config::active_name}},
-                                            mvo()("arb", arb) ));
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(dismissarb), vector<permission_level>{{N(eosio), config::active_name}},
+                mvo()
+					("arb", arb) 
+		));
         set_transaction_headers(trx);
-        trx.sign(get_private_key(arb, "active"), control->get_chain_id());
+        trx.sign(get_private_key(N(eosio), "active"), control->get_chain_id());
         return push_transaction(trx);
     }
 
