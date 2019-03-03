@@ -18,9 +18,28 @@ public:
 
 	const string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
 	const string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
+    const vector<string> claim_links = {
+            "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb",
+            "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139",
+            "ipfs://323456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "ipfs://423456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+    };
 
-	const string response_link1 = "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn";
+
+    const string response_link1 = "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn";
 	const string response_link2 = "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy";
+    const vector<string> response_links ={
+            "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn",
+            "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy",
+    };
+
+    const vector<string> ruling_links = {
+            "ipfs://131264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb",
+            "ipfs://2c59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139",
+            "ipfs://333456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "ipfs://433456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+    };
+
 
 	const vector<uint8_t> lang_codes = {0, 1, 2};
 
