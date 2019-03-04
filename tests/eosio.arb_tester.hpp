@@ -40,7 +40,6 @@ public:
             "ipfs://433456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
     };
 
-
 	const vector<uint8_t> lang_codes = {0, 1, 2};
 
     abi_serializer abi_ser;
@@ -450,6 +449,18 @@ public:
             ("case_id", case_id)
             ("rationale", rationale)
             ("assigned_arb", assigned_arb)));
+        set_transaction_headers(trx);
+        trx.sign(get_private_key(assigned_arb, "active"), control->get_chain_id());
+        return push_transaction(trx);
+    }
+
+	transaction_trace_ptr setruling(uint64_t case_id, name assigned_arb, string case_ruling) {
+        signed_transaction trx;
+        trx.actions.emplace_back(get_action(N(eosio.arb), N(setruling), vector<permission_level>{{assigned_arb, config::active_name}}, mvo()
+            ("case_id", case_id)
+            ("assigned_arb", assigned_arb)
+            ("case_ruling", case_ruling)
+		));
         set_transaction_headers(trx);
         trx.sign(get_private_key(assigned_arb, "active"), control->get_chain_id());
         return push_transaction(trx);

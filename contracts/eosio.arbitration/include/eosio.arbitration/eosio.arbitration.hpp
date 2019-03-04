@@ -108,6 +108,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	// [[eosio::action]] 
 	// void injectarbs(vector<name> to_inject); //TODO: remove production deployment
 
+	[[eosio::action]]
+	void deleteclaim(uint64_t claim_id, name arb);
+
 #pragma region Arb_Elections
 
 	[[eosio::action]] 
@@ -309,7 +312,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		vector<claim> unread_claims;
 		vector<uint64_t> accepted_claims;
 		string case_ruling;
-		uint32_t last_edit;
+		uint32_t last_edit; //TODO: do we need to keep this? If so, then we need to update it everytime an action modifies
 
 		uint64_t primary_key() const { return case_id; }
 
@@ -404,26 +407,19 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	void validate_ipfs_url(string ipfs_url);
 
+	void assert_string(string to_check, string error_msg);
+
 	void start_new_election(uint8_t available_seats);
 
 	bool has_available_seats(arbitrators_table & arbitrators, uint8_t & available_seats);
 
-	void add_arbitrator(arbitrators_table & arbitrators, name arb_name, std::string credential_link);
+	bool is_arb(name account);
 
-	void assert_string(string to_check, string error_msg);
+	void add_arbitrator(arbitrators_table & arbitrators, name arb_name, std::string credential_link);
 
 	vector<claim>::iterator get_claim_at(string claim_hash, vector<claim>& claims);
 
 	void del_claim_at(const string claim_hash, vector<claim> claims);
-
-	template <typename T, typename func>
-	void map(vector<T> & arr, func && handler)
-	{
-		for (auto it = arr.begin(); it != arr.end(); ++it)
-		{
-			handler(it);
-		}
-	}
 
 	void transfer_handler(name from, name to, asset quantity);
 
@@ -461,6 +457,15 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 			to_acnts.modify(to, same_payer, [&](auto &a) {
 				a.balance += value;
 			});
+		}
+	}
+
+	template <typename T, typename func>
+	void map(vector<T> & arr, func && handler)
+	{
+		for (auto it = arr.begin(); it != arr.end(); ++it)
+		{
+			handler(it);
 		}
 	}
 

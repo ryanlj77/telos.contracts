@@ -30,6 +30,18 @@ arbitration::~arbitration()
 // 	}
 // }
 
+//NOTE: TEST ACTION SHOULD BE REMOVED IN PRODUCTION
+//TODO: remove before production deployment
+void arbitration::deleteclaim(uint64_t claim_id, name arb) {
+	require_auth(arb);
+	check(is_arb(arb), "actor is not an arbitrator");
+
+	claims_table claims(get_self(), get_self().value);
+	const auto &claim = claims.get(claim_id, "claim with claim_id does not exist");
+
+	claims.erase(claim);
+}
+
 void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration,
 							uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
 {
@@ -600,6 +612,8 @@ void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_rul
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
 	validate_ipfs_url(case_ruling);
 
+	print("setruling called");
+
 	casefiles.modify(cf, same_payer, [&](auto& row) {
 		row.case_ruling = case_ruling;
 	});
@@ -611,13 +625,17 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
+	check(cf.case_status > AWAITING_ARBS, "case_status must be greater than AWAITING_ARBS");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
+	if (cf.case_status + 1 == RESOLVED) {
+		check(cf.case_ruling != string(""), "case_ruling must be set before advancing case to RESOLVED status");
+	}
 
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
-	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
+	check(arb_it != cf.arbitrators.end(), "actor is not assigned to this case_id");
 
 	auto approval_it = std::find(cf.approvals.begin(), cf.approvals.end(), assigned_arb);
-	check(approval_it != cf.arbitrators.end(), "arbitrator has already approved advancing this case");
+	check(approval_it == cf.approvals.end(), "arbitrator has already approved advancing this case");
 
 	auto case_status = cf.case_status;
 	auto approvals = cf.approvals;
@@ -627,10 +645,6 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	} else if (cf.approvals.size() + 1 == cf.arbitrators.size()) {
 		case_status++;
 		approvals.clear();
-	}
-
-	if (cf.case_status == RESOLVED) {
-		check(cf.case_ruling != string(""), "case_ruling must be set before advancing case to RESOLVED status");
 	}
 
 	casefiles.modify(cf, same_payer, [&](auto &row) {
@@ -757,6 +771,12 @@ void arbitration::deletecase(uint64_t case_id)
 #pragma region Helpers
 
 typedef arbitration::claim claim;
+
+bool arbitration::is_arb(name account)
+{
+	arbitrators_table arbitrators(get_self(), get_self().value);
+	return arbitrators.find(account.value) != arbitrators.end();
+}
 
 vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim>& claims)
 {
@@ -897,7 +917,7 @@ extern "C"
 			{
 				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(setconfig)(initelection)(regarb)(unregnominee)
 				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
-				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(recuse)(newarbstatus)
+				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
 				(setlangcodes)(dismissarb)(deletecase));
 			}
 		}

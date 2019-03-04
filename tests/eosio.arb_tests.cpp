@@ -887,23 +887,6 @@ BOOST_FIXTURE_TEST_CASE( case_setup_flow, eosio_arb_tester ) try {
 
 BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
-	
-	name assigner = name("assigner");
-	name non_claimant = name("nonclaimant");
-	name claimant = name("claimant");
-	name respondant = name("respondant");
-
-	create_accounts({
-		claimant.value, 
-		respondant.value, 
-		non_claimant.value,
-		assigner.value
-	});
-
-	string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
-	string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
-	vector<uint8_t> lang_codes = {0, 1, 2};
-	
 
 	filecase(claimant, claim_link1, lang_codes, respondant);
 	uint64_t current_case_id = 0;
@@ -928,14 +911,14 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	newarbstatus(AVAILABLE, test_voters[2]);
 	produce_blocks();
 
-	assigntocase(current_case_id, name(test_voters[0]), assigner); //TODO: missing require signature issue.
+	assigntocase(current_case_id, test_voters[0], assigner); //TODO: missing require signature issue.
 
 	cf = get_casefile(current_case_id);
 	BOOST_REQUIRE_EQUAL(cf["case_status"].as<uint8_t>(), CASE_INVESTIGATION);
 
 	auto case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
 	BOOST_REQUIRE_EQUAL(case_arbs.size(), 1);
-	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), test_voters[0].to_string());
 
 	//NOTE: Arbitrator calls addarbs, in order to add new arbitrators.
 	addarbs(current_case_id, test_voters[0], 2);
@@ -944,15 +927,15 @@ BOOST_FIXTURE_TEST_CASE( assign_arb_flow, eosio_arb_tester ) try {
 	// and acts according to the arguments in the action
 
 	//NOTE: in this case the service would then call assigntocase twice
-	assigntocase(current_case_id, name(test_voters[1]), assigner);
-	assigntocase(current_case_id, name(test_voters[2]), assigner);
+	assigntocase(current_case_id, test_voters[1], assigner);
+	assigntocase(current_case_id, test_voters[2], assigner);
 
 	cf = get_casefile(current_case_id);
 	case_arbs = cf["arbitrators"].as<vector<fc::variant>>();
 	BOOST_REQUIRE_EQUAL(case_arbs.size(), 3);
-	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), name(test_voters[0]).to_string());
-	BOOST_REQUIRE_EQUAL(case_arbs[1].as_string(), name(test_voters[1]).to_string());
-	BOOST_REQUIRE_EQUAL(case_arbs[2].as_string(), name(test_voters[2]).to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[0].as_string(), test_voters[0].to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[1].as_string(), test_voters[1].to_string());
+	BOOST_REQUIRE_EQUAL(case_arbs[2].as_string(), test_voters[2].to_string());
 
 } FC_LOG_AND_RETHROW()
 
@@ -1004,19 +987,127 @@ BOOST_FIXTURE_TEST_CASE( transfer_handler_integrity, eosio_arb_tester ) try {
 } FC_LOG_AND_RETHROW()
 
 BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
-	//TODO: setup case
+	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
+	newarbstatus(AVAILABLE, test_voters[0]);
+	newarbstatus(AVAILABLE, test_voters[1]);
+	newarbstatus(AVAILABLE, test_voters[2]);
+	uint64_t current_case_id = 0;
 
-	//TODO: assign 3 to 5 arbitrators
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	produce_blocks();
 
-	//TODO: advance case with all arbitrators
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
 
-	//TODO: check if case_state is 1 greater than before
+	transfer(N(eosio), claimant.value, asset::from_string("1000.0000 TLOS"), "");
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		advancecase(current_case_id, test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("case_status must be greater than AWAITING_ARBS")
+    );
+
+	assigntocase(current_case_id, test_voters[0], assigner);
+	dismisscase(current_case_id, test_voters[0], response_link1);
+
+	BOOST_REQUIRE_EQUAL(DISMISSED, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+
+	BOOST_REQUIRE_EXCEPTION(
+		advancecase(current_case_id, test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("Case has already been resolved or dismissed")
+    );
+
+	filecase(claimant, claim_link1, lang_codes, respondant);
+	current_case_id++;
+	produce_blocks();
+
+	BOOST_REQUIRE_EQUAL(false, get_casefile(current_case_id).is_null());
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link1).is_null());
+	addclaim(current_case_id, claim_link2, claimant);
+	BOOST_REQUIRE_EQUAL(false, get_unread_claim(current_case_id, claim_link2).is_null());
+
+	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
+
+	readycase(current_case_id, claimant);
+	produce_blocks();
+
+	assigntocase(current_case_id, test_voters[0], assigner);
+
+	BOOST_REQUIRE_EXCEPTION(
+		advancecase(current_case_id, bad_actor),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("actor is not assigned to this case_id")
+    );
+
+	advancecase(current_case_id, test_voters[0]);
+	BOOST_REQUIRE_EQUAL(HEARING, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+	produce_blocks();
+
+	advancecase(current_case_id, test_voters[0]);
+	BOOST_REQUIRE_EQUAL(DELIBERATION, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+	produce_blocks();
+
+	advancecase(current_case_id, test_voters[0]);
+	BOOST_REQUIRE_EQUAL(DECISION, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+	produce_blocks();
+
+	advancecase(current_case_id, test_voters[0]);
+	BOOST_REQUIRE_EQUAL(ENFORCEMENT, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+	produce_blocks();
+
+	addarbs(current_case_id, test_voters[0], 2);
+	assigntocase(current_case_id, test_voters[1], assigner);
+	assigntocase(current_case_id, test_voters[2], assigner);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		advancecase(current_case_id, test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("case_ruling must be set before advancing case to RESOLVED status")
+    );
+
+	eosio_arb_tester::setruling(current_case_id, test_voters[0], claim_link1);
+	produce_blocks();
+
+	BOOST_REQUIRE_EQUAL(claim_link1, get_casefile(current_case_id)["case_ruling"].as_string());
+
+	advancecase(current_case_id, test_voters[0]);
 	
-	//TODO: advance case with a bad actor
+	auto approvals = get_casefile(current_case_id)["approvals"].as<vector<fc::variant>>();
 
-	//TODO: advance case to resolve and see this error case_ruling must be set before advancing case to RESOLVED status
+	BOOST_REQUIRE_EQUAL(1, approvals.size());
+	BOOST_REQUIRE_EQUAL(test_voters[0], approvals[0].as_string());
+	produce_blocks();
 
-	//TODO: setruling with ipfs link
+	cout << "casefile: " << get_casefile(current_case_id) << endl;
+
+	BOOST_REQUIRE_EXCEPTION(
+	advancecase(current_case_id, test_voters[0]),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("arbitrator has already approved advancing this case")
+    );
+
+	advancecase(current_case_id, test_voters[1]);
+	approvals = get_casefile(current_case_id)["approvals"].as<vector<fc::variant>>();
+
+	BOOST_REQUIRE_EQUAL(2, approvals.size());
+	BOOST_REQUIRE_EQUAL(test_voters[0], approvals[0].as_string());
+	BOOST_REQUIRE_EQUAL(test_voters[1], approvals[1].as_string());
+	produce_blocks();
+
+	advancecase(current_case_id, test_voters[2]);
+	approvals = get_casefile(current_case_id)["approvals"].as<vector<fc::variant>>();
+
+	BOOST_REQUIRE_EQUAL(0, approvals.size());
+	BOOST_REQUIRE_EQUAL(RESOLVED, get_casefile(current_case_id)["case_status"].as<uint8_t>());
+	produce_blocks();
 
 	//TODO: advance case to resolve, should pass
 } FC_LOG_AND_RETHROW()
@@ -1052,7 +1143,7 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 		eosio_assert_message_is("case status does NOT allow responses at this time")
     );
 
-	assigntocase(current_case_id, name(test_voters[0]), assigner);
+	assigntocase(current_case_id, test_voters[0], assigner);
 
 	respond(current_case_id, claim_link1, respondant, response_link1);
 	produce_blocks();
@@ -1081,7 +1172,7 @@ BOOST_FIXTURE_TEST_CASE( respondant_response, eosio_arb_tester ) try {
 	transfer(claimant.value, N(eosio.arb), asset::from_string("200.0000 TLOS"), "");
 
 	readycase(current_case_id, claimant);
-	assigntocase(current_case_id, name(test_voters[0]), assigner);
+	assigntocase(current_case_id, test_voters[0], assigner);
 
 	BOOST_REQUIRE_EXCEPTION(
 		respond(current_case_id, claim_link1, bad_actor, response_link1),
@@ -1201,7 +1292,6 @@ BOOST_FIXTURE_TEST_CASE( dismiss_case, eosio_arb_tester ) try {
             eosio_assert_message_is("Arbitrator isn't selected for this case")
     );
 
-
     dismisscase(current_case_id, test_voters[0], ruling_links[0]   );
     produce_blocks();
 
@@ -1310,8 +1400,6 @@ BOOST_FIXTURE_TEST_CASE( accept_dismiss_claims, eosio_arb_tester ) try {
     ("response_link", response_links[1])
     ("decision_class", 0)
     );
-
-
 	//dismissclaim
 
     claim = get_unread_claim(current_case_id, claim_links[0]);
