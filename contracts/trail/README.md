@@ -4,7 +4,11 @@ Trail is a fully on-chain voting platform for the Telos Blockchain Network. It o
 
 ## Purpose of VOTE Token
 
-Trail manages an internal token named `VOTE` that is used in place of the native system token. This is done to avoid confusion that a user's `TLOS` are being held on the platform, and to allow for more efficient actions and therefore lower resource usage.
+Trail manages an internal token named `VOTE` that is used in place of the native system token. 
+
+Addiitonally, Trail uses the virtual `VOTE` token to avoid confusion that a user's `TLOS` are being held on the platform, and to allow for more efficient actions and therefore lower resource usage when interacting with the platform.
+
+All users who own a balance of `TLOS` are able to mirror their staked balance for an equavalent number of `VOTE` tokens. Trail calculates a user's `VOTE` balance by simply issuing `1 VOTE` per `0.0001 TLOS` of the user's staked resources
 
 ## Services
 
@@ -16,7 +20,7 @@ Trail manages an internal token named `VOTE` that is used in place of the native
 
 * `Casting Votes`
 
-    All users who own a balance of `TLOS` are able to mirror their balance and receive an equal number of `VOTE` tokens, which are castable on any Ballot that is created for use with that token.
+    All users who own a balance of `TLOS` are able to mirror their staked balance and receive an equal number of `VOTE` tokens, which are castable on any Ballot that is created for use with that token.
 
     Additionally, if users have balance of custom tokens and there are open ballots for that token, they may cast their votes on that Ballot as well.
 
