@@ -1,282 +1,51 @@
-# Trail Service User/Developer Guide
+# Trail Voting Platform
 
-Trail offers a comprehensive suite of blockchain-based voting services available to any prospective voter or contract developer on the Telos Blockchain Network.
+Trail is a fully on-chain voting platform for the Telos Blockchain Network. It offers a suite of voting services for both users and developers and is maintained as a completely open source project for maximum transparency and auditability.
 
-## Understanding Trail's Role
+## VOTE Token Purpose
 
-Trail was designed to allow maximum flexibility for smart contract developers, while at the same time consolidating many of the boilerplate functions of voting contracts into a single service. 
+Trail manages an internal token named `VOTE` that is used in place of the native system token. This is done to avoid confusion that user's `TLOS` are being held on the platform, and to allow for more efficient actions and therefore lower resource usage.
 
-This paradigm basically means contract writers can leave the "vote counting" up to Trail and instead focus on how they want to interpret the results of their ballot. Through cross-contract table lookup, any contract can view the results of a ballot and then have their contracts act based on those results.
+## Services
 
-### Recommended Minimum Resources
+* `Public Ballot Creation`
 
-* Telos Blockchain Network Account
+    Any user on the Telos Blockchain Network can create a ballot that is publicly viewable by all users.
 
-* 9 TLOS to CPU
+    During Ballot creation, the Ballot publisher may specify which token they would like the Ballot to use for counting votes. For most users this will be the default `VOTE` token, but Trail offers additional services for creating controlled voting tokens that Ballot publishers can choose to use instead.
 
-* 1 TLOS to NET
+* `Casting Votes`
 
-* 10 KB of RAM
+    All users who own a balance of `TLOS` are able to claim `VOTE` tokens, which are castable on any Ballot that is created for use with that token.
 
-## Ballot Lifecycle
+    Additionally, if users have balance of custom tokens and there are open ballots for that token, they may cast their votes on that Ballot as well.
 
-Building a ballot on Trail is simple and gives great flexibility to the developer to build their ballots in a variety of ways. An example ballot and voting contract will be used throughout this guide, and is recommended as an established model for current Trail interface best practices.
+* `Custom Voting Token Creation`
 
-### 1. Setting Up Your Contract (Optional)
+    Any user may create a custom voting token hosted by Trail that automatically inherits Trail's entire suite of voting services.
 
-While setting up an external contract is not required to utilize Trail's services, it is required if developers want to **contractually** act on ballot results. If you aren't interested in having a separate contract and just want to run a ballot or campaign, then proceed to step 2.
+    For instance, a user could create a `BOARD` token to represent one board seat at their company. They would then own the entire `BOARD` token namespace within Trail and have the full authority to `mint` or `send` those board tokens to their respective owners. Trail's verbose token interface even allows for additional token features (set at the time of token creation) such as `burning`, `seizing`, or `mutable_max`.
 
-For our contract example, we will be making a simple document updater where updates are voted on by the community. The basic interface of our sample contract looks like this:
+* `Custom Token Ballots`
 
-* `createdoc(namae doc_name, string text)`
+    Once a user has created a custom voting token, any holder of that token may publish Ballots that are votable on by any holder of the custom token.
 
-    The createdoc action will create a new document, retrievable by the supplied `doc_name`. The text of the document is stored as a string (not ideal for production, but fine for this example).
+    Continuing with the `BOARD` example, a board member could propose a vote for all `BOARD` holders. Ballots created for custom tokens operate exactly the same as Ballots running on the system-bakced `VOTE` token.
 
-* `makeproposal(name doc_name, string new_text)`
+* `Fraud Prevention`
 
-    The makeproposal action stores the new text retrievable by the document name, after first making sure the associated document exists. In a more complex example, this action could send an inline action to Trail's `createballot()` action to make the whole process atomic.
+    Trail has implemented a powerful Rebalance system that detects changes to a user's staked resources and automatically updates all open votes for the user.
 
-* `updatedoc(name doc_name, string new_text)`
+* `System Efficiency`
 
-    The updatedoc action simply updates our document with the new text provided in the proposal. This will be called after voting has completed to update our document with the text supplied in the proposal (if the proposal passes, if not the document will stay the same).
-
-* `closeprop(name ballot_name)`
-
-    The closeprop action is important for performing custom logic on ballot results, and simply sends an inline action to Trail's `closeballot()` action upon completion. The `status` field of the ballot allows ballot operators the ability to assign any context to status codes they desire. For example, a contract could interpret a status code of `7` to mean `REFUNDED`. However, status codes `0`, `1`, and `2` are reserved for meaning `SETUP`, `OPEN`, and `CLOSED`, respectively.
-
-Note that we are never storing vote counts on our contract (remember, that's Trail's job).
-
-### 2. Creating a Ballot
-
-Trail offers extensive tools for any prospective user or developer to launch a ballot that is publicly votable by all TLOS token holders. Ballots can also be created that count votes based on custom user-crerated tokens, allowing teams or organizations to manage internal voting.
-
-* `newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, uint8_t max_votable_options, symbol voting_sym)`
-
-    The createballot action will begin setup of a new ballot. Note that all string arguments should be supplied in markdown format, as Trail's dedicated front-end will consume strings as markdown to ensure a consistent experience across UI's.
-
-    `ballot_name` is the unique name of the ballot. No other ballot may concurrently share this name.
-
-    `category` is the category the ballot falls under. A list of categories is below:
-
-    * `proposal` : Users vote on a proposal by casting votes for either the YES, NO, or ABSTAIN options.
-
-    * `election` : Users vote on candidate(s) from a set of candidate options.
-
-    * `poll` : Users vote on a custom set of options. Polls can also be deleted mid-vote, and are the best way to quickly gauge the community's appetite for change.
-
-    `publisher` is the account publishing the ballot. Only this account will be able to modify and close the ballot.  
-
-    `title` is the title of the ballot.
-
-    `description` is a brief explanantion of the ballot (ideally in markdown format). 
-
-    `info_url` is critical to ensuring voters are able to know exactly what they are voting on when they cast their votes. This parameter should be a url to a webpage (or even better, an IPFS hash) that explains what the ballot is for, and should provide sufficient information for voters to make an informed decision.
-
-    `max_votable_options` is the maximum number of options a single voter is allowed to cast on this ballot. For example, if an election was being run with 3 different candidates and the max votable options was set to 2, then voters may vote for no more than 2 of the 3 candidates on the ballot.
-
-    `voting_sym` is the symbol to be used for counting votes. In order to cast a vote on the ballot, the voter must own a balance of tokens with the voting symbol.
-    
-    Note that in order to eliminate potential confusion with tokens on the `eosio.token` contract, the core voting symbol used by Trail is `VOTE` instead of `TLOS`, however since `VOTE` tokens are issued to all holders of `TLOS` at a 1:1 ratio based on the user's current stake, any user's `VOTE` balance will be functionally equivalent to their `TLOS` stake at any given time.
-    
-    Additionally, custom voting tokens must exist on Trail (by calling newtoken) before being able to create ballots that use them.
-
-* `setinfo(name ballot_name, name publisher, string title, string description, string info_url)`
-
-    The setinfo action allows the ballot publisher to replace the title, description, and info_url supplied in the initial newballot action.
-
-    `ballot_name` is the name of the ballot to change.
-
-    `publisher` is the name of the account that published the ballot. Only this account is authorized to reset the info on the ballot.
-
-    `title` is the new ballot title.
-
-    `description` is the new ballot description.
-
-    `info_url` is the new ballot info url.
-
-
-* `readyballot(name ballot_name, name publisher, uint32_t end_time)`
-
-    The readyballot action is called by the ballot publisher when voting is ready to open. After calling this action no further changes may be made to the ballot.
-
-    `ballot_name` is the name of the ballot to ready.
-
-    `publisher` is the name of the account that published the ballot. Only this account is authorized to ready the ballot for voting.
-
-    `end_time` is the time voting will close for the ballot. The end_time value is expressed as seconds since the Unix Epoch.
-
-
-* `deleteballot(name ballot_name, name publisher)`
-
-    The deleteballot action deletes an existing ballot. This action can only be performed before a ballot opens for voting, and only by the publisher of the ballot.
-
-    `ballot_name` is the name the ballot to delete.
-
-    `publisher` is the account that published the ballot. Only this account can delete the ballot.
-
-### 3. Running A Ballot 
-
-After ballot setup is complete, the only thing left to do is wait for users to begin casting their votes. All votes cast on Trail are live, so it's easy to see the state of the ballot as votes roll in. There are also a few additional features available for ballot runners that want to operate a more complex campaign. This feature set will grow with the development of Trail and as more complex versions of ballots are introduced to the system.
-
-* `endpoll()`
-
-In our custom contract example, none of these actions are used (just to keep it simple). 
-
-### 4. Closing A Ballot
-
-Once a ballot has reached it's end time, it will automatically stop accepting votes. The final tally can be seen by querying the `ballots` table with the appropriate `ballot_name`.
-
-* `closeballot(name ballot_name, name publisher, uint8_t new_status)`
-
-    The closeballot action is used by publishers to close out a ballot and render a decision based on the results.
-
-    `ballot_name` is the name of the ballot to close.
-
-    `publisher` is the publisher of the ballot. Only this account may close the ballot.
-
-    `new_status` is the resultant status after reaching a descision on the end state of the ballot. This number can represent any end state desired, but `0`, `1`, `2`, and `4` are reserved for `SETUP`, `OPEN`, `CLOSED`, and `ARCHIVED` respectively.
-
-Back in our custom contract example, the `closeprop()` action would be called by the ballot publisher, where closeprop would perform a cross-contract table lookup to access the final ballot results. Then, based on the results of the ballot, the custom contract would determine whether the proposal passed or failed according to it's own standards, and update it's tables accordingly. Finally, the closeprop action would send an inline action to Trail's `closeballot()` action to (atomically) close out the ballot and assign a final status code for the ballot.
-
-## Voter Registration and Participation
-
-All users on the Telos Blockchain Network can register their Telos accounts and receive a `VOTE` balance that's valid for casting votes on any ballot whose `voting_sym` is set to `VOTE`.
-
-### 1. Registration
-
-* `open(name owner, symbol token_sym)`
-
-    The open action creates an zero-balance wallet for the given token symbol if a token registry of the given symbol exists.
-
-    `owner` is the name of the user opening the new account.
-
-    `token_sym` is the symbol of tokens being stored in the new balance.
-
-All users who want to participate in core voting **must** call `open()` and supply `VOTE,0` as the token symbol.
-
-* `close(name owner, symbol token_sym)`
-
-    The close action cancels an existing account balance from Trail and returns the RAM cost back to the user.
-
-    `owner` is the nameof the user closing the account.
-
-    `token_sym` is the symbol of the token balance to close.
-
-Deleted accounts canbe created again at any time by simply calling `open()` again.
-
-### 2. Getting and Casting Votes
-
-* `castvote(name voter, name ballot_name, name option)`
-
-    The castvote action will cast user's full `VOTE` balance on the given ballot. Note that this **does not spend** the user's `VOTE` tokens, it only **copies** their full token weight onto the ballot.
-
-### 3. Cleaning Old Votes
-
-* `cleanupvotes(name voter, uint16_t count, symbol voting_sym)`
-
-    The cleanupvotes action is a way to clear out old votes and allows voters to reclaim their RAM that has been allocated for storing vote receipts.
-
-    `voter` is the account for which old receipts will be deleted.
-
-    `count` is the number of receipts the voter wishes to delete. This action will run until it deletes specified number of receipts, or until it reaches the end of the list. Passing in a hard number allows voters to carefully manage their NET and CPU expenditure.
-
-    Note that Trail has been designed to be tolerant of users deleting their vote receipts. Trail will never delete a vote receipt that is still applicable to an open ballot. Because of this, the `cleanupvotes()` action may be called by anyone to clean up any user's list of vote receipts.
-
-* `cleanhouse(name voter)`
-
-    The cleanhouse action will attempt to clean out a voter's entire history of votes in one sweep. If a user has an exceptionally large backlog of uncleaned votes this action may fail to clean all of them within the minimum transaction time. If that happens it's better to call `cleanupvotes()` several times first to reduce the number of votes `cleanhouse()` will attempt to clean. 
-
-    `voter` is the name of the account to clean votes for.
-
-Note that this action requires no account authorization, meaning any user can call `cleanhouse()` for any other user to assist in cleaning their vote backlog. There is no security risk to doing this and is a really nice way to help the platform generally run smoother.
-
-## Creating Custom Voting Tokens
-
-Trail allows any Telos Blockchain Network user to create and manage their own custom tokens, which can also be used to vote on any ballot that has been configured to count votes based on that token.
-
-### About Token Registries
-
-Trail stores metadata about its tokens in a custom data structure called a Token Registry. This stucture automatically updates when actions are called that would modify any part of the registry's state.
-
-### 1. Registering a New Token
-
-* `newtoken(name publisher, asset max_supply, token_settings settings, string info_url)`
-
-    The newtoken action creates a new voting token in Trail, and initializes it with the given token settings.
-
-    `publisher` is the name of the account that is creating the token registry. Only this account is authorized to issue new tokens, change settings, and execute other actions related to directly modifying the state of the registry.
-
-    `max_supply` is the total number of tokens allowed to simultaneously exist in circulation. This action will fail if a token already exists with the same symbol in Trail.
-
-    `settings` is a custom list of boolean settings designed for Trail's token registries. The currently supported settings are as follows:
-
-    * `is_destructible` allows the registry to be erased completely by the publisher.
-    * `is_proxyable` allows tokens to be proxied to users that have registered as a valid proxy for this registry. **In Development...**
-    * `is_burnable` allows tokens to be burned from circulation by the publisher. 
-    * `is_seizable` allows the tokens to be seized from token holders by the publisher. This setting is intended for publishers who want to operate a more controlled internal token voting system.
-    * `is_max_mutable` allows the registry's max_supply field to be adjusted through an action call. Only the publisher can call the `changemax` action.
-    * `is_transferable` allows the tokens to be transferred to other users. **In Development...**
-
-    `info_url` is a url link (ideally an IPFS link) that prospective voters can follow to get more information about the token and its purpose.
-
-### 2. Operating A Token Registry
-
-Trail offers a wide range of token features designed to offer maximum flexibility and control for registry operators, while at the same time ensuring the transparency and security of registry operations for token holders. Registry operators can execute any of the following actions (provided their token settings allow it) to modify the state of token balances and the Registry itself.
-
-* `mint(name publisher, name recipient, asset amount_to_mint)`
-
-    The mint action is the only way for new tokens to be introduced into circulation.
-
-    `publisher` is the name of the account that published the registry. Only the registry publisher has the authority to mint new tokens.
-
-    `recipient` is the name of the recipient intended to receive the newly minted tokens.
-
-    `amount_to_mint` is the amount of tokens to mint for the recipient. This action will fail if the number of tokens to mint would breach the max supply allowed by the registry.
-
-* `burn(name publisher, asset amount_to_burn)`
-
-    The burn action is used to burn tokens from a user's wallet. This action is only callable by the registry publisher, and if the registry allows token burning.
-
-    `publisher` is the publisher of the registry. The publisher may only burn tokens from their own balance.
-
-    `amount_to_burn` is the number of tokens to burn from circulation.
-
-* `send(name sender, name recipient, asset amount, string memo)`
-
-    The send action is very similar to the regular `eosio.token::transfer` in that it simply sends a specified number of tokens to another user. Note that this action has been purposefully named `send()` in order to avoid confusion with the regular `eosio.token::transfer` action. This action is callable by any token holder, but only if the registry's `is_liquid` setting is set to `true`.
-
-    `sender` is the name of the account sending the tokens.
-
-    `recipient` is the name of the account receiving the tokens.
-
-    `amount` is the quantity of tokens to send.
-
-    `memo` is a brief memo to send with the tokens.
-
-Additionally, any registry that has `is_liquid` set to `true` in their token settings will automatically inhereit Trail's propietary `rebalance` system to eliminate vote washing and ensure the integrity of every vote.
-
-* `seize(name publisher, name owner, asset amount_to_seize)`
-
-    The seize action is called by the publisher to seize a balance of tokens from another account. Only the publisher can seize tokens, and only if the registry's settings allow it.
-
-    `publisher` is the name of the account that published the registry. Only this account is authorized to execute the `seize()` action.
-
-    `owner` is the name of the owner of the account balance being seized.
-
-    `amount_to_seize` is the quantity of tokens to seize from the owner's balance.
-
-Note that this action is mostly intended for use in internal voting systems, and Trail's native `VOTE` token is not subject to seizure.
-
-* `changemax(name publisher, asset max_supply_delta)`
-
-    The changemax action is called to adjust the maximum supply on a token registry. The max supply can never be changed to an amount below zero or the currently circulating supply.
-
-    `publisher` is the name of the account that published the registry. Only this account is authoried to change the max supply.
-
-    `max_supply_delta` is the delta to apply to the maximum supply. Giving a negative value will lower the supply, and giving a positive one will increase it.
+    Trail has several efficiency actions that are callable by any user on the network to help clean up old votes and maintain a lightweight voting system.
 
 ## In Development (in no particular order)
 
 * Proxy Registration, Proxy Voting, Proxy Management
+
+* Cleanup Rewards (Task Market)
+
+* Additional Categories
 
 * Additional Token Settings
