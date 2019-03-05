@@ -572,6 +572,19 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
+	transaction_trace_ptr changemax(name publisher, asset max_supply_delta) {
+		signed_transaction trx;
+		trx.actions.emplace_back( get_action(N(trailservice), N(changemax), vector<permission_level>{{publisher, config::active_name}},
+			mvo()
+			("publisher", publisher)
+			("max_supply_delta", max_supply_delta)
+			)
+		);
+		set_transaction_headers(trx);
+		trx.sign(get_private_key(publisher, "active"), control->get_chain_id());
+		return push_transaction( trx );
+	}
+
 	transaction_trace_ptr open(name owner, symbol token_sym) {
 		signed_transaction trx;
 		trx.actions.emplace_back( get_action(N(trailservice), N(open), vector<permission_level>{{owner, config::active_name}},

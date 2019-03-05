@@ -8,7 +8,7 @@ Trail manages an internal token named `VOTE` that is used in place of the native
 
 Addiitonally, Trail uses the virtual `VOTE` token to avoid confusion that a user's `TLOS` are being held on the platform, and to allow for more efficient actions and therefore lower resource usage when interacting with the platform.
 
-All users who own a balance of `TLOS` are able to mirror their staked balance for an equavalent number of `VOTE` tokens. Trail calculates a user's `VOTE` balance by simply issuing `1 VOTE` per `0.0001 TLOS` of the user's staked resources
+All users who own a balance of `TLOS` are able to mirror their staked balance for an equavalent number of `VOTE` tokens. Trail calculates a user's `VOTE` balance by simply issuing `1 VOTE` per `0.0001 TLOS` of the user's staked resources.
 
 ## Services
 

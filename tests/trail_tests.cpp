@@ -458,7 +458,14 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     //init CRAIG token
     const symbol CRAIG_SYM = symbol(2, "CRAIG"); //heh
     const asset custom_max_supply = asset::from_string("1000.00 CRAIG");
-    token_settings craig_settings;
+    token_settings craig_settings = {
+        true, //is_descructible
+        true, //is_proxyable
+        true, //is_burnable
+        true, //is_seizable
+        true, //is_max_mutable
+        true //is_transferable`
+    };
     string info_url = "Craig Token Registry";
     newtoken(N(testaccount1), custom_max_supply, craig_settings, info_url);
     produce_blocks();
@@ -553,7 +560,7 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     auto ca4 = get_balance(N(testaccount4), CRAIG_SYM);
     auto ca5 = get_balance(N(testaccount5), CRAIG_SYM);
     
-    //cehck voting accounts match minted amount, num votes incremented
+    //check voting accounts match minted amount, num votes incremented
     REQUIRE_MATCHING_OBJECT(ca1, mvo()
         ("balance", "100.00 CRAIG")
         ("num_votes", 1)
@@ -624,6 +631,67 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     BOOST_REQUIRE_EQUAL(true, cv3.is_null());
     BOOST_REQUIRE_EQUAL(true, cv4.is_null());
     BOOST_REQUIRE_EQUAL(true, cv5.is_null());
+
+    //test send
+    auto send_trx = send(N(testaccount1), N(testaccount2), asset(5000, CRAIG_SYM), "test send");
+    produce_blocks();
+
+    //check balances after send
+    ca1 = get_balance(N(testaccount1), CRAIG_SYM);
+    ca2 = get_balance(N(testaccount2), CRAIG_SYM);
+    REQUIRE_MATCHING_OBJECT(ca1, mvo()
+        ("balance", "50.00 CRAIG")
+        ("num_votes", 0)
+	);
+    REQUIRE_MATCHING_OBJECT(ca2, mvo()
+        ("balance", "150.00 CRAIG")
+        ("num_votes", 0)
+	);
+
+    //test burn
+    auto burn_trx = burn(N(testaccount1), asset(2500, CRAIG_SYM));
+    produce_blocks();
+
+    //check balances after burn
+    ca1 = get_balance(N(testaccount1), CRAIG_SYM);
+    REQUIRE_MATCHING_OBJECT(ca1, mvo()
+        ("balance", "25.00 CRAIG")
+        ("num_votes", 0)
+	);
+
+    //check registry after burn
+
+
+    //test seize
+    auto seize_trx = seize(N(testaccount1), N(testaccount2), asset(15000, CRAIG_SYM));
+    produce_blocks();
+
+    //check balances after seize
+    ca1 = get_balance(N(testaccount1), CRAIG_SYM);
+    ca2 = get_balance(N(testaccount2), CRAIG_SYM);
+    REQUIRE_MATCHING_OBJECT(ca1, mvo()
+        ("balance", "175.00 CRAIG")
+        ("num_votes", 0)
+	);
+    REQUIRE_MATCHING_OBJECT(ca2, mvo()
+        ("balance", "0.00 CRAIG")
+        ("num_votes", 0)
+	);
+
+    //test changemax
+    auto changemax_trx = changemax(N(testaccount1), asset(-10000, CRAIG_SYM));
+    produce_blocks();
+
+    //check registry after changemax
+    //auto cr1 = get_registry(CRAIG_SYM);
+
+    //test close
+    auto close_trx = close(N(testaccount2), CRAIG_SYM);
+    produce_blocks();
+
+    //check account doesn't exist
+    ca2 = get_balance(N(testaccount2), CRAIG_SYM);
+    BOOST_REQUIRE_EQUAL(true, ca2.is_null());
 
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END CUSTOM_TOKEN_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	

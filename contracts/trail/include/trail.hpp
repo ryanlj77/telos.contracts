@@ -189,6 +189,7 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION changemax(name publisher, asset max_supply_delta);
 
+    //TODO: add inline for rebalance() ?
     ACTION open(name owner, symbol token_sym);
 
     ACTION close(name owner, symbol token_sym);
@@ -204,6 +205,12 @@ class [[eosio::contract("trail")]] trail : public contract {
     void unvote_option();
     asset get_staked_tlos(name owner);
     bool applied_rebalance(name ballot_name, asset delta, vector<name> options_to_rebalance);
+
+    //adds amount to account balance
+    void add_balance(name owner, asset amount);
+
+    //subtracts amount from account balance
+    void sub_balance(name owner, asset amount);
     
     //reactions
     void upsert_balance();
