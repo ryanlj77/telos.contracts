@@ -1067,6 +1067,12 @@ BOOST_FIXTURE_TEST_CASE( advance_case, eosio_arb_tester ) try {
 	BOOST_REQUIRE_EQUAL(DECISION, get_casefile(current_case_id)["case_status"].as<uint8_t>());
 	produce_blocks();
 
+	BOOST_REQUIRE_EXCEPTION(
+		eosio_arb_tester::setruling(current_case_id, test_voters[0], claim_link1),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("case_status must be ENFORCEMENT")
+    );
+
 	advancecase(current_case_id, test_voters[0]);
 	BOOST_REQUIRE_EQUAL(ENFORCEMENT, get_casefile(current_case_id)["case_status"].as<uint8_t>());
 	produce_blocks();

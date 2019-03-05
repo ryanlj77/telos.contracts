@@ -588,6 +588,7 @@ void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_rul
 	require_auth(assigned_arb);
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
+	check(cf.case_status == ENFORCEMENT, "case_status must be ENFORCEMENT");
 
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
@@ -967,7 +968,7 @@ extern "C"
 		{
 			switch (action)
 			{
-				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(setconfig)(initelection)(regarb)(unregnominee)
+				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(deleteclaim)(setconfig)(initelection)(regarb)(unregnominee)
 				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
 				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
 				(setlangcodes)(dismissarb)(deletecase));
