@@ -195,7 +195,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 #pragma region BP_Multisig_Actions
 
-	[[eosio::action]] void dismissarb(name arb);
+	[[eosio::action]] void dismissarb(name arb, bool remove_from_cases);
 
 	//TODO: affidavit action, forced recusal of arbitrator from a specified case.
 
@@ -416,6 +416,10 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	bool is_arb(name account);
 
 	void add_arbitrator(arbitrators_table & arbitrators, name arb_name, std::string credential_link);
+
+	vector<permission_level_weight> get_arb_permissions();
+
+	void set_permissions(vector<permission_level_weight> &perms);
 
 	vector<claim>::iterator get_claim_at(string claim_hash, vector<claim>& claims);
 

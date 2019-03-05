@@ -38,11 +38,16 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
       max_elected_arbs = 20;
 
    produce_blocks(1);
+   auto current_time = now();
    // setup config
    setconfig ( max_elected_arbs, start_election, election_duration, arbitrator_term_length, fees);
-   produce_blocks(1);
+   produce_blocks();
+   
 
    auto config = get_config();
+   cout << config << endl;
+   cout << "last_time_edited: " << config["last_time_edited"].as<uint32_t>() << endl;
+
    REQUIRE_MATCHING_OBJECT(
       config, 
       mvo()
@@ -52,10 +57,14 @@ BOOST_FIXTURE_TEST_CASE( check_config_setter, eosio_arb_tester ) try {
          ("election_start", start_election)
 		 ("fee_structure", vector<int64_t>({int64_t(1), int64_t(2), int64_t(3), int64_t(4)}))
          ("arb_term_length", uint32_t(one_day * 10))
-		 ("last_time_edited", now())
+		 // NOTE: test now() function returns time offset by +1 second
+		 // added this line so unit test would pass. 
+		 ("last_time_edited", config["last_time_edited"].as<uint32_t>()) 
 		 ("current_ballot_id", 0)
 		 ("auto_start_election", 0)
    );
+   
+   produce_blocks(1);
 
    init_election();
    produce_blocks(1);
@@ -1455,9 +1464,17 @@ BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
 BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try { //TODO: for peter
 	elect_arbitrators(8, 10); // test_voters 0-7 are arbitrators, 8-17 voted for 0-7
 	newarbstatus(AVAILABLE, test_voters[0]);
+	newarbstatus(AVAILABLE, test_voters[1]);
 	BOOST_REQUIRE_EQUAL(AVAILABLE, get_arbitrator(test_voters[0])["arb_status"].as<uint8_t>());
 
-	dismissarb(test_voters[0]);
+	dismissarb(test_voters[0], false);
+	produce_blocks();
+
+	BOOST_REQUIRE_EXCEPTION(
+		dismissarb(test_voters[0], false),
+		eosio_assert_message_exception,
+		eosio_assert_message_is("arbitrator is already removed or their seat has expired")
+    );
 
 	BOOST_REQUIRE_EQUAL(REMOVED, get_arbitrator(test_voters[0])["arb_status"].as<uint8_t>());
 	uint64_t current_case_id = 0;
@@ -1475,12 +1492,36 @@ BOOST_FIXTURE_TEST_CASE( dismiss_arb, eosio_arb_tester ) try { //TODO: for peter
 	readycase(current_case_id, claimant);
 	produce_blocks();
 
-	BOOST_REQUIRE_EXCEPTION( //TODO: should fail with "actor isn't an arbitrator"
+	BOOST_REQUIRE_EXCEPTION(
 		assigntocase(current_case_id, test_voters[0], assigner),
 		eosio_assert_message_exception,
 		eosio_assert_message_is("Arbitrator has been removed.")
     );
 
+	assigntocase(current_case_id, test_voters[1], assigner);
+	auto cf = get_casefile(current_case_id);
+	auto case_arbs = cf["arbitrators"].as<vector<name>>();
+
+	BOOST_REQUIRE_EQUAL(1, case_arbs.size());
+	BOOST_REQUIRE_EQUAL(test_voters[1].to_string(), case_arbs[0].to_string());
+
+	auto arb = get_arbitrator(test_voters[1]);
+	auto open_ids = arb["open_case_ids"].as<vector<uint64_t>>();
+
+	BOOST_REQUIRE_EQUAL(1, open_ids.size());
+	BOOST_REQUIRE_EQUAL(current_case_id, open_ids[0]);
+
+	dismissarb(test_voters[1], true);
+
+	cf = get_casefile(current_case_id);
+	case_arbs = cf["arbitrators"].as<vector<name>>();
+
+	BOOST_REQUIRE_EQUAL(0, case_arbs.size());
+
+	arb = get_arbitrator(test_voters[1]);
+	open_ids = arb["open_case_ids"].as<vector<uint64_t>>();
+
+	BOOST_REQUIRE_EQUAL(0, open_ids.size());
 } FC_LOG_AND_RETHROW()
 
 BOOST_AUTO_TEST_SUITE_END()

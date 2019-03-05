@@ -264,26 +264,7 @@ void arbitration::endelection(name nominee) //NOTE: required eosio.arb@eosio.cod
 			}
 		}
 
-		//permissions need to be sorted
-		sort(arbs_perms.begin(), arbs_perms.end(), [](const auto &first, const auto &second) { return first.permission.actor.value < second.permission.actor.value; });
-
-		//review update auth permissions and weights.
-		if (arbs_perms.size() > 0)
-		{
-			uint32_t weight = arbs_perms.size() > 3 ? (((2 * arbs_perms.size()) / uint32_t(3)) + 1) : 1;
-
-			action(permission_level{get_self(), "owner"_n}, "eosio"_n, "updateauth"_n,
-				   std::make_tuple(
-					   get_self(),
-					   "major"_n,
-					   "owner"_n,
-					   authority{
-						   weight,
-						   std::vector<key_weight>{},
-						   arbs_perms,
-						   std::vector<wait_weight>{}}))
-				.send();
-		}
+		set_permissions(arbs_perms);
 	}
 
 	//close ballot action.
@@ -647,6 +628,8 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 		approvals.clear();
 	}
 
+	//TODO: remove case_id from open_case_ids if case if marked resolved.
+
 	casefiles.modify(cf, same_payer, [&](auto &row) {
 		row.case_status = case_status;
 		row.approvals = approvals;
@@ -753,7 +736,7 @@ void arbitration::deletecase(uint64_t case_id)
 
 #pragma region BP_Multisig_Actions
 
-	void arbitration::dismissarb(name arb)
+	void arbitration::dismissarb(name arb, bool remove_from_cases)
 	{
 		require_auth("eosio"_n);
 		check(is_account(arb), "arb must be account");
@@ -762,9 +745,43 @@ void arbitration::deletecase(uint64_t case_id)
 
 		const auto& to_dismiss = arbitrators.get(arb.value, "arbitrator not found");
 
+		check(to_dismiss.arb_status != SEAT_EXPIRED && to_dismiss.arb_status != REMOVED, 
+			"arbitrator is already removed or their seat has expired");
+
 		arbitrators.modify(to_dismiss, same_payer, [&](auto& a) {
 			a.arb_status = REMOVED;
-		});	
+		});
+
+		auto perms = get_arb_permissions();
+		set_permissions(perms);
+
+		if(remove_from_cases) {
+			casefiles_table casefiles(get_self(), get_self().value);
+
+			for(const auto &id: to_dismiss.open_case_ids) {
+				auto cf_it = casefiles.find(id);
+
+				if (cf_it != casefiles.end()) {
+					auto case_arbs = cf_it->arbitrators;
+					auto arb_it = find(case_arbs.begin(), case_arbs.end(), to_dismiss.arb);
+
+					if (arb_it != case_arbs.end() && cf_it->case_status < RESOLVED) {
+						case_arbs.erase(arb_it);
+						casefiles.modify(cf_it, same_payer, [&](auto &row) {
+							row.arbitrators = case_arbs;
+						});
+					}
+				}
+			}
+
+			auto open_ids = to_dismiss.open_case_ids;
+			open_ids.clear();
+
+			arbitrators.modify(to_dismiss, same_payer, [&](auto& a) {
+				a.arb_status = REMOVED;
+				a.open_case_ids = open_ids;
+			});
+		}
 	}
 #pragma endregion BP_Multisig_Actions
 
@@ -857,6 +874,41 @@ bool arbitration::has_available_seats(arbitrators_table &arbitrators, uint8_t &a
 	available_seats = uint8_t(_config.max_elected_arbs - occupied_seats);
 
 	return available_seats > 0;
+}
+
+vector<arbitration::permission_level_weight> arbitration::get_arb_permissions() {
+	arbitrators_table arbitrators(get_self(), get_self().value);
+	vector<permission_level_weight> perms;
+	for(const auto &a: arbitrators) {
+		if (a.arb_status != SEAT_EXPIRED || a.arb_status != REMOVED)
+		{
+			perms.emplace_back(permission_level_weight{permission_level{a.arb, "active"_n}, 1});
+		}
+	}
+	return perms;
+}
+
+void arbitration::set_permissions(vector<permission_level_weight> &perms) {
+	//review update auth permissions and weights.
+	if (perms.size() > 0)
+	{
+		sort(perms.begin(), perms.end(), [](const auto &first, const auto &second) 
+			{ return first.permission.actor.value < second.permission.actor.value; });
+
+		uint32_t weight = perms.size() > 3 ? (((2 * perms.size()) / uint32_t(3)) + 1) : 1;
+
+		action(permission_level{get_self(), "owner"_n}, "eosio"_n, "updateauth"_n,
+				std::make_tuple(
+					get_self(),
+					"major"_n,
+					"owner"_n,
+					authority{
+						weight,
+						std::vector<key_weight>{},
+						perms,
+						std::vector<wait_weight>{}}))
+			.send();
+	}
 }
 
 void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, string credential_link)

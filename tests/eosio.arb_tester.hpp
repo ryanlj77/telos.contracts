@@ -489,11 +489,12 @@ public:
         return push_transaction(trx);
 	}
 
-    transaction_trace_ptr dismissarb(name arb) {
+    transaction_trace_ptr dismissarb(name arb, bool remove_from_cases) {
         signed_transaction trx;
         trx.actions.emplace_back(get_action(N(eosio.arb), N(dismissarb), vector<permission_level>{{N(eosio), config::active_name}},
                 mvo()
-					("arb", arb) 
+					("arb", arb)
+					("remove_from_cases", remove_from_cases)
 		));
         set_transaction_headers(trx);
         trx.sign(get_private_key(N(eosio), "active"), control->get_chain_id());
