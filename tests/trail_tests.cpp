@@ -489,13 +489,13 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     auto bal_end_time = now() + BALLOT_LENGTH;
     readyballot(CUSTOM_BALLOT_NAME, N(testaccount1), bal_end_time);
     produce_blocks();
-
-    //open balance for each test account
-    open(N(testaccount1), CRAIG_SYM);
-    open(N(testaccount2), CRAIG_SYM);
-    open(N(testaccount3), CRAIG_SYM);
-    open(N(testaccount4), CRAIG_SYM);
-    open(N(testaccount5), CRAIG_SYM);
+    
+    //regvoter for each test account
+    regvoter(N(testaccount1), CRAIG_SYM);
+    regvoter(N(testaccount2), CRAIG_SYM);
+    regvoter(N(testaccount3), CRAIG_SYM);
+    regvoter(N(testaccount4), CRAIG_SYM);
+    regvoter(N(testaccount5), CRAIG_SYM);
     produce_blocks();
 
     //mint CRAIG tokens to test accounts
@@ -685,8 +685,8 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     //check registry after changemax
     //auto cr1 = get_registry(CRAIG_SYM);
 
-    //test close
-    auto close_trx = close(N(testaccount2), CRAIG_SYM);
+    //test unregvoter
+    auto close_trx = unregvoter(N(testaccount2), CRAIG_SYM);
     produce_blocks();
 
     //check account doesn't exist

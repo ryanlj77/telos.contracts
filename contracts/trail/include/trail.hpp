@@ -70,6 +70,8 @@ class [[eosio::contract("trail")]] trail : public contract {
         bool is_transferable = false; //TODO: rename to is_liquid
     };
 
+    //======================== tables ========================
+
     //@scope get_self().value
     TABLE ballot {
         name ballot_name;
@@ -144,19 +146,21 @@ class [[eosio::contract("trail")]] trail : public contract {
     typedef multi_index<name("votes"), vote,
         indexed_by<name("byexp"), const_mem_fun<vote, uint64_t, &vote::by_exp>>> votes;
 
+    //======================== ballot actions ========================
+
     //ballot actions
     ACTION newballot(name ballot_name, name category, name publisher, 
         string title, string description, string info_url, uint8_t max_votable_options,
         symbol voting_sym);
 
     //TODO: add max_votable_options to params
-    ACTION setinfo(name ballot_name, name publisher,
+    ACTION upsertinfo(name ballot_name, name publisher,
         string title, string description, string info_url);
 
     ACTION addoption(name ballot_name, name publisher,
         name option_name, string option_info);
 
-    //ACTION rmvoption(name ballot_name, name publisher, name option_name);
+    // ACTION rmvoption(name ballot_name, name publisher, name option_name);
 
     ACTION readyballot(name ballot_name, name publisher, uint32_t end_time);
 
@@ -164,19 +168,10 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION deleteballot(name ballot_name, name publisher);
 
-    ACTION castvote(name voter, name ballot_name, name option);
+    ACTION archive(name ballot_name, name publisher); //TODO: change to reqarchive()? require a TLOS transfer to archive?
 
-    ACTION unvote(name voter, name ballot_name, name option);
+    //======================== token actions ========================
 
-    ACTION rebalance(name voter); //TODO: after unstake, require rebalancing before voting again?
-
-    ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
-
-    ACTION cleanhouse(name voter);
-
-    ACTION archive(name ballot_name, name publisher); //TODO: change to reqarchive()? //TODO: require a TLOS transfer to archive?
-
-    //token actions
     ACTION newtoken(name publisher, asset max_supply, token_settings settings, string info_url);
 
     ACTION mint(name publisher, name recipient, asset amount_to_mint);
@@ -189,21 +184,41 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     ACTION changemax(name publisher, asset max_supply_delta);
 
+    //======================== voter actions ========================
+
     //TODO: add inline for rebalance() ?
-    ACTION open(name owner, symbol token_sym);
+    ACTION regvoter(name owner, symbol token_sym);
 
-    ACTION close(name owner, symbol token_sym);
+    ACTION castvote(name voter, name ballot_name, name option);
 
+    ACTION unvote(name voter, name ballot_name, name option);
 
+    ACTION rebalance(name voter); //TODO: after unstake, require rebalancing before voting again?
 
-    //functions
+    ACTION cleanupvotes(name voter, uint16_t count, symbol voting_sym);
+
+    ACTION cleanhouse(name voter);
+
+    ACTION unregvoter(name owner, symbol token_sym);
+
+    //========== functions ==========
+
+    //returns true if the given option_name is in the list of options
     bool is_option_in_ballot(name option_name, vector<option> options);
+
+    //returns true if the given option_name is in the list of names
     bool is_option_in_receipt(name option_name, vector<name> options_voted);
+
+    //returns the index of the vector that points to the option_name
     int get_option_index(name option_name, vector<option> options);
+
+    //returns true if the voter has a balance of the token symbol (even if its just 0)
     bool has_token_balance(name voter, symbol sym);
-    void update_votes(name voter);
-    void unvote_option();
+
+    //returns total stake from CPU + NET
     asset get_staked_tlos(name owner);
+
+    //checks if a rebalance is needed and returns true if applied to ballot
     bool applied_rebalance(name ballot_name, asset delta, vector<name> options_to_rebalance);
 
     //adds amount to account balance
@@ -211,8 +226,5 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     //subtracts amount from account balance
     void sub_balance(name owner, asset amount);
-    
-    //reactions
-    void upsert_balance();
-    void apply_delta();
+
 };

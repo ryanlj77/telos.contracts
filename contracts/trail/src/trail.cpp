@@ -4,7 +4,7 @@ trail::trail(name self, name code, datastream<const char*> ds) : contract(self, 
 
 trail::~trail() {}
 
-//actions
+//======================== ballot actions ========================
 
 void trail::newballot(name ballot_name, name category, name publisher, 
     string title, string description, string info_url, 
@@ -40,7 +40,7 @@ void trail::newballot(name ballot_name, name category, name publisher,
 
 }
 
-void trail::setinfo(name ballot_name, name publisher, string title, string description, string info_url) {
+void trail::upsertinfo(name ballot_name, name publisher, string title, string description, string info_url) {
     require_auth(publisher);
 
     //get ballot
@@ -135,6 +135,256 @@ void trail::deleteballot(name ballot_name, name publisher) {
     //TODO: add exception for polls 
 
     ballots.erase(bal);
+}
+
+void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
+
+    //get account
+    accounts accounts(get_self(), voter.value);
+    auto& acc = accounts.get(voting_sym.code().raw(), "account not found");
+    
+    //sort votes by expiration, lowest first
+    votes votes(get_self(), voter.value);
+    auto sorted_votes = votes.get_index<name("byexp")>(); 
+    auto sv_itr = sorted_votes.begin();
+
+    uint16_t votes_deleted = 0;
+
+    //deletes expired votes until count reaches 0 or end of table, skips active votes
+    while (count > 0 && sv_itr->amount.symbol == voting_sym && sv_itr != sorted_votes.end()) {
+        if (sv_itr->expiration < now()) { //expired
+            //print("\ncleaning vote for ", sv_itr->ballot_name);
+            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
+            count--;
+            votes_deleted++;
+        } else { //active
+            sv_itr++;
+        }
+    }
+
+    //update account's num_votes if votes were deleted
+    accounts.modify(acc, same_payer, [&](auto& row) {
+        row.num_votes -= votes_deleted;
+    });
+
+}
+
+void trail::cleanhouse(name voter) {
+
+    //sort votes by expiration, lowest first
+    votes votes(get_self(), voter.value);
+    auto sorted_votes = votes.get_index<name("byexp")>();
+    auto sv_itr = sorted_votes.begin();
+
+    //deletes all expired votes, skips active votes
+    while (sv_itr != sorted_votes.end()) {
+        if (sv_itr->expiration > now()) { //expired
+            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
+        } else { //active
+            sv_itr++;
+        }
+    }
+
+}
+
+void trail::archive(name ballot_name, name publisher) {
+    // require_recipient(publisher);
+
+    // //get ballot
+    // ballots ballots(get_self(), get_self().value);
+    // auto& bal = accounts.get(VOTE_SYM.code().raw(), "account not found");
+
+    // //authenticate
+    // check(bal.publisher == publisher, "only ballot publisher can archive a ballot");
+
+    // //TODO: require TLOS transfer?
+
+    // //replace ram payer with Trail
+    // ballots.modify(bal, same_payer, [&](auto& row) {
+    //     row.balance = vote_stake;
+    // });
+}
+
+//======================== token actions ========================
+
+void trail::newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
+    //authenticate
+    require_auth(publisher);
+
+    symbol new_sym = max_supply.symbol;
+
+    //check registry doesn't already exist
+    registries registries(get_self(), get_self().value);
+    auto reg = registries.find(new_sym.code().raw());
+    check(reg == registries.end(), "registry with symbol not found");
+    check(new_sym.code().raw() != symbol("TLOS", 4).code().raw(), "the TLOS symbol is restricted to avoid confusion with the system token");
+
+    registries.emplace(publisher, [&](auto& row){
+        row.supply = asset(0, new_sym);
+        row.max_supply = max_supply;
+        row.publisher = publisher;
+        row.total_voters = uint32_t(0);
+        row.total_proxies = uint32_t(0);
+        row.settings = settings;
+        row.info_url = info_url;
+    });
+
+}
+
+void trail::mint(name publisher, name recipient, asset amount_to_mint) {
+    symbol token_sym = amount_to_mint.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //get account
+    accounts accounts(get_self(), recipient.value);
+    auto& acc = accounts.get(token_sym.code().raw(), "account balance not found");
+
+    //authenticate
+    require_auth(publisher);
+    check(reg.publisher == publisher, "only registry publisher is authorized to mint tokens");
+
+    //validate
+    check(is_account(recipient), "recipient account doesn't exist");
+    check(reg.publisher == publisher, "only registry publisher can mint new tokens");
+    check(reg.supply + amount_to_mint <= reg.max_supply, "cannot mint tokens beyond max_supply");
+    check(amount_to_mint > asset(0, token_sym), "must mint a positive amount");
+    check(amount_to_mint.is_valid(), "invalid amount");
+
+    //update recipient balance
+    accounts.modify(acc, same_payer, [&](auto& row) {
+        row.balance += amount_to_mint;
+    });
+
+    //update registry supply
+    registries.modify(reg, same_payer, [&](auto& row) {
+        row.supply += amount_to_mint;
+    });
+
+}
+
+void trail::burn(name publisher, asset amount_to_burn) {
+    symbol token_sym = amount_to_burn.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //get account
+    accounts accounts(get_self(), publisher.value);
+    auto& acc = accounts.get(token_sym.code().raw(), "account balance not found");
+
+    //authenticate
+    require_auth(publisher);
+    check(reg.publisher == publisher, "only registry publisher is authorized to burn tokens");
+
+    //validate
+    check(reg.supply - amount_to_burn >= asset(0, token_sym), "cannot burn more tokens than exist");
+    check(acc.balance >= amount_to_burn, "cannot burn more tokens than owned");
+    check(amount_to_burn > asset(0, token_sym), "must burn a positive amount");
+    check(amount_to_burn.is_valid(), "invalid amount");
+
+    //update publisher balance
+    accounts.modify(acc, same_payer, [&](auto& row) {
+        row.balance -= amount_to_burn;
+    });
+}
+
+void trail::send(name sender, name recipient, asset amount, string memo) {
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(amount.symbol.code().raw(), "registry with symbol not found");
+
+    //authenticate
+    require_auth(sender);
+
+    //validate
+    check(sender != recipient, "cannot send tokens to yourself");
+    check(is_account(recipient), "recipient account doesn't exist");
+    check(amount.is_valid(), "invalid amount");
+    check(amount.amount > 0, "must transfer positive amount");
+    check(amount.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+    check(memo.size() <= 256, "memo has more than 256 bytes");
+
+    //sub amount from sender
+    sub_balance(sender, amount);
+
+    //add amount to recipient
+    add_balance(recipient, amount);
+
+    //TODO: trigger rebalance?
+}
+
+void trail::seize(name publisher, name owner, asset amount_to_seize) {
+    symbol token_sym = amount_to_seize.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //authenticate
+    require_auth(publisher);
+    check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
+
+    //validate
+    check(publisher != owner, "cannot seize tokens from yourself");
+    check(is_account(owner), "owner account doesn't exist");
+    check(amount_to_seize.is_valid(), "invalid amount");
+    check(amount_to_seize.amount > 0, "must seize positive amount");
+    check(amount_to_seize.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+
+    //sub amount from owner
+    sub_balance(owner, amount_to_seize);
+
+    //add amount to publisher
+    add_balance(publisher, amount_to_seize);
+}
+
+void trail::changemax(name publisher, asset max_supply_delta) {
+    symbol token_sym = max_supply_delta.symbol;
+
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //authenticate
+    require_auth(publisher);
+    check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
+
+    //validate
+    check(max_supply_delta.is_valid(), "invalid amount");
+    check(max_supply_delta.symbol == reg.max_supply.symbol, "symbol precision mismatch");
+    check(reg.max_supply - max_supply_delta >= asset(0, token_sym), "cannot lower max_supply below zero");
+    check(reg.max_supply - max_supply_delta >= reg.supply, "cannot lower max_supply below circulating supply");
+
+    //change max
+    registries.modify(reg, same_payer, [&](auto& row) {
+        row.max_supply += max_supply_delta;
+    });
+}
+
+//======================== voter actions ========================
+
+void trail::regvoter(name owner, symbol token_sym) {
+    //get registry
+    registries registries(get_self(), get_self().value);
+    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
+
+    //authenticate
+    require_auth(owner);
+
+    //check account balance doesn't already exist
+    accounts accounts(get_self(), owner.value);
+    auto acc = accounts.find(token_sym.code().raw());
+    check(acc == accounts.end(), "account balance already exists");
+    check(token_sym != symbol("TLOS", 4), "cannot open a TLOS balance here");
+
+    //emplace account with zero balance
+    accounts.emplace(owner, [&](auto& row){
+        row.balance = asset(0, token_sym);
+    });
 }
 
 void trail::castvote(name voter, name ballot_name, name option) {
@@ -316,255 +566,7 @@ void trail::rebalance(name voter) {
 
 }
 
-void trail::cleanupvotes(name voter, uint16_t count, symbol voting_sym) {
-
-    //get account
-    accounts accounts(get_self(), voter.value);
-    auto& acc = accounts.get(voting_sym.code().raw(), "account not found");
-    
-    //sort votes by expiration, lowest first
-    votes votes(get_self(), voter.value);
-    auto sorted_votes = votes.get_index<name("byexp")>(); 
-    auto sv_itr = sorted_votes.begin();
-
-    uint16_t votes_deleted = 0;
-
-    //deletes expired votes until count reaches 0 or end of table, skips active votes
-    while (count > 0 && sv_itr->amount.symbol == voting_sym && sv_itr != sorted_votes.end()) {
-        if (sv_itr->expiration < now()) { //expired
-            //print("\ncleaning vote for ", sv_itr->ballot_name);
-            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
-            count--;
-            votes_deleted++;
-        } else { //active
-            sv_itr++;
-        }
-    }
-
-    //update account's num_votes if votes were deleted
-    accounts.modify(acc, same_payer, [&](auto& row) {
-        row.num_votes -= votes_deleted;
-    });
-
-}
-
-void trail::cleanhouse(name voter) {
-
-    //sort votes by expiration, lowest first
-    votes votes(get_self(), voter.value);
-    auto sorted_votes = votes.get_index<name("byexp")>();
-    auto sv_itr = sorted_votes.begin();
-
-    //deletes all expired votes, skips active votes
-    while (sv_itr != sorted_votes.end()) {
-        if (sv_itr->expiration > now()) { //expired
-            sv_itr = sorted_votes.erase(sv_itr); //returns next iterator
-        } else { //active
-            sv_itr++;
-        }
-    }
-
-}
-
-void trail::archive(name ballot_name, name publisher) {
-    // require_recipient(publisher);
-
-    // //get ballot
-    // ballots ballots(get_self(), get_self().value);
-    // auto& bal = accounts.get(VOTE_SYM.code().raw(), "account not found");
-
-    // //authenticate
-    // check(bal.publisher == publisher, "only ballot publisher can archive a ballot");
-
-    // //TODO: require TLOS transfer?
-
-    // //replace ram payer with Trail
-    // ballots.modify(bal, same_payer, [&](auto& row) {
-    //     row.balance = vote_stake;
-    // });
-}
-
-
-
-void trail::newtoken(name publisher, asset max_supply, token_settings settings, string info_url) {
-    //authenticate
-    require_auth(publisher);
-
-    symbol new_sym = max_supply.symbol;
-
-    //check registry doesn't already exist
-    registries registries(get_self(), get_self().value);
-    auto reg = registries.find(new_sym.code().raw());
-    check(reg == registries.end(), "registry with symbol not found");
-    check(new_sym.code().raw() != symbol("TLOS", 4).code().raw(), "the TLOS symbol is restricted to avoid confusion with the system token");
-
-    registries.emplace(publisher, [&](auto& row){
-        row.supply = asset(0, new_sym);
-        row.max_supply = max_supply;
-        row.publisher = publisher;
-        row.total_voters = uint32_t(0);
-        row.total_proxies = uint32_t(0);
-        row.settings = settings;
-        row.info_url = info_url;
-    });
-
-}
-
-void trail::mint(name publisher, name recipient, asset amount_to_mint) {
-    symbol token_sym = amount_to_mint.symbol;
-
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-
-    //get account
-    accounts accounts(get_self(), recipient.value);
-    auto& acc = accounts.get(token_sym.code().raw(), "account balance not found");
-
-    //authenticate
-    require_auth(publisher);
-    check(reg.publisher == publisher, "only registry publisher is authorized to mint tokens");
-
-    //validate
-    check(is_account(recipient), "recipient account doesn't exist");
-    check(reg.publisher == publisher, "only registry publisher can mint new tokens");
-    check(reg.supply + amount_to_mint <= reg.max_supply, "cannot mint tokens beyond max_supply");
-    check(amount_to_mint > asset(0, token_sym), "must mint a positive amount");
-    check(amount_to_mint.is_valid(), "invalid amount");
-
-    //update recipient balance
-    accounts.modify(acc, same_payer, [&](auto& row) {
-        row.balance += amount_to_mint;
-    });
-
-    //update registry supply
-    registries.modify(reg, same_payer, [&](auto& row) {
-        row.supply += amount_to_mint;
-    });
-
-}
-
-void trail::burn(name publisher, asset amount_to_burn) {
-    symbol token_sym = amount_to_burn.symbol;
-
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-
-    //get account
-    accounts accounts(get_self(), publisher.value);
-    auto& acc = accounts.get(token_sym.code().raw(), "account balance not found");
-
-    //authenticate
-    require_auth(publisher);
-    check(reg.publisher == publisher, "only registry publisher is authorized to burn tokens");
-
-    //validate
-    check(reg.supply - amount_to_burn >= asset(0, token_sym), "cannot burn more tokens than exist");
-    check(acc.balance >= amount_to_burn, "cannot burn more tokens than owned");
-    check(amount_to_burn > asset(0, token_sym), "must burn a positive amount");
-    check(amount_to_burn.is_valid(), "invalid amount");
-
-    //update publisher balance
-    accounts.modify(acc, same_payer, [&](auto& row) {
-        row.balance -= amount_to_burn;
-    });
-}
-
-void trail::send(name sender, name recipient, asset amount, string memo) {
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(amount.symbol.code().raw(), "registry with symbol not found");
-
-    //authenticate
-    require_auth(sender);
-
-    //validate
-    check(sender != recipient, "cannot send tokens to yourself");
-    check(is_account(recipient), "recipient account doesn't exist");
-    check(amount.is_valid(), "invalid amount");
-    check(amount.amount > 0, "must transfer positive amount");
-    check(amount.symbol == reg.max_supply.symbol, "symbol precision mismatch");
-    check(memo.size() <= 256, "memo has more than 256 bytes");
-
-    //sub amount from sender
-    sub_balance(sender, amount);
-
-    //add amount to recipient
-    add_balance(recipient, amount);
-
-    //TODO: trigger rebalance?
-}
-
-void trail::seize(name publisher, name owner, asset amount_to_seize) {
-    symbol token_sym = amount_to_seize.symbol;
-
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-
-    //authenticate
-    require_auth(publisher);
-    check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
-
-    //validate
-    check(publisher != owner, "cannot seize tokens from yourself");
-    check(is_account(owner), "owner account doesn't exist");
-    check(amount_to_seize.is_valid(), "invalid amount");
-    check(amount_to_seize.amount > 0, "must seize positive amount");
-    check(amount_to_seize.symbol == reg.max_supply.symbol, "symbol precision mismatch");
-
-    //sub amount from owner
-    sub_balance(owner, amount_to_seize);
-
-    //add amount to publisher
-    add_balance(publisher, amount_to_seize);
-}
-
-void trail::changemax(name publisher, asset max_supply_delta) {
-    symbol token_sym = max_supply_delta.symbol;
-
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-
-    //authenticate
-    require_auth(publisher);
-    check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
-
-    //validate
-    check(max_supply_delta.is_valid(), "invalid amount");
-    check(max_supply_delta.symbol == reg.max_supply.symbol, "symbol precision mismatch");
-    check(reg.max_supply - max_supply_delta >= asset(0, token_sym), "cannot lower max_supply below zero");
-    check(reg.max_supply - max_supply_delta >= reg.supply, "cannot lower max_supply below circulating supply");
-
-    //change max
-    registries.modify(reg, same_payer, [&](auto& row) {
-        row.max_supply += max_supply_delta;
-    });
-}
-
-void trail::open(name owner, symbol token_sym) {
-    //get registry
-    registries registries(get_self(), get_self().value);
-    auto& reg = registries.get(token_sym.code().raw(), "registry with symbol not found");
-
-    //authenticate
-    require_auth(owner);
-
-    //check account balance doesn't already exist
-    accounts accounts(get_self(), owner.value);
-    auto acc = accounts.find(token_sym.code().raw());
-    check(acc == accounts.end(), "account balance already exists");
-    check(token_sym != symbol("TLOS", 4), "cannot open a TLOS balance here");
-
-    //emplace account with zero balance
-    accounts.emplace(owner, [&](auto& row){
-        row.balance = asset(0, token_sym);
-    });
-}
-
-void trail::close(name owner, symbol token_sym) {
+void trail::unregvoter(name owner, symbol token_sym) {
     //get account
     accounts accounts(get_self(), owner.value);
     auto& acc = accounts.get(token_sym.code().raw(), "account balance doesn't exist");
@@ -578,8 +580,7 @@ void trail::close(name owner, symbol token_sym) {
     accounts.erase(acc);
 }
 
-
-//functions
+//========== functions ==========
 
 bool trail::is_option_in_ballot(name option_name, vector<option> options) {
     for (option opt : options) {
@@ -593,13 +594,6 @@ bool trail::is_option_in_ballot(name option_name, vector<option> options) {
 
 bool trail::is_option_in_receipt(name option_name, vector<name> options_voted) {
     return std::find(options_voted.begin(), options_voted.end(), option_name) != options_voted.end();
-
-    // for (name n : options_voted) {
-    //     if (option_name == n) {
-    //         return true;
-    //     }
-    // }
-    // return false;
 }
 
 int trail::get_option_index(name option_name, vector<option> options) {
@@ -619,19 +613,6 @@ bool trail::has_token_balance(name voter, symbol sym) {
         return true;
     }
     return false;
-}
-
-void trail::update_votes(name voter) {
-    //return if no VOTE balance found, user must call open() first
-    if (!has_token_balance(voter, VOTE_SYM)) {
-        return;
-    }
-
-    //calc balance delta
-
-    //revote for all active VOTE ballots (only inserting the delta)
-
-    //update VOTE balance
 }
 
 asset trail::get_staked_tlos(name owner) {
@@ -694,6 +675,8 @@ void trail::sub_balance(name owner, asset amount) {
     });
 }
 
+//========== dispatcher ==========
+
 extern "C"
 {
     void apply(uint64_t receiver, uint64_t code, uint64_t action)
@@ -711,9 +694,10 @@ extern "C"
         {
             switch (action)
             {
-                EOSIO_DISPATCH_HELPER(trail, (newballot)(setinfo)(addoption)(readyballot)(closeballot)(deleteballot)
-                    (castvote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)
-                    (newtoken)(mint)(burn)(send)(seize)(open)(close));
+                EOSIO_DISPATCH_HELPER(trail, 
+                    (newballot)(upsertinfo)(addoption)(readyballot)(closeballot)(deleteballot)(archive)
+                    (newtoken)(mint)(burn)(send)(seize)(changemax)
+                    (regvoter)(castvote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)(unregvoter));
             }
 
         } else if (code == name("eosio").value && action == name("undelegatebw").value) {

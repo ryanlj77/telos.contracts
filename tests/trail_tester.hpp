@@ -132,11 +132,11 @@ class trail_tester : public tester
 		produce_blocks();
 		
 		//open balance for each test account
-		open(N(testaccount1), VOTE_SYM);
-		open(N(testaccount2), VOTE_SYM);
-		open(N(testaccount3), VOTE_SYM);
-		open(N(testaccount4), VOTE_SYM);
-		open(N(testaccount5), VOTE_SYM);
+		regvoter(N(testaccount1), VOTE_SYM);
+		regvoter(N(testaccount2), VOTE_SYM);
+		regvoter(N(testaccount3), VOTE_SYM);
+		regvoter(N(testaccount4), VOTE_SYM);
+		regvoter(N(testaccount5), VOTE_SYM);
 		produce_blocks();
 
 		//rebalance each account to sync with system stake
@@ -354,9 +354,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr setinfo(name ballot_name, name publisher, string title, string description, string info_url) {
+	transaction_trace_ptr upsertinfo(name ballot_name, name publisher, string title, string description, string info_url) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(setinfo), vector<permission_level>{{publisher, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(upsertinfo), vector<permission_level>{{publisher, config::active_name}},
 			mvo()
 			("ballot_name", ballot_name)
 			("publisher", publisher)
@@ -585,9 +585,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr open(name owner, symbol token_sym) {
+	transaction_trace_ptr regvoter(name owner, symbol token_sym) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(open), vector<permission_level>{{owner, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(regvoter), vector<permission_level>{{owner, config::active_name}},
 			mvo()
 			("owner", owner)
 			("token_sym", token_sym)
@@ -598,9 +598,9 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr close(name owner, symbol token_sym) {
+	transaction_trace_ptr unregvoter(name owner, symbol token_sym) {
 		signed_transaction trx;
-		trx.actions.emplace_back( get_action(N(trailservice), N(close), vector<permission_level>{{owner, config::active_name}},
+		trx.actions.emplace_back( get_action(N(trailservice), N(unregvoter), vector<permission_level>{{owner, config::active_name}},
 			mvo()
 			("owner", owner)
 			("token_sym", token_sym)
