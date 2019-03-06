@@ -54,7 +54,7 @@ class trail_tester : public tester
         RESERVED_STATUS //4 //RESOLVING?
     };
 
-	const symbol VOTE_SYM = symbol(0, "VOTE");
+	const symbol VOTE_SYM = symbol(4, "VOTE");
 	const symbol TLOS_SYM = symbol(4, "TLOS");
 
 	const name BALLOT_NAME = name("testballot");
@@ -125,7 +125,7 @@ class trail_tester : public tester
 		//Registry Setup : VOTE,0
 
         //init registry
-		asset max_supply = asset::from_string("10000000000 VOTE");
+		asset max_supply = asset::from_string("10000000000.0000 VOTE");
 		string info_url = "Telos Core Governance Registry";
         token_settings vote_settings; 
         newtoken(N(trailservice), max_supply, vote_settings, info_url);

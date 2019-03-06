@@ -42,7 +42,7 @@ class [[eosio::contract("trail")]] trail : public contract {
     typedef eosio::multi_index<name("userres"), user_resources> user_resources_table;
 
     //definitions
-    const symbol VOTE_SYM = symbol("VOTE", 0);
+    const symbol VOTE_SYM = symbol("VOTE", 4);
     const uint32_t MIN_BALLOT_LENGTH = 86400; //1 day
     const uint32_t MIN_CLOSE_LENGTH = 259200; //3 days
     const uint16_t MAX_VOTE_RECEIPTS = 51; //TODO: move to token registry?

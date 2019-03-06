@@ -85,31 +85,31 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
     REQUIRE_MATCHING_OBJECT(v1, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("yes")}))
-        ("amount", "1000000 VOTE")
+        ("amount", "100.0000 VOTE")
         ("expiration", bal_end_time)
 	);
     REQUIRE_MATCHING_OBJECT(v2, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("no")}))
-        ("amount", "2000000 VOTE")
+        ("amount", "200.0000 VOTE")
         ("expiration", bal_end_time)
 	);
     REQUIRE_MATCHING_OBJECT(v3, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("yes")}))
-        ("amount", "3000000 VOTE")
+        ("amount", "300.0000 VOTE")
         ("expiration", bal_end_time)
 	);
     REQUIRE_MATCHING_OBJECT(v4, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("abstain")}))
-        ("amount", "4000000 VOTE")
+        ("amount", "400.0000 VOTE")
         ("expiration", bal_end_time)
 	);
     REQUIRE_MATCHING_OBJECT(v5, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("yes")}))
-        ("amount", "5000000 VOTE")
+        ("amount", "500.0000 VOTE")
         ("expiration", bal_end_time)
 	);
 
@@ -121,23 +121,23 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
     auto a5 = get_balance(N(testaccount5), VOTE_SYM);
     
     REQUIRE_MATCHING_OBJECT(a1, mvo()
-        ("balance", "1000000 VOTE")
+        ("balance", "100.0000 VOTE")
         ("num_votes", 1)
 	);
     REQUIRE_MATCHING_OBJECT(a2, mvo()
-        ("balance", "2000000 VOTE")
+        ("balance", "200.0000 VOTE")
         ("num_votes", 1)
 	);
     REQUIRE_MATCHING_OBJECT(a3, mvo()
-        ("balance", "3000000 VOTE")
+        ("balance", "300.0000 VOTE")
         ("num_votes", 1)
 	);
     REQUIRE_MATCHING_OBJECT(a4, mvo()
-        ("balance", "4000000 VOTE")
+        ("balance", "400.0000 VOTE")
         ("num_votes", 1)
 	);
     REQUIRE_MATCHING_OBJECT(a5, mvo()
-        ("balance", "5000000 VOTE")
+        ("balance", "500.0000 VOTE")
         ("num_votes", 1)
 	);
 
@@ -165,7 +165,7 @@ BOOST_FIXTURE_TEST_CASE(simple_flow, trail_tester ) try {
     REQUIRE_MATCHING_OBJECT(v1, mvo()
         ("ballot_name", BALLOT_NAME)
         ("option_names", vector<name>({name("abstain")}))
-        ("amount", "1000000 VOTE")
+        ("amount", "100.0000 VOTE")
         ("expiration", bal_end_time)
 	);
 
@@ -489,7 +489,7 @@ BOOST_FIXTURE_TEST_CASE(custom_token_flow, trail_tester ) try {
     auto bal_end_time = now() + BALLOT_LENGTH;
     readyballot(CUSTOM_BALLOT_NAME, N(testaccount1), bal_end_time);
     produce_blocks();
-    
+
     //regvoter for each test account
     regvoter(N(testaccount1), CRAIG_SYM);
     regvoter(N(testaccount2), CRAIG_SYM);
