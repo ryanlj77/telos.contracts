@@ -1549,6 +1549,7 @@ BOOST_FIXTURE_TEST_CASE( case_resolution, eosio_arb_tester ) try {
     );
 
     setruling(current_case_id, test_voters[0], ruling_links[0]);
+    advancecase(current_case_id, test_voters[0]);
 
     cf = get_casefile(current_case_id);
     BOOST_REQUIRE_EQUAL ( cf["case_status"].as<uint8_t>(), RESOLVED );
