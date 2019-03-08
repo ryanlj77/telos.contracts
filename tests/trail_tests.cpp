@@ -309,7 +309,8 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
         produce_blocks();
 
         //ready new ballot
-        readyballot(ballots[i], N(testaccount1), now() + 86400);
+        bal_end_time = now() + 86400;
+        readyballot(ballots[i], N(testaccount1), bal_end_time);
         produce_blocks();
 
         //check emplacement
@@ -437,6 +438,9 @@ BOOST_FIXTURE_TEST_CASE(multi_ballot_flow, trail_tester ) try {
         auto bal = get_ballot(b);
         //BOOST_REQUIRE_EQUAL(false, bal.is_null());
     }
+
+    //fast forward past ballot cooldown so they can be deleted
+    produce_blocks(BALLOT_COOLDOWN * 2);
 
     //delete old ballots
     for (name b : ballots) {
@@ -704,6 +708,16 @@ BOOST_FIXTURE_TEST_CASE(proxy_flow, trail_tester ) try {
     
 
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END PROXY_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	
+} FC_LOG_AND_RETHROW()
+
+BOOST_FIXTURE_TEST_CASE(bad_actor_flow, trail_tester ) try {
+
+    std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN BAD_ACTOR_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+
+    
+
+    std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END BAD_ACTOR_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	
 } FC_LOG_AND_RETHROW()
 

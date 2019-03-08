@@ -46,13 +46,14 @@ class [[eosio::contract("trail")]] trail : public contract {
     const uint32_t MIN_BALLOT_LENGTH = 86400; //1 day
     const uint32_t MIN_CLOSE_LENGTH = 259200; //3 days
     const uint16_t MAX_VOTE_RECEIPTS = 51; //TODO: move to token registry?
+    const uint32_t BALLOT_COOLDOWN = 259200; //3 days in seconds
 
     enum ballot_status : uint8_t {
         SETUP, //0
         OPEN, //1
-        CLOSED, //2 //TODO: need closed status? anything after open is closed
-        ARCHIVED, //3
-        RESERVED_STATUS //4 //RESOLVING?
+        CLOSED, //2
+        CANCELLED, //3
+        ARCHIVED //4
     };
 
     struct option {
@@ -67,7 +68,11 @@ class [[eosio::contract("trail")]] trail : public contract {
         bool is_burnable = false;
         bool is_seizable = false;
         bool is_max_mutable = false;
-        bool is_transferable = false; //TODO: rename to is_liquid
+        bool is_liquid = false;
+
+        // EOSLIB_SERIALIZE(token_settings, 
+        //     (is_destructible)(is_proxyable)(is_burnable)
+        //     (is_seizable)(is_max_mutable)(is_liquid))
     };
 
     //======================== tables ========================
@@ -154,8 +159,8 @@ class [[eosio::contract("trail")]] trail : public contract {
         symbol voting_sym);
 
     //TODO: add max_votable_options to params
-    ACTION upsertinfo(name ballot_name, name publisher,
-        string title, string description, string info_url);
+    ACTION upsertinfo(name ballot_name, name publisher, string title, string description, 
+        string info_url, uint8_t max_votable_options);
 
     ACTION addoption(name ballot_name, name publisher,
         name option_name, string option_info);
@@ -163,6 +168,8 @@ class [[eosio::contract("trail")]] trail : public contract {
     // ACTION rmvoption(name ballot_name, name publisher, name option_name);
 
     ACTION readyballot(name ballot_name, name publisher, uint32_t end_time);
+
+    ACTION cancelballot(name ballot_name, name publisher);
 
     ACTION closeballot(name ballot_name, name publisher, uint8_t new_status);
 
@@ -183,6 +190,8 @@ class [[eosio::contract("trail")]] trail : public contract {
     ACTION seize(name publisher, name owner, asset amount_to_seize);
 
     ACTION changemax(name publisher, asset max_supply_delta);
+
+    // ACTION destroytoken();
 
     //======================== voter actions ========================
 

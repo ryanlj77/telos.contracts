@@ -12,7 +12,7 @@ Trail offers a comprehensive suite of blockchain-based voting services available
 
 ## Voter Registration
 
-All users on the Telos Blockchain Network can register their Telos accounts within Trail .
+All users on the Telos Blockchain Network are eleigible to register their Telos accounts within Trail and participate in the voting process.
 
 * `regvoter(name owner, symbol token_sym)`
 
@@ -22,7 +22,7 @@ All users on the Telos Blockchain Network can register their Telos accounts with
 
     `token_sym` is the symbol of tokens being stored in the new balance.
 
-All users who want to participate in core voting **must** sign the  `open()` action and supply `VOTE,0` as the token symbol.
+All users who want to participate in core voting **must** sign the  `regvoter()` action and supply `VOTE,4` as the token symbol.
 
 * `unregvoter(name owner, symbol token_sym)`
 
@@ -36,7 +36,7 @@ Note that an account must be empty of all tokens before being allowed to close. 
 
 ## Voter Participation
 
-Voter participation is key to the effectiveness of the Trail platform, so Trail has been designed with a streamlined voter interface that keeps the voting process simple for users but also allows for extensive account and resource management.
+Voter participation is key to the effectiveness of the Trail platform, therefore Trail has been designed with a streamlined voter interface that keeps the voting process simple for users but also allows for extensive account and resource management.
 
 ### 1. Casting Votes
 
@@ -44,7 +44,7 @@ Voter participation is key to the effectiveness of the Trail platform, so Trail 
 
     The castvote action will cast user's full `VOTE` balance on the given ballot option. Note that this **does not spend** the user's `VOTE` tokens, it only **copies** their full token weight onto the ballot.
 
-    For example, if UserA has already registered with Trail and been credited with `50.0000 VOTE` to their balance, they may then sign a `castvote(UserA, testballot, yes)` action to cast `50 VOTE` tokens towards the "yes" option on the ballot named "testballot". After casting their vote, the total "yes" votes on the ballot will have increased by `50 VOTE` and the UserA's balance still has all `50 VOTE` tokens in their account.
+    For example, if UserA has already registered with Trail and been credited with `50.0000 VOTE` to their balance, they may then sign a `castvote(UserA, testballot, yes)` action to cast their `50 VOTE` tokens towards the "yes" option on the ballot named "testballot". After casting their vote, the total "yes" votes on the ballot will have increased by `50 VOTE` and the UserA's balance still has all `50 VOTE` tokens in their account.
 
 ### 2. Cleaning Old Votes
 
@@ -64,4 +64,4 @@ Voter participation is key to the effectiveness of the Trail platform, so Trail 
 
     `voter` is the name of the account to clean votes for.
 
-Note that this action requires no account authorization, meaning any user can call `cleanhouse()` for any other user to assist in cleaning their vote backlog. There is no security risk to doing this and is a really nice way to help the platform generally run smoother.
+Note that this action requires no account authorization, meaning any user can call `cleanhouse()` for any other user to assist in cleaning their vote backlog. There is no security risk to doing this and is a great way to help the platform generally run smoother.

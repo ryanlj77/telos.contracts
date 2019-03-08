@@ -50,7 +50,7 @@ Trail offers extensive tools for any prospective user or developer to launch a b
 
 * `newballot(name ballot_name, name category, name publisher, string title, string description, string info_url, uint8_t max_votable_options, symbol voting_sym)`
 
-    The createballot action will begin setup of a new ballot. Note that all string arguments should be supplied in markdown format, as Trail's dedicated front-end will consume strings as markdown to ensure a consistent experience across UI's.
+    The createballot action will begin setup of a new ballot.
 
     `ballot_name` is the unique name of the ballot. No other ballot may concurrently share this name.
 
@@ -78,9 +78,9 @@ Trail offers extensive tools for any prospective user or developer to launch a b
     
     Additionally, custom voting tokens must exist on Trail (by calling newtoken) before being able to create ballots that use them.
 
-* `setinfo(name ballot_name, name publisher, string title, string description, string info_url)`
+* `upsertinfo(name ballot_name, name publisher, string title, string description, string info_url)`
 
-    The setinfo action allows the ballot publisher to replace the title, description, and info_url supplied in the initial newballot action.
+    The upsertinfo action allows the ballot publisher to replace the title, description, and info_url of the ballot.
 
     `ballot_name` is the name of the ballot to change.
 
@@ -106,17 +106,21 @@ Trail offers extensive tools for any prospective user or developer to launch a b
 
 * `deleteballot(name ballot_name, name publisher)`
 
-    The deleteballot action deletes an existing ballot. This action can only be performed before a ballot opens for voting, and only by the publisher of the ballot.
+    The deleteballot action deletes an existing ballot. This action cannot be called during the voting process, and all ballots must wait for the ballot to "cool down" after the ballot's end time before being eligible for deletion. The current Ballot Cooldown period is `3 days`.
 
     `ballot_name` is the name the ballot to delete.
 
     `publisher` is the account that published the ballot. Only this account can delete the ballot.
 
+In our custom contract example, the account that wishes to start a new ballot must simply call the `newballot()` action to begin the ballot setup process. Next, the same account would call `readyballot()` to open the ballot for voting.
+
 ### 3. Running A Ballot 
 
 After ballot setup is complete, the only thing left to do is wait for users to begin casting their votes. All votes cast on Trail are live, so it's easy to see the state of the ballot as votes roll in. There are also a few additional features available for ballot runners that want to operate a more complex campaign. This feature set will grow with the development of Trail and as more complex versions of ballots are introduced to the system.
 
-* `endpoll()`
+* `cancelballot()`
+
+    The cancelballot action will cancel an existing proposal and mark its status as cancelled. Ballots that have been cancelled can no longer receive votes but remain visible in Trail so voters can remain informed on the status of the ballot. Only after the ballot has reached it's original end time *plus* the global ballot cooldown period may the ballot may be deleted as normal.
 
 In our custom contract example, none of these actions are used (just to keep it simple). 
 
@@ -138,7 +142,7 @@ Back in our custom contract example, the `closeprop()` action would be called by
 
 ## Creating Custom Voting Tokens
 
-Trail allows any Telos Blockchain Network user to create and manage their own custom tokens, which can also be used to vote on any ballot that has been configured to count votes based on that token.
+Trail allows any Telos Blockchain Network user to create and manage their own custom voting tokens, which can be used to vote on any ballot that has been configured to count votes based on that token.
 
 ### About Token Registries
 

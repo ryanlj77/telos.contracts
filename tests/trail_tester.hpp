@@ -37,7 +37,7 @@ class trail_tester : public tester
         bool is_burnable = false;
         bool is_seizable = false;
         bool is_max_mutable = false;
-        bool is_transferable = false;
+        bool is_liquid = false;
     };
 
 	struct option {
@@ -50,8 +50,8 @@ class trail_tester : public tester
         SETUP, //0
         OPEN, //1
         CLOSED, //2 
-        ARCHIVED, //3
-        RESERVED_STATUS //4 //RESOLVING?
+        CANCELLED, //3
+        ARCHIVED //4
     };
 
 	const symbol VOTE_SYM = symbol(4, "VOTE");
@@ -65,10 +65,13 @@ class trail_tester : public tester
 	const uint8_t MAX_VOTABLE_OPTIONS = 3;
 	const uint32_t BALLOT_LENGTH = 86400; //1 day in seconds
 	const int MAX_VOTES_PER_ACCOUNT = 51;
+	const uint32_t BALLOT_COOLDOWN = 259200; //3 days in seconds
 
 	const name YES_NAME = name("yes");
 	const name NO_NAME = name("no");
 	const name ABSTAIN_NAME = name("abstain");
+
+	uint32_t bal_end_time;
 
 	trail_tester()
 	{
@@ -354,7 +357,7 @@ class trail_tester : public tester
 		return push_transaction( trx );
 	}
 
-	transaction_trace_ptr upsertinfo(name ballot_name, name publisher, string title, string description, string info_url) {
+	transaction_trace_ptr upsertinfo(name ballot_name, name publisher, string title, string description, string info_url, uint8_t max_votable_ops) {
 		signed_transaction trx;
 		trx.actions.emplace_back( get_action(N(trailservice), N(upsertinfo), vector<permission_level>{{publisher, config::active_name}},
 			mvo()
@@ -363,6 +366,7 @@ class trail_tester : public tester
 			("title", title)
 			("description", description)
 			("info_url", info_url)
+			("max_votable_options", max_votable_ops)
 			)
 		);
 		set_transaction_headers(trx);
@@ -507,7 +511,7 @@ class trail_tester : public tester
 				("is_burnable", settings.is_burnable)
 				("is_seizable", settings.is_seizable)
 				("is_max_mutable", settings.is_max_mutable)
-				("is_transferable", settings.is_transferable))
+				("is_liquid", settings.is_liquid))
             ("info_url", info_url)
 			)
 		);

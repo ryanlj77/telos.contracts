@@ -40,21 +40,24 @@ void trail::newballot(name ballot_name, name category, name publisher,
 
 }
 
-void trail::upsertinfo(name ballot_name, name publisher, string title, string description, string info_url) {
-    require_auth(publisher);
-
+void trail::upsertinfo(name ballot_name, name publisher, string title, string description,
+    string info_url, uint8_t max_votable_options) {
     //get ballot
     ballots ballots(get_self(), get_self().value);
     auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
-    //validate
+    //authenticate
+    require_auth(publisher);
     check(bal.publisher == publisher, "only ballot publisher can set info");
+
+    //validate
     check(bal.status == SETUP, "ballot must be in setup mode to edit");
 
     ballots.modify(bal, same_payer, [&](auto& row) {
         row.title = title;
         row.description = description;
         row.info_url = info_url;
+        row.max_votable_options = max_votable_options;
     });
 
 }
@@ -93,7 +96,7 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
     //validate
     check(bal.publisher == publisher, "only ballot publisher can ready ballot");
     check(bal.options.size() >= 2, "ballot must have at least 2 options");
-    check(bal.status == SETUP, "ballot must be in setup mode to edit");
+    check(bal.status == SETUP, "ballot must be in setup mode to ready");
     check(end_time - now() >= MIN_BALLOT_LENGTH, "ballot must be open for at least 1 day");
 
     ballots.modify(bal, same_payer, [&](auto& row) {
@@ -102,6 +105,23 @@ void trail::readyballot(name ballot_name, name publisher, uint32_t end_time) {
         row.status = OPEN;
     });
 
+}
+
+void trail::cancelballot(name ballot_name, name publisher) {
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
+
+    //authenticate
+    require_auth(publisher);
+
+    //validate
+    check(bal.publisher == publisher, "only ballot publisher can ready ballot");
+    check(bal.status == OPEN, "ballot must be in open mode to cancel");
+
+    ballots.modify(bal, same_payer, [&](auto& row) {
+        row.status = CANCELLED;
+    });
 }
 
 void trail::closeballot(name ballot_name, name publisher, uint8_t new_status) {
@@ -122,15 +142,17 @@ void trail::closeballot(name ballot_name, name publisher, uint8_t new_status) {
 }
 
 void trail::deleteballot(name ballot_name, name publisher) {
-    require_auth(publisher);
-
     //get ballot
     ballots ballots(get_self(), get_self().value);
     auto& bal = ballots.get(ballot_name.value, "ballot name doesn't exist");
 
+    //authenticate
+    require_auth(publisher);
+
     //validate
     check(bal.publisher == publisher, "only ballot publisher can delete ballot");
     check(bal.status != OPEN, "cannot delete while voting is in progress");
+    check(now() > bal.end_time + BALLOT_COOLDOWN, "cannot delete until 3 days past ballot's end time");
 
     //TODO: add exception for polls 
 
@@ -281,6 +303,7 @@ void trail::burn(name publisher, asset amount_to_burn) {
     check(reg.publisher == publisher, "only registry publisher is authorized to burn tokens");
 
     //validate
+    check(reg.settings.is_burnable, "token is not burnable");
     check(reg.supply - amount_to_burn >= asset(0, token_sym), "cannot burn more tokens than exist");
     check(acc.balance >= amount_to_burn, "cannot burn more tokens than owned");
     check(amount_to_burn > asset(0, token_sym), "must burn a positive amount");
@@ -301,6 +324,7 @@ void trail::send(name sender, name recipient, asset amount, string memo) {
     require_auth(sender);
 
     //validate
+    check(reg.settings.is_liquid, "token is not liquid and cannot be sent");
     check(sender != recipient, "cannot send tokens to yourself");
     check(is_account(recipient), "recipient account doesn't exist");
     check(amount.is_valid(), "invalid amount");
@@ -329,6 +353,7 @@ void trail::seize(name publisher, name owner, asset amount_to_seize) {
     check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
 
     //validate
+    check(reg.settings.is_seizable, "token is not seizable");
     check(publisher != owner, "cannot seize tokens from yourself");
     check(is_account(owner), "owner account doesn't exist");
     check(amount_to_seize.is_valid(), "invalid amount");
@@ -354,6 +379,7 @@ void trail::changemax(name publisher, asset max_supply_delta) {
     check(reg.publisher == publisher, "only registry publisher is authorized to seize tokens");
 
     //validate
+    check(reg.settings.is_max_mutable, "token's max supply is not mutable");
     check(max_supply_delta.is_valid(), "invalid amount");
     check(max_supply_delta.symbol == reg.max_supply.symbol, "symbol precision mismatch");
     check(reg.max_supply - max_supply_delta >= asset(0, token_sym), "cannot lower max_supply below zero");
@@ -695,7 +721,7 @@ extern "C"
             switch (action)
             {
                 EOSIO_DISPATCH_HELPER(trail, 
-                    (newballot)(upsertinfo)(addoption)(readyballot)(closeballot)(deleteballot)(archive)
+                    (newballot)(upsertinfo)(addoption)(readyballot)(cancelballot)(closeballot)(deleteballot)(archive)
                     (newtoken)(mint)(burn)(send)(seize)(changemax)
                     (regvoter)(castvote)(unvote)(rebalance)(cleanupvotes)(cleanhouse)(unregvoter));
             }
