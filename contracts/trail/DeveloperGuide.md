@@ -165,7 +165,7 @@ Trail stores metadata about its tokens in a custom data structure called a Token
     * `is_burnable` allows tokens to be burned from circulation by the publisher. 
     * `is_seizable` allows the tokens to be seized from token holders by the publisher. This setting is intended for publishers who want to operate a more controlled internal token voting system.
     * `is_max_mutable` allows the registry's max_supply field to be adjusted through an action call. Only the publisher can call the `changemax` action.
-    * `is_transferable` allows the tokens to be transferred to other users. **In Development...**
+    * `is_liquid` allows the tokens to be transferred to other users. **In Development...**
 
     `info_url` is a url link (ideally an IPFS link) that prospective voters can follow to get more information about the token and its purpose.
 
@@ -224,3 +224,4 @@ Note that this action is mostly intended for use in internal voting systems, and
     `publisher` is the name of the account that published the registry. Only this account is authoried to change the max supply.
 
     `max_supply_delta` is the delta to apply to the maximum supply. Giving a negative value will lower the supply, and giving a positive one will increase it.
+

@@ -210,21 +210,33 @@ void trail::cleanhouse(name voter) {
 }
 
 void trail::archive(name ballot_name, name publisher) {
-    // require_recipient(publisher);
+    //get ballot
+    ballots ballots(get_self(), get_self().value);
+    auto& bal = ballots.get(ballot_name.value, "ballot not found");
 
-    // //get ballot
-    // ballots ballots(get_self(), get_self().value);
-    // auto& bal = accounts.get(VOTE_SYM.code().raw(), "account not found");
+    //authenticate
+    require_recipient(publisher);
+    check(bal.publisher == publisher, "only ballot publisher can archive a ballot");
+    check(bal.status == CLOSED, "can only archive ballots that were properly closed");
 
-    // //authenticate
-    // check(bal.publisher == publisher, "only ballot publisher can archive a ballot");
+    check(false, "***Archive Action In Development***");
 
-    // //TODO: require TLOS transfer?
-
-    // //replace ram payer with Trail
-    // ballots.modify(bal, same_payer, [&](auto& row) {
-    //     row.balance = vote_stake;
-    // });
+    //replace ram payer with Trail
+    ballots.modify(bal, name("trailservice"), [&](auto& row) {
+        row.ballot_name = bal.ballot_name;
+        row.category = bal.category;
+        row.publisher = bal.publisher;
+        row.title = bal.title;
+        row.description = bal.description;
+        row.info_url = bal.info_url;
+        row.options = bal.options;
+        row.unique_voters = bal.unique_voters;
+        row.max_votable_options = bal.max_votable_options;
+        row.voting_symbol = bal.voting_symbol;
+        row.begin_time = bal.begin_time;
+        row.end_time = bal.end_time;
+        row.status = bal.status;
+    });
 }
 
 //======================== token actions ========================
