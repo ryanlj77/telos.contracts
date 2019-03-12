@@ -715,7 +715,23 @@ BOOST_FIXTURE_TEST_CASE(bad_actor_flow, trail_tester ) try {
 
     std::cout << ">>>>>>>>>>>>>>>>>>>>>>> BEGIN BAD_ACTOR_FLOW >>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
+    //ready default ballot
+    readyballot(name("testballot"), name("testaccount1"), now() + 86400);
+    produce_blocks();
+
+    //check emplacement
+    auto bal = get_ballot(name("testballot"));
+    BOOST_REQUIRE_EQUAL(false, bal.is_null());
+
+    //cast vote on ballot
+    castvote(name("testaccount1"), name("testballot"), name("yes"));
+    produce_blocks();
     
+    //check vote was emplaced
+    auto v = get_vote(name("testaccount1"), name("testballot"));
+    BOOST_REQUIRE_EQUAL(false, v.is_null());
+
+    //
 
     std::cout << "<<<<<<<<<<<<<<<<<<<<<<< END BAD_ACTOR_FLOW <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	
