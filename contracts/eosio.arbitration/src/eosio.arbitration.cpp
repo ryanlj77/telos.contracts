@@ -497,6 +497,8 @@ void arbitration::assigntocase(uint64_t case_id, name arb_to_assign)
 
 	casefiles_table casefiles(get_self(), get_self().value);
 	const auto& cf = casefiles.get(case_id, "Case not found with given Case ID");
+	check(cf.case_status >= AWAITING_ARBS, "case file is still in CASE_SETUP");
+	check(cf.case_status < RESOLVED, "case file can not be RESOLVED or DISMISSED");
 
 	//check(cf.arbitrators.size() == size_t(0), "Case already has an assigned arbitrator");
 	check(std::find(cf.arbitrators.begin(), cf.arbitrators.end(), arb_to_assign) == cf.arbitrators.end(),
@@ -553,7 +555,7 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Only the assigned arbitrator can accept a claim");
 
-	check(decision_class > UNDECIDED && decision_class <= MISC, "decision_class must be valid [1 - 15]");
+	check(decision_class > UNDECIDED && decision_class <= MISC, "decision_class must be valid [2 - 15]");
 	check(cf.case_status < DECISION && cf.case_status > AWAITING_ARBS, "unable to dismiss claim while this case file is in this status");
 
 	claims_table claims(get_self(), get_self().value);
@@ -667,6 +669,8 @@ void arbitration::recuse(uint64_t case_id, string rationale, name assigned_arb)
 
 	//TODO: check if assign_arb is an arbitrator
 	//TODO: check if case_state is > AWAITING_ARB AND case_state < RESOLVED
+	check(cf.case_status > AWAITING_ARBS && cf.case_status < RESOLVED, 
+		"unable to recuse if the case is resolved");	
 
 	auto arb_case = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
 	check(arb_case != cf.arbitrators.end(), "Arbitrator isn't selected for this case.");
