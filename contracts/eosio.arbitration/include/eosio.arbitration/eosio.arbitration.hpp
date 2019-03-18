@@ -173,8 +173,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	[[eosio::action]] void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link,
 	        uint8_t decision_class);
 
-	[[eosio::action]] void execaccept(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
-	        string decision_link, uint8_t decision_class);
+	[[eosio::action]] void execclaim(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
+                                     string decision_link, uint8_t decision_class);
 
 	[[eosio::action]] void advancecase(uint64_t case_id, name assigned_arb);
 
@@ -411,7 +411,7 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	config_singleton configs;
 	config _config;
 
-	using exec_accept = action_wrapper<"execaccept"_n, &arbitration::execaccept>;
+	using exec_claim = action_wrapper<"execaccept"_n, &arbitration::execclaim>;
 	using exec_file = action_wrapper<"execfile"_n, &arbitration::execfile>;
 
 #pragma endregion Tables and Structs

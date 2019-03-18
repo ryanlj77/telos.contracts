@@ -594,11 +594,11 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 		row.response_link = response_link;
 	});
 
-	exec_accept exec("eosio.arb"_n, {get_self(), "active"_n});
+	exec_claim exec("eosio.arb"_n, {get_self(), "active"_n});
 	exec.send(new_claim_id, case_id, assigned_arb, claim_hash, decision_link, decision_class);
 }
 
-void arbitration::execaccept(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
+void arbitration::execclaim(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
 				string decision_link, uint8_t decision_class) {
 	require_auth(get_self());
 }
@@ -991,7 +991,7 @@ extern "C"
 			{
 				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(deleteclaim)(setconfig)(initelection)(regarb)(unregnominee)
 				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(execfile)(addclaim)(removeclaim)(shredcase)(readycase)
-				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(execaccept)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
+				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(execclaim)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
 				(setlangcodes)(dismissarb)(deletecase));
 			}
 		}
