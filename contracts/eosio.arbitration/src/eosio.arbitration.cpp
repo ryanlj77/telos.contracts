@@ -341,9 +341,10 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 	}
 
 	vector<claim> unr_claims = {claim{uint64_t(0), claim_link, ""}};
+	uint64_t new_case_id = casefiles.available_primary_key();
 
 	casefiles.emplace(claimant, [&](auto &row) {
-		row.case_id = casefiles.available_primary_key();
+		row.case_id = new_case_id;
 		row.case_status = CASE_SETUP;
 		row.claimant = claimant;
 		row.respondant = *respondant;
@@ -357,6 +358,14 @@ void arbitration::filecase(name claimant, string claim_link, vector<uint8_t> lan
 	});
 
 	//print("\nCased Filed");
+
+	exec_file exec("eosio.arb"_n, {get_self(), "active"_n});
+	exec.send(new_case_id, claimant, claim_link, lang_codes, *respondant);
+}
+
+void arbitration::execfile(uint64_t new_case_id, name claimant, string claim_link,
+			  vector<uint8_t> lang_codes, name respondant) {
+	require_auth(get_self());
 }
 
 void arbitration::addclaim(uint64_t case_id, string claim_link, name claimant)
@@ -584,6 +593,14 @@ void arbitration::acceptclaim(uint64_t case_id, name assigned_arb, string claim_
 		row.decision_class = decision_class;
 		row.response_link = response_link;
 	});
+
+	exec_accept exec("eosio.arb"_n, {get_self(), "active"_n});
+	exec.send(new_claim_id, case_id, assigned_arb, claim_hash, decision_link, decision_class);
+}
+
+void arbitration::execaccept(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
+				string decision_link, uint8_t decision_class) {
+	require_auth(get_self());
 }
 
 void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_ruling) {
@@ -973,8 +990,8 @@ extern "C"
 			switch (action)
 			{
 				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(deleteclaim)(setconfig)(initelection)(regarb)(unregnominee)
-				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(addclaim)(removeclaim)(shredcase)(readycase)
-				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
+				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(execfile)(addclaim)(removeclaim)(shredcase)(readycase)
+				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(execaccept)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
 				(setlangcodes)(dismissarb)(deletecase));
 			}
 		}

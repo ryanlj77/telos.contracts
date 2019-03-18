@@ -117,7 +117,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	void initelection();
 
 	[[eosio::action]] //REGCAND
-	void regarb(name nominee, string credentials_link); //NOTE: actually regnominee, currently regarb for nonsense governance reasons
+	void regarb(name nominee, string credentials_link);
+    //NOTE: actually regnominee, currently regarb for nonsense governance reasons
 
 	[[eosio::action]] //UNREGCAND
 	void unregnominee(name nominee);
@@ -138,7 +139,11 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	[[eosio::action]] void withdraw(name owner);
 
 	//NOTE: filing a case doesn't require a respondent
-	[[eosio::action]] void filecase(name claimant, string claim_link, vector<uint8_t> lang_codes, std::optional<name> respondant);
+	[[eosio::action]] void filecase(name claimant, string claim_link, vector<uint8_t> lang_codes,
+	        std::optional<name> respondant);
+
+	[[eosio::action]] void execfile(uint64_t new_case_id, name claimant, string claim_link,
+	        vector<uint8_t> lang_codes, name respondant);
 
 	//NOTE: adds subsequent claims to a case
 	[[eosio::action]] void addclaim(uint64_t case_id, string claim_link, name claimant);
@@ -165,7 +170,11 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	[[eosio::action]] void dismissclaim(uint64_t case_id, name assigned_arb, string claim_hash, string memo);
 
-	[[eosio::action]] void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link, uint8_t decision_class);
+	[[eosio::action]] void acceptclaim(uint64_t case_id, name assigned_arb, string claim_hash, string decision_link,
+	        uint8_t decision_class);
+
+	[[eosio::action]] void execaccept(uint64_t new_claim_id, uint64_t case_id, name assigned_arb, string claim_hash,
+	        string decision_link, uint8_t decision_class);
 
 	[[eosio::action]] void advancecase(uint64_t case_id, name assigned_arb);
 
@@ -273,7 +282,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		vector<uint8_t> languages; //NOTE: language codes
 
 		uint64_t primary_key() const { return arb.value; }
-		EOSLIB_SERIALIZE(arbitrator, (arb)(arb_status)(open_case_ids)(closed_case_ids)(credentials_link)(elected_time)(term_expiration)(languages))
+		EOSLIB_SERIALIZE(arbitrator, (arb)(arb_status)(open_case_ids)(closed_case_ids)(credentials_link)
+		    (elected_time)(term_expiration)(languages))
 	};
 
 	//NOTE: Stores all information related to a single claim.
@@ -349,14 +359,16 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 		 * fee_structure[LOST_KEY_RECOVERY]  	= LOST_KEY_RECOVERY fee
 		 *  ...
 		*/
-		vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value //TODO: just make vector of assets
+		vector<int64_t> fee_structure; //NOTE: always in TLOS so only store asset.amount value
+		// TODO: just make vector of assets
 		uint32_t arb_term_length;
 		uint32_t last_time_edited;
 		uint64_t current_ballot_id = 0;
 		bool auto_start_election = false;
 
 		uint64_t primary_key() const { return publisher.value; }
-		EOSLIB_SERIALIZE(config, (publisher)(max_elected_arbs)(election_duration)(election_start)(fee_structure)(arb_term_length)(last_time_edited)(current_ballot_id)(auto_start_election))
+		EOSLIB_SERIALIZE(config, (publisher)(max_elected_arbs)(election_duration)(election_start)
+		    (fee_structure)(arb_term_length)(last_time_edited)(current_ballot_id)(auto_start_election))
 	};
 
 	/**
@@ -398,6 +410,9 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	typedef singleton<name("config"), config> config_singleton;
 	config_singleton configs;
 	config _config;
+
+	using exec_accept = action_wrapper<"execaccept"_n, &arbitration::execaccept>;
+	using exec_file = action_wrapper<"execfile"_n, &arbitration::execfile>;
 
 #pragma endregion Tables and Structs
 
