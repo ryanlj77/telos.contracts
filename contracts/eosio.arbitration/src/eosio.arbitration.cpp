@@ -613,7 +613,7 @@ void arbitration::setruling(uint64_t case_id, name assigned_arb, string case_rul
 	check(arb_it != cf.arbitrators.end(), "arbitrator is not assigned to this case_id");
 	validate_ipfs_url(case_ruling);
 
-	print("setruling called");
+	// print("setruling called");
 
 	casefiles.modify(cf, same_payer, [&](auto& row) {
 		row.case_ruling = case_ruling;
@@ -643,7 +643,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 
 	if (approvals.size() + 1 < cf.arbitrators.size()) {
 		approvals.emplace_back(assigned_arb);
-	} else if (cf.approvals.size() + 1 == cf.arbitrators.size()) {
+	} else if (cf.approvals.size() + 1 >= cf.arbitrators.size()) {
 		case_status++;
 		approvals.clear();
 	}
