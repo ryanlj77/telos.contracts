@@ -16,28 +16,28 @@ public:
 	const name assigner = name("assigner");
 	const name non_claimant = name("nonclaimant");
 
-	const string claim_link1 = "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb";
-	const string claim_link2 = "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139";
+	const string claim_link1 = "QmPcfm42GpRbShfMv7aBuXSN3mWwmbmiq6ZrRT1LtqL3ZX";
+	const string claim_link2 = "QmaR8uSSy9MxFs6cftuaUNfirA6ypHKPpfB7eStds4AYDh";
     const vector<string> claim_links = {
-            "ipfs://931264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb",
-            "ipfs://bc59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139",
-            "ipfs://323456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
-            "ipfs://423456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "QmaqXXdxX8CSDrLHidjRk51RVdGhyLLX1w8SMyudNy7Aye",
+            "QmQUxGfBBctLVQrAEQJjWHSLufaBUAzncRAf2o3Ue88n55",
+            "QmVXaHjxByYNsh7ZwzoJMWmpDQ6pTzzBqAymH9XK2JkvRK",
+            "QmTqdYyLPzZ5VjLB5v4yS44NVsjfYuBPtjMj5B8U8uPQMm",
     };
 
 
-    const string response_link1 = "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn";
-	const string response_link2 = "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy";
+    const string response_link1 = "QmQeqYBXbQZ91QVrLdczc43z5RKurPqJiZze3jpTQ7MY3G";
+	const string response_link2 = "QmfJcVYGDeK4SBudEPXWKRBG4dmTFapmUHJGx2SfpR5qPW";
     const vector<string> response_links ={
-            "ipfs://vvufklxcwyxrwmhnjcpkfyaubpkgrpygufckzsenksqyhifzujfn",
-            "ipfs://nsafrcprogpfzhhmnhcgarfljezrszyuqbtrwgereqctxuairvjy",
+            "QmR1mWk6DtJEC6k7qgucuhNyu3g6WsEmrb6Z3wMKprq43e",
+            "QmV59dyJn3RoJz1axfMk1BL2MMgj1iMFf99GR1w2veg9mK",
     };
 
     const vector<string> ruling_links = {
-            "ipfs://131264531ab2ff13d504d95cbc2931264531ab2ff13d504d95cb",
-            "ipfs://2c59d405d31ff2ba1354621392cbc59d405d31ff2ba135462139",
-            "ipfs://333456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
-            "ipfs://433456jkfadfhjlkldfajldfshjkldfahjfdsghaleedkjaagkso",
+            "QmekkVz5Jy1VgyQgH31p7LMfc6euXWfiHxPat2yf8BuhTM",
+            "QmQwNsNHBbG5WRai6jnmW2b3QdwVLxxQn4tiPcSgSEHnat",
+            "Qmcgk5fmBqXweDYq816i7m1abdGfzzbG2XY66AC1DvuWp7",
+            "QmbnYHXjb4qpC8GzvmgMUY5u3p2cjarTrNopkkjDQWhjuN",
     };
 
 	const vector<uint8_t> lang_codes = {0, 1, 2};

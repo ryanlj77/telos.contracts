@@ -432,6 +432,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 
 	void add_arbitrator(arbitrators_table & arbitrators, name arb_name, std::string credential_link);
 
+	void del_claim(uint64_t claim_id);
+
 	vector<permission_level_weight> get_arb_permissions();
 
 	void set_permissions(vector<permission_level_weight> &perms);

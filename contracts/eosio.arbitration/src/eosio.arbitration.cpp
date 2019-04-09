@@ -742,15 +742,13 @@ void arbitration::deletecase(uint64_t case_id)
 	casefiles_table casefiles(get_self(), get_self().value);
 
 	const auto& cf = casefiles.get(case_id, "case file not found");
-	check(cf.case_status >= RESOLVED, "case must either be RESOLVED or DISMISSED");
+	//check(cf.case_status >= RESOLVED, "case must either be RESOLVED or DISMISSED");
 	casefiles.erase(cf);
 
 	auto claim_ids = cf.accepted_claims;
-	claims_table claims(get_self(), get_self().value);
 	
 	for(auto& id : claim_ids) {
-		const auto& claim = claims.get(id, "claim not found");
-		claims.erase(claim);
+		del_claim(id);
 	}
 }
 
@@ -826,7 +824,7 @@ vector<claim>::iterator arbitration::get_claim_at(string hash, vector<claim>& cl
 
 void arbitration::validate_ipfs_url(string ipfs_url)
 {
-	check(ipfs_url.length() == 59 || ipfs_url.length() == 53, "invalid ipfs string, valid schema: <hash>");
+	check(ipfs_url.length() == 46 || ipfs_url.length() == 49, "invalid ipfs string, valid schema: <hash>");
 }
 
 void arbitration::assert_string(string to_check, string error_msg)
@@ -957,6 +955,12 @@ void arbitration::add_arbitrator(arbitrators_table &arbitrators, name arb_name, 
 			a.credentials_link = credential_link;
 		});
 	}
+}
+
+void arbitration::del_claim(uint64_t claim_id) {
+	claims_table claims(get_self(), get_self().value);
+	const auto& claim = claims.get(claim_id, "claim not found");
+	claims.erase(claim);
 }
 
 void arbitration::transfer_handler(name from, name to, asset quantity)
