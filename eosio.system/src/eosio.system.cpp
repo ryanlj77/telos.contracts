@@ -6,7 +6,7 @@
 #include "delegate_bandwidth.cpp"
 #include "voting.cpp"
 #include "exchange_state.cpp"
-
+#include "rex.cpp"
 
 namespace eosiosystem {
 
@@ -16,6 +16,10 @@ namespace eosiosystem {
     _producers(_self, _self.value),
     _global(_self, _self.value),
     _rammarket(_self, _self.value),
+    _rexpool(_self, _self.value),
+    _rexfunds(_self, _self.value),
+    _rexbalance(_self, _self.value),
+    _rexorders(_self, _self.value),
     _schedule_metrics(_self, _self.value),
     _rotation(_self, _self.value),
     _payments(_self, _self.value)
@@ -36,6 +40,11 @@ namespace eosiosystem {
    time_point system_contract::current_time_point() {
       const static time_point ct{ microseconds{ static_cast<int64_t>( current_time() ) } };
       return ct;
+   }
+
+   time_point_sec system_contract::current_time_point_sec() {
+      const static time_point_sec cts{ current_time_point() };
+      return cts;
    }
 
    block_timestamp system_contract::current_block_time() {
@@ -300,6 +309,9 @@ namespace eosiosystem {
          m.quote.balance.amount = system_token_supply.amount / 1000;
          m.quote.balance.symbol = core;
       });
+
+      INLINE_ACTION_SENDER(eosio::token, open)( token_account, { _self, active_permission },
+                                                { rex_account, core, _self } );
    }
 
    void system_contract::votebpout(name bp, uint32_t penalty_hours) {
@@ -322,6 +334,9 @@ EOSIO_DISPATCH( eosiosystem::system_contract,
      (newaccount)(updateauth)(deleteauth)(linkauth)(unlinkauth)(canceldelay)(onerror)(setabi)
      // eosio.system.cpp
      (init)(setram)(setramrate)(setparams)(setpriv)(setalimits)(rmvproducer)(updtrevision)(bidname)(bidrefund)(votebpout)
+     // rex.cpp
+     (deposit)(withdraw)(buyrex)(unstaketorex)(sellrex)(cnclrexorder)(rentcpu)(rentnet)(fundcpuloan)(fundnetloan)
+     (defcpuloan)(defnetloan)(updaterex)(consolidate)(mvtosavings)(mvfrsavings)(setrex)(rexexec)(closerex)
      // delegate_bandwidth.cpp
      (buyrambytes)(buyram)(sellram)(delegatebw)(undelegatebw)(refund)
      // voting.cpp

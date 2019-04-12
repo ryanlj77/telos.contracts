@@ -37,6 +37,7 @@ namespace eosiosystem {
       asset         cpu_weight;
       int64_t       ram_bytes = 0;
 
+      bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0 && ram_bytes == 0; }
       uint64_t primary_key()const { return owner.value; }
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
@@ -53,6 +54,7 @@ namespace eosiosystem {
       asset         net_weight;
       asset         cpu_weight;
 
+      bool is_empty()const { return net_weight.amount == 0 && cpu_weight.amount == 0; }
       uint64_t  primary_key()const { return to.value; }
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
@@ -380,28 +382,31 @@ namespace eosiosystem {
          }
       }
 
-      // update voting power
-      {
-         asset total_update = stake_net_delta + stake_cpu_delta;
-         auto from_voter = _voters.find( from.value );
-         if( from_voter == _voters.end() ) {
-            from_voter = _voters.emplace( from, [&]( auto& v ) {
-                  v.owner  = from;
-                  v.staked = total_update.amount;
-               });
-         } else {
-            _voters.modify( from_voter, same_payer, [&]( auto& v ) {
-                  v.staked += total_update.amount;
-               });
-         }
-         eosio_assert( 0 <= from_voter->staked, "stake for voting cannot be negative");
-      //    if( from == "b1"_n ) {
-      //       validate_b1_vesting( from_voter->staked );
-      //    }
+      update_voting_power( from, stake_net_delta + stake_cpu_delta );
+   }
 
-         if( from_voter->producers.size() || from_voter->proxy ) {
-            update_votes( from, from_voter->proxy, from_voter->producers, false );
-         }
+   void system_contract::update_voting_power( const name& voter, const asset& total_update )
+   {
+      auto voter_itr = _voters.find( voter.value );
+      if( voter_itr == _voters.end() ) {
+         voter_itr = _voters.emplace( voter, [&]( auto& v ) {
+            v.owner  = voter;
+            v.staked = total_update.amount;
+         });
+      } else {
+         _voters.modify( voter_itr, same_payer, [&]( auto& v ) {
+            v.staked += total_update.amount;
+         });
+      }
+
+      check( 0 <= voter_itr->staked, "stake for voting cannot be negative" );
+
+      //if( voter == "b1"_n ) {
+      //   validate_b1_vesting( voter_itr->staked );
+      //}
+
+      if( voter_itr->producers.size() || voter_itr->proxy ) {
+         update_votes( voter, voter_itr->proxy, voter_itr->producers, false );
       }
    }
 
