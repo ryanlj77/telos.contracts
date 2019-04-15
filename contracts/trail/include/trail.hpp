@@ -5,8 +5,8 @@
  * to match a wide variety of intended use cases. 
  * 
  * @author Craig Branscom
- * @contract trailservice
- * @copyright
+ * @contract trail
+ * @copyright see LICENSE.txt
  */
 
 #include <eosiolib/asset.hpp>
@@ -15,6 +15,7 @@
 #include <eosiolib/dispatcher.hpp>
 #include <string>
 #include <algorithm>
+
 #include <eosiolib/print.hpp>
 
 using namespace eosio;
@@ -58,26 +59,25 @@ class [[eosio::contract("trail")]] trail : public contract {
 
     struct option {
         name option_name;
-        string info; //TODO: remove? ballot info could explain each option
         asset votes;
+        string info; //TODO: remove? ballot info could explain each option
     };
+    // EOSLIB_SERIALIZE(option, (option_name)(votes)(info))
 
     struct token_settings {
-        bool is_destructible = false;
-        bool is_proxyable = false;
-        bool is_burnable = false;
-        bool is_seizable = false;
-        bool is_max_mutable = false;
-        bool is_liquid = false;
-
-        // EOSLIB_SERIALIZE(token_settings, 
-        //     (is_destructible)(is_proxyable)(is_burnable)
-        //     (is_seizable)(is_max_mutable)(is_liquid))
+        bool burnable = false;
+        bool proxyable = false;
+        bool seizable = false;
+        bool transferable = false;
     };
+    // EOSLIB_SERIALIZE(token_settings, 
+    //     (burnable)(proxyable)
+    //     (seizable)(transferable))
 
     //======================== tables ========================
 
     //@scope get_self().value
+    //@ram
     TABLE ballot {
         name ballot_name;
         name category;
@@ -85,11 +85,11 @@ class [[eosio::contract("trail")]] trail : public contract {
 
         string title;
         string description;
-        string info_url;
+        string info_link; //typically IPFS link to content
 
         vector<option> options;
         uint32_t unique_voters;
-        uint8_t max_votable_options;
+        uint8_t max_votable_options; //number of options user is allowed to vote on
         symbol voting_symbol;
 
         uint32_t begin_time;
@@ -98,29 +98,36 @@ class [[eosio::contract("trail")]] trail : public contract {
 
         uint64_t primary_key() const { return ballot_name.value; }
         EOSLIB_SERIALIZE(ballot, (ballot_name)(category)(publisher)
-            (title)(description)(info_url)
+            (title)(description)(info_link)
             (options)(unique_voters)(max_votable_options)(voting_symbol)
             (begin_time)(end_time)(status))
     };
 
+    typedef multi_index<name("ballots"), ballot> ballots;
+
     //@scope get_self().value
-    TABLE registry {
+    //@ram 
+    TABLE registry { //TODO: rename to treasury?
         asset supply;
         asset max_supply;
         name publisher;
+
         uint32_t total_voters;
         uint32_t total_proxies;
         token_settings settings;
-        string info_url;
+        string info_link;
 
         //TODO: maybe track max_vote_receipts here? or maybe in token_settings?
 
         uint64_t primary_key() const { return supply.symbol.code().raw(); }
         EOSLIB_SERIALIZE(registry, (supply)(max_supply)(publisher)
-            (total_voters)(total_proxies)(settings)(info_url))
+            (total_voters)(total_proxies)(settings)(info_link))
     };
 
+    typedef multi_index<name("registries"), registry> registries;
+
     //@scope name.value
+    //@ram 
     TABLE vote {
         name ballot_name;
         vector<name> option_names;
@@ -132,7 +139,11 @@ class [[eosio::contract("trail")]] trail : public contract {
         EOSLIB_SERIALIZE(vote, (ballot_name)(option_names)(amount)(expiration))
     };
 
+    typedef multi_index<name("votes"), vote,
+        indexed_by<name("byexp"), const_mem_fun<vote, uint64_t, &vote::by_exp>>> votes;
+
     //@scope name.value
+    //@ram 
     TABLE account {
         asset balance;
         uint16_t num_votes;
@@ -141,15 +152,7 @@ class [[eosio::contract("trail")]] trail : public contract {
         EOSLIB_SERIALIZE(account, (balance)(num_votes))
     };
 
-    //table defs
-    typedef multi_index<name("ballots"), ballot> ballots;
-
-    typedef multi_index<name("registries"), registry> registries;
-
     typedef multi_index<name("accounts"), account> accounts;
-
-    typedef multi_index<name("votes"), vote,
-        indexed_by<name("byexp"), const_mem_fun<vote, uint64_t, &vote::by_exp>>> votes;
 
     //======================== ballot actions ========================
 

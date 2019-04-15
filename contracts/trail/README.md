@@ -1,6 +1,6 @@
 # Trail Voting Platform
 
-Trail is a fully on-chain voting platform for the Telos Blockchain Network that offers a suite of voting services for both users and developers. Trail is maintained as a completely open source project for maximum transparency and auditability.
+Trail is an on-chain voting platform for the Telos Blockchain Network that offers a full suite of voting services for both users and developers. Trail is maintained as a completely open source project by [@craigbranscom](https://github.com/craigbranscom) for maximum transparency and auditability.
 
 ## Purpose of VOTE Token
 
@@ -8,7 +8,7 @@ Trail manages an internal token named `VOTE` that is used in place of the native
 
 Trail uses the virtual `VOTE` token to avoid confusion that a user's `TLOS` are being held on the platform, and to allow for more efficient actions and therefore lower resource usage when interacting with the platform.
 
-All users who own a balance of `TLOS` are eligible to mirror their staked balance for an equavalent number of `VOTE` tokens. Trail calculates a user's `VOTE` balance by simply issuing `1 VOTE` per `1 TLOS` of the user's staked resources.
+All users who own a balance of `TLOS` are eligible to mirror their staked balance for an equivalent number of `VOTE` tokens. Trail calculates a user's `VOTE` balance by simply issuing `1 VOTE` per `1 TLOS` of the user's staked resources.
 
 ## Services
 
@@ -16,25 +16,27 @@ All users who own a balance of `TLOS` are eligible to mirror their staked balanc
 
     Any user on the Telos Blockchain Network can create a ballot that is publicly viewable and votable by all users on the platform.
 
-    During Ballot creation, the Ballot publisher may specify which token they would like to use for counting votes. In most cases this will be the default `VOTE` token, but Trail offers additional services for creating privately-managed voting tokens that Ballot publishers can elect to use instead.
+    During Ballot creation, the Ballot publisher may specify which token they want to use for counting votes. In most cases this will be the default `VOTE` token, but Trail offers additional services for creating privately-managed voting tokens that Ballot publishers can use instead.
 
 * `Casting Votes`
 
-    All users who own a balance of `TLOS` are elligible to mirror their staked balance and receive `VOTE` tokens at a 1:1 rate. These `VOTE` tokens are castable on any Ballot that is created for use with that token.
+    All users who own a balance of `TLOS` are elligible to mirror their staked balance and receive `VOTE` tokens at a 1:1 ratio. These `VOTE` tokens are castable on any Ballot that is created for use with that token.
 
-    Additionally, if users have balance of custom tokens and there are open ballots for that token, they may cast their votes on those Ballots as well.
+    In short, regular `TLOS` tokens do not exist on the Trail platform they are instead swapped with `VOTE` tokens and those `VOTE` tokens are what are used to cast votes on Telos Governance proposals.
+
+    However, if users have balances of custom tokens and there are open ballots for those tokens, they may cast their votes on those Ballots as well.
 
 * `Custom Voting Token Creation`
 
-    Any user may create a custom voting token hosted by Trail that automatically inherits Trail's entire suite of voting services and fraud prevention tools.
+    Any user may create a custom voting token that automatically inherits Trail's entire suite of voting services and fraud prevention tools.
 
-    For instance, a user could create a `BOARD` token to represent one board seat at their company. They would then own the entire `BOARD` token namespace within Trail and have the full authority to `mint` or `send` those board tokens to their intended owners. Trail's verbose token interface even allows for additional token features (set at the time of token creation) such as `burning`, `seizing`, or `mutable_max`.
+    For instance, a user could create a `BOARD` token to represent one board seat at their company. They would then own the entire `BOARD` token namespace within Trail and have the full authority to `mint` or `send` those tokens. Trail's verbose token interface even allows for additional token features (set at the time of token creation) such as `burning`, `seizing`, or `mutable_max`.
 
 * `Custom Token Ballots`
 
-    Once a user has created a custom voting token, any holder of that token may publish Ballots that are votable on by any holder of the custom token.
+    Once a user has created a custom voting token, any holder of that token may publish Ballots that are votable on by any other holder of that custom token.
 
-    Continuing with the `BOARD` example, a board member could propose a vote for all `BOARD` holders. Ballots created for custom tokens operate exactly the same as Ballots running on the system-backed `VOTE` token, they simply use a custom token to count votes. 
+    Continuing with the `BOARD` example, a board member could propose a vote for all `BOARD` holders. Ballots created for custom tokens operate exactly the same as Ballots running on the system-backed `VOTE` token, they simply use a different token to count votes.
 
 * `Fraud Prevention`
 
