@@ -108,8 +108,8 @@ class[[eosio::contract("eosio.arbitration")]] arbitration : public eosio::contra
 	// [[eosio::action]] 
 	// void injectarbs(vector<name> to_inject); //TODO: remove production deployment
 
-	[[eosio::action]]
-	void deleteclaim(uint64_t claim_id, name arb);
+	// [[eosio::action]]
+	// void deleteclaim(uint64_t claim_id, name arb);
 
 #pragma region Arb_Elections
 

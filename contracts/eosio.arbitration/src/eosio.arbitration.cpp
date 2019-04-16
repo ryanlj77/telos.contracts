@@ -32,15 +32,15 @@ arbitration::~arbitration()
 
 //NOTE: TEST ACTION SHOULD BE REMOVED IN PRODUCTION
 //TODO: remove before production deployment
-void arbitration::deleteclaim(uint64_t claim_id, name arb) {
-	require_auth(arb);
-	check(is_arb(arb), "actor is not an arbitrator");
+// void arbitration::deleteclaim(uint64_t claim_id, name arb) {
+// 	require_auth(arb);
+// 	check(is_arb(arb), "actor is not an arbitrator");
 
-	claims_table claims(get_self(), get_self().value);
-	const auto &claim = claims.get(claim_id, "claim with claim_id does not exist");
+// 	claims_table claims(get_self(), get_self().value);
+// 	const auto &claim = claims.get(claim_id, "claim with claim_id does not exist");
 
-	claims.erase(claim);
-}
+// 	claims.erase(claim);
+// }
 
 void arbitration::setconfig(uint16_t max_elected_arbs, uint32_t election_duration,
 							uint32_t election_start, uint32_t arbitrator_term_length, vector<int64_t> fees)
@@ -629,7 +629,7 @@ void arbitration::advancecase(uint64_t case_id, name assigned_arb)
 	check(cf.case_status > AWAITING_ARBS, "case_status must be greater than AWAITING_ARBS");
 	check(cf.case_status < RESOLVED && cf.case_status != DISMISSED, "Case has already been resolved or dismissed");
 	if (cf.case_status + 1 == RESOLVED) {
-		check(cf.case_ruling != string(""), "case_ruling must be set before advancing case to RESOLVED status");
+		check(cf.case_ruling != string(""), "Case Ruling must be set before advancing case to RESOLVED status");
 	}
 
 	auto arb_it = std::find(cf.arbitrators.begin(), cf.arbitrators.end(), assigned_arb);
@@ -993,7 +993,7 @@ extern "C"
 		{
 			switch (action)
 			{
-				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)*/(deleteclaim)(setconfig)(initelection)(regarb)(unregnominee)
+				EOSIO_DISPATCH_HELPER(arbitration, /*(injectarbs)(deleteclaim)*/(setconfig)(initelection)(regarb)(unregnominee)
 				(candaddlead)(candrmvlead)(endelection)(withdraw)(respond)(filecase)(execfile)(addclaim)(removeclaim)(shredcase)(readycase)
 				(assigntocase)(addarbs)(dismissclaim)(acceptclaim)(execclaim)(advancecase)(dismisscase)(setruling)(recuse)(newarbstatus)
 				(setlangcodes)(dismissarb)(deletecase));
