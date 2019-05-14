@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 project(eosio_contracts VERSION 1.5.1)
 
-set(EOSIO_CDT_VERSION_MIN "1.6")
-set(EOSIO_CDT_VERSION_SOFT_MAX "1.6")
-#set(EOSIO_CDT_VERSION_HARD_MAX "")
+set(EOSIO_CDT_VERSION_MIN "1.5")
+set(EOSIO_CDT_VERSION_SOFT_MAX "1.5")
+set(EOSIO_CDT_VERSION_HARD_MAX "1.5")
 
 find_package(eosio.cdt)
 
@@ -30,17 +30,17 @@ else()
 endif()
 
 
-#add_subdirectory(eosio.bios)
-#add_subdirectory(eosio.msig)
-#add_subdirectory(eosio.wrap)
+add_subdirectory(eosio.bios)
+add_subdirectory(eosio.msig)
+add_subdirectory(eosio.wrap)
 add_subdirectory(eosio.system)
 add_subdirectory(eosio.token)
-#add_subdirectory(eosio.trail)
-#add_subdirectory(eosio.arbitration)
+add_subdirectory(eosio.trail)
+add_subdirectory(eosio.arbitration)
 #add_subdirectory(eosio.amend)
-#add_subdirectory(eosio.saving)
-#add_subdirectory(telos.tfvt)
-#add_subdirectory(telos.free)
+add_subdirectory(eosio.saving)
+add_subdirectory(telos.tfvt)
+add_subdirectory(telos.free)
 #add_subdirectory(token.registry)
 
 

@@ -688,7 +688,7 @@ namespace eosiosystem {
 
       /// transfer from eosio.names to eosio.rex
       if ( pool->namebid_proceeds.amount > 0 ) {
-         channel_to_rex( names_account, pool->namebid_proceeds );
+         channeltorex( names_account, pool->namebid_proceeds );
          _rexpool.modify( pool, same_payer, [&]( auto& rt ) {
             rt.namebid_proceeds.amount = 0;
          });
@@ -953,7 +953,7 @@ namespace eosiosystem {
     * @param from - account from which asset is transfered to REX pool
     * @param amount - amount of tokens to be transfered
     */
-   void system_contract::channel_to_rex( const name& from, const asset& amount )
+   void system_contract::channeltorex( const name& from, const asset& amount )
    {
 #if CHANNEL_RAM_AND_NAMEBID_FEES_TO_REX
       if ( rex_available() ) {

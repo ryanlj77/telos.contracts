@@ -68,6 +68,7 @@ namespace eosiosystem {
       eosio::asset    net_amount;
       eosio::asset    cpu_amount;
 
+      bool is_empty()const { return net_amount.amount == 0 && cpu_amount.amount == 0; }
       uint64_t  primary_key()const { return owner.value; }
 
       // explicit serialization macro is not necessary, used here only to improve compilation time
@@ -133,6 +134,7 @@ namespace eosiosystem {
             token_account, { {payer, active_permission} },
             { payer, ramfee_account, fee, std::string("ram fee") }
          );
+         channeltorex( ramfee_account, fee );
       }
 
       int64_t bytes_out;
@@ -213,6 +215,7 @@ namespace eosiosystem {
             token_account, { {account, active_permission} },
             { account, ramfee_account, asset(fee, core_symbol()), std::string("sell ram fee") }
          );
+         channeltorex( ramfee_account, asset(fee, core_symbol() ));
       }
    }
 
@@ -258,7 +261,7 @@ namespace eosiosystem {
          }
          eosio_assert( 0 <= itr->net_weight.amount, "insufficient staked net bandwidth" );
          eosio_assert( 0 <= itr->cpu_weight.amount, "insufficient staked cpu bandwidth" );
-         if ( itr->net_weight.amount == 0 && itr->cpu_weight.amount == 0 ) {
+         if ( itr->is_empty() ) {
             del_tbl.erase( itr );
          }
       } // itr can be invalid, should go out of scope
@@ -333,7 +336,7 @@ namespace eosiosystem {
                eosio_assert( 0 <= req->net_amount.amount, "negative net refund amount" ); //should never happen
                eosio_assert( 0 <= req->cpu_amount.amount, "negative cpu refund amount" ); //should never happen
 
-               if ( req->net_amount.amount == 0 && req->cpu_amount.amount == 0 ) {
+               if ( req->is_empty() ) {
                   refunds_tbl.erase( req );
                   need_deferred_trx = false;
                } else {

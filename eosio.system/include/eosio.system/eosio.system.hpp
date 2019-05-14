@@ -642,6 +642,9 @@ namespace eosiosystem {
          [[eosio::action]]
          void votebpout(name bp, uint32_t penalty_hours);
 
+         [[eosio::action]]
+         void channeltorex( const name& from, const asset& amount );
+
          using init_action = eosio::action_wrapper<"init"_n, &system_contract::init>;
          using delegatebw_action = eosio::action_wrapper<"delegatebw"_n, &system_contract::delegatebw>;
          using deposit_action = eosio::action_wrapper<"deposit"_n, &system_contract::deposit>;
@@ -682,6 +685,7 @@ namespace eosiosystem {
          using setpriv_action = eosio::action_wrapper<"setpriv"_n, &system_contract::setpriv>;
          using setalimits_action = eosio::action_wrapper<"setalimits"_n, &system_contract::setalimits>;
          using setparams_action = eosio::action_wrapper<"setparams"_n, &system_contract::setparams>;
+         using channeltorex_action = eosio::action_wrapper<"channeltorex"_n, &system_contract::channeltorex>;
 
       private:
          // Implementation details:
@@ -710,7 +714,6 @@ namespace eosiosystem {
                                         const char* error_msg = "must vote for at least 21 producers or for a proxy before buying REX" )const;
          rex_order_outcome fill_rex_order( const rex_balance_table::const_iterator& bitr, const asset& rex );
          asset update_rex_account( const name& owner, const asset& proceeds, const asset& unstake_quant, bool force_vote_update = false );
-         void channel_to_rex( const name& from, const asset& amount );
          void channel_namebid_to_rex( const int64_t highest_bid );
          template <typename T>
          int64_t rent_rex( T& table, const name& from, const name& receiver, const asset& loan_payment, const asset& loan_fund );
