@@ -190,7 +190,7 @@ void ratifyamend::addclause(uint64_t sub_id, uint8_t new_clause_num, string new_
         }
     }
 
-    eosio_assert(existing_clause = false, "clause number to add already exists in proposal");
+    eosio_assert(existing_clause == false, "clause number to add already exists in proposal");
 
     sub.new_clause_nums.push_back(new_clause_num);
     sub.new_ipfs_urls.push_back(new_ipfs_url);
