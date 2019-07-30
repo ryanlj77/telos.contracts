@@ -203,7 +203,7 @@ void workerproposal::claim(uint64_t sub_id) {
     auto updated_fee = sub.fee;
 
     // print("\n GET FEE BACK WHEN <<<< ", prop.yes_count, " >= ", votes_fee_thresh," && ", total_votes, " >= ", voters_fee_thresh);
-    if( sub.fee && prop.yes_count.amount > 0 && prop.yes_count >= votes_fee_thresh && total_votes >= voters_fee_thresh) {
+    if( sub.fee && prop.yes_count.amount > 0 && prop.yes_count >= votes_fee_thresh && total_votes.amount >= voters_fee_thresh) {
         asset the_fee = asset(int64_t(sub.fee), symbol("TLOS", 4));
         if(sub.receiver == sub.proposer){
             outstanding += the_fee;
@@ -219,7 +219,7 @@ void workerproposal::claim(uint64_t sub_id) {
     }
 
     // print("\n GET MUNI WHEN <<<< ", prop.yes_count, " > ", votes_pass_thresh, " && ", total_votes, " >= ", voters_pass_thresh);
-    if( prop.yes_count > votes_pass_thresh && total_votes >= voters_pass_thresh ) {
+    if( prop.yes_count > votes_pass_thresh && total_votes.amount >= voters_pass_thresh ) {
         outstanding += asset(int64_t(sub.amount), symbol("TLOS", 4));
     }
     

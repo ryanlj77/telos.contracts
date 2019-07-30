@@ -315,7 +315,7 @@ void ratifyamend::closeprop(uint64_t sub_id) {
     uint64_t voters_fee_thresh = (e->supply.amount * configs_struct.threshold_fee_voters) / 100; 
     asset votes_fee_thresh = (total_votes * configs_struct.threshold_fee_votes) / 100; 
 
-    if( prop.yes_count >= votes_fee_thresh && total_votes >= voters_fee_thresh) {
+    if( prop.yes_count >= votes_fee_thresh && total_votes.amount >= voters_fee_thresh) {
         action(permission_level{ _self, "active"_n }, "eosio.token"_n, "transfer"_n, make_tuple(
             _self,
             sub.proposer,
@@ -325,7 +325,7 @@ void ratifyamend::closeprop(uint64_t sub_id) {
     }
 
     uint8_t new_status = 2;
-    if( prop.yes_count > votes_pass_thresh && total_votes >= voters_pass_thresh ) {
+    if( prop.yes_count > votes_pass_thresh && total_votes.amount >= voters_pass_thresh ) {
         update_doc(sub.document_id, sub.new_clause_nums, sub.new_ipfs_urls);
         new_status = uint8_t(1);
     }
