@@ -669,7 +669,7 @@ namespace eosiosystem {
          void votebpout(name bp, uint32_t penalty_hours);
 
          [[eosio::action]]
-         void setpayrates(uint64_t inflation, uint64_t worker);
+         void setpayrates(uint64_t bpay, uint64_t worker);
 
          [[eosio::action]]
          void distviarex(name from, asset amount); 
