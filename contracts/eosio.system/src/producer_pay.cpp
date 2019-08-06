@@ -148,10 +148,7 @@ namespace eosiosystem {
         //auto to_workers = (worker_rate / continuous_rate) * new_tokens;
         //auto to_producers = new_tokens - to_workers;
 
-        const name token_account = "eosio.token"_n;
         const name tedp_account = "eosio.tedp"_n;
-        const name saving_account = "eosio.saving"_n;
-        const name bpay_account = "eosio.bpay"_n;
 
         double bpay_rate = _gpayrate.bpay_rate / 100000;
         auto to_workers = static_cast<int64_t>((12 * double(_gpayrate.worker_amount) * double(usecs_since_last_fill)) / double(useconds_per_year));
@@ -176,19 +173,19 @@ namespace eosiosystem {
 
         if (transfer_tokens > 0) {
             INLINE_ACTION_SENDER(eosio::token, transfer)
-            (token_account, {_self, "active"_n}, {tedp_account, _self, asset(transfer_tokens, core_symbol()), std::string("TEDP: Inflation offset")});
+            (token_account, {_self, active_permission}, {tedp_account, _self, asset(transfer_tokens, core_symbol()), std::string("TEDP: Inflation offset")});
         }                
 
         if (issue_tokens > 0) {
             INLINE_ACTION_SENDER(eosio::token, issue)
-            (token_account, {{_self, "active"_n}}, {_self, asset(issue_tokens, core_symbol()), std::string("Issue new TLOS tokens")});
+            (token_account, {{_self, active_permission}}, {_self, asset(issue_tokens, core_symbol()), std::string("Issue new TLOS tokens")});
         }
 
         INLINE_ACTION_SENDER(eosio::token, transfer)
-        (token_account, {_self, "active"_n}, {_self, saving_account, asset(to_workers, core_symbol()), std::string("Transfer worker proposal share to eosio.saving account")});
+        (token_account, {_self, active_permission}, {_self, saving_account, asset(to_workers, core_symbol()), std::string("Transfer worker proposal share to eosio.saving account")});
 
         INLINE_ACTION_SENDER(eosio::token, transfer)
-        (token_account, {_self, "active"_n}, {_self, bpay_account, asset(to_producers, core_symbol()), std::string("Transfer producer share to per-block bucket")});
+        (token_account, {_self, active_permission}, {_self, bpay_account, asset(to_producers, core_symbol()), std::string("Transfer producer share to per-block bucket")});
 
         _gstate.perblock_bucket += to_producers;
         _gstate.last_pervote_bucket_fill = ct;
