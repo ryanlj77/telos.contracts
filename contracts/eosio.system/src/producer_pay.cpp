@@ -107,7 +107,7 @@ namespace eosiosystem {
    }
 
    void system_contract::claimrewards_snapshot() {
-    require_auth("eosio"_n); //can only come from bp's onblock call
+    require_auth(_self); //can only come from bp's onblock call
 
     eosio_assert(_gstate.thresh_activated_stake_time > time_point(), "cannot take snapshot until chain is activated");
 
@@ -148,13 +148,18 @@ namespace eosiosystem {
         //auto to_workers = (worker_rate / continuous_rate) * new_tokens;
         //auto to_producers = new_tokens - to_workers;
 
+        const name token_account = "eosio.token"_n;
+        const name tedp_account = "eosio.tedp"_n;
+        const name saving_account = "eosio.saving"_n;
+        const name bpay_account = "eosio.bpay"_n;
+
         double bpay_rate = _gpayrate.bpay_rate / 100000;
         auto to_workers = static_cast<int64_t>((12 * double(_gpayrate.worker_amount) * double(usecs_since_last_fill)) / double(useconds_per_year));
         auto to_producers = static_cast<int64_t>((bpay_rate * double(token_supply.amount) * double(usecs_since_last_fill)) / double(useconds_per_year));
         auto new_tokens = to_workers + to_producers;
 
 
-        asset tedp_balance = eosio::token::get_balance("eosio.token"_n, "eosio.tedp"_n, symbol_code("TLOS"));
+        asset tedp_balance = eosio::token::get_balance(token_account, tedp_account, core_symbol().code());
 
         uint64_t transfer_tokens = 0;
         uint64_t issue_tokens = 0;
@@ -171,19 +176,19 @@ namespace eosiosystem {
 
         if (transfer_tokens > 0) {
             INLINE_ACTION_SENDER(eosio::token, transfer)
-            ("eosio.token"_n, {"eosio"_n, "active"_n}, {"eosio.tedp"_n, "eosio"_n, asset(transfer_tokens, core_symbol()), std::string("TEDP: Inflation offset")});
+            (token_account, {_self, "active"_n}, {tedp_account, _self, asset(transfer_tokens, core_symbol()), std::string("TEDP: Inflation offset")});
         }                
 
         if (issue_tokens > 0) {
             INLINE_ACTION_SENDER(eosio::token, issue)
-            ("eosio.token"_n, {{"eosio"_n, "active"_n}}, {"eosio"_n, asset(issue_tokens, core_symbol()), std::string("Issue new TLOS tokens")});
+            (token_account, {{_self, "active"_n}}, {_self, asset(issue_tokens, core_symbol()), std::string("Issue new TLOS tokens")});
         }
 
         INLINE_ACTION_SENDER(eosio::token, transfer)
-        ("eosio.token"_n, {"eosio"_n, "active"_n}, {"eosio"_n, "eosio.saving"_n, asset(to_workers, core_symbol()), std::string("Transfer worker proposal share to eosio.saving account")});
+        (token_account, {_self, "active"_n}, {_self, saving_account, asset(to_workers, core_symbol()), std::string("Transfer worker proposal share to eosio.saving account")});
 
         INLINE_ACTION_SENDER(eosio::token, transfer)
-        ("eosio.token"_n, {"eosio"_n, "active"_n}, {"eosio"_n, "eosio.bpay"_n, asset(to_producers, core_symbol()), std::string("Transfer producer share to per-block bucket")});
+        (token_account, {_self, "active"_n}, {_self, bpay_account, asset(to_producers, core_symbol()), std::string("Transfer producer share to per-block bucket")});
 
         _gstate.perblock_bucket += to_producers;
         _gstate.last_pervote_bucket_fill = ct;
