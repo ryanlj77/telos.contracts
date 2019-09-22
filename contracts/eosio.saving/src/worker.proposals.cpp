@@ -1,119 +1,331 @@
 #include <worker.proposals.hpp>
-#include <eosio/symbol.hpp>
-#include <eosio/print.hpp>
 
-using namespace eosio;
-using eosio::print;
+// #include <eosio/print.hpp>
 
-workerproposal::workerproposal(name self, name code, datastream<const char*> ds) : contract(self, code, ds), wpenv(self, self.value) {
-    if (!wpenv.exists()) {
+wps::wps(name self, name code, datastream<const char*> ds) : contract(self, code, ds) {}
 
-        wp_env_struct = wp_env{
-			_self,
-            uint32_t(2500000),    // cycle duration in seconds (default 2,500,000 or 5,000,000 blocks or ~29 days)
-            uint16_t(3),          // percent from requested amount (default 3%)
-            uint64_t(500000),     // minimum fee amount (default 50 TLOS)
-			uint32_t(864000000),      // delay before voting starts on a submission in seconds (~30 years)
-            double(5),          // % of all registered voters to pass (minimum, including exactly this value)
-            double(50),         // % yes over no, to consider it passed (strictly over this value)
-            double(4),          // % of all registered voters to refund fee (minimum, including exactly this value)
-            double(20)          // % of yes to give fee back
-        };
+wps::~wps() {}
 
-        wpenv.set(wp_env_struct, _self);
+//======================== wps actions ========================
+
+ACTION wps::updatewps(string version) {
+	//authenticate
+    require_auth(get_self());
+
+	//initialize
+	config new_config;
+
+	//open wpsconfig singleton
+    wpsconfig_singleton wpsconfigs(get_self(), get_self().value);
+
+	if (wpsconfigs.exists()) {
+		//get wpsconfig
+		new_config = wpsconfigs.get();
+		
+		//update wps_version
+		new_configs.wps_version = version;
     } else {
-        wp_env_struct = wpenv.get();     
+		//initialize
+		map<name, double> default_thresholds;
+		default_thresholds[name("passvoters")] = double(5.0);
+		default_thresholds[name("passvotes")] = double(50.0);
+		default_thresholds[name("refundvoters")] = double(4.0);
+		default_thresholds[name("refundvotes")] = double(20.0);
+
+		//set defaults
+		new_config = {
+			"2.0.0", //wps_version
+			name("eosio.saving"), //manager
+			uint32_t(2500000), //cycle_duration
+			asset(50, TLOS_SYM),
+			default_thresholds //thresholds
+		};
     }
+
+    //set new config
+    configs.set(new_config, get_self());
 }
 
-workerproposal::~workerproposal() { }
+ACTION wps::newproposal(name proposal_name, name category, string title, string description, string ipfs_cid, 
+		name proposer, name recipient, asset total_funds_requested, optional<uint8_t> cycles) {
 
-void workerproposal::setenv(wp_env new_environment) {
-	check(new_environment.cycle_duration > 0, "cycle duration must be a non-zero number");
-	check(new_environment.fee_percentage > 0, "fee_percentage must be a non-zero number");
-	check(new_environment.start_delay > 0, "start_delay must be a non-zero number");
-	check(new_environment.fee_min > 0, "fee_min must be a non-zero number");
-	check(new_environment.threshold_pass_voters >= 0 && new_environment.threshold_pass_voters <= 100, "threshold pass_voters must be between 0 and 100");
-	check(new_environment.threshold_pass_votes >= 0 && new_environment.threshold_pass_votes <= 100, "threshold pass_votes must be between 0 and 100");
-	check(new_environment.threshold_fee_voters >= 0 && new_environment.threshold_fee_voters <= 100, "threshold fee_voters must be between 0 and 100");
-	check(new_environment.threshold_fee_votes >= 0 && new_environment.threshold_fee_votes <= 100, "threshold fee_votes must be between 0 and 100");
-	require_auth(_self);
-	wpenv.set(new_environment, _self);
-}
+	//authenticate
+	require_auth(proposer);
 
-void workerproposal::getdeposit(name owner) {
-    require_auth(owner);
-	deposits_table deposits(_self, _self.value);
-	auto d_itr = deposits.find(owner.value);
-    check(d_itr != deposits.end(), "Deposit not found");
+	//open proposals table, search for existing proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto p_itr = proposals.find(proposal_name.value);
 
-	auto d = *d_itr;
-    require_auth(d.owner);
+	//validate
+	check(p_itr == proposals.end(), "proposal already exists");
+	check(valid_category(category), "invalid category");
+	check(valid_ipfs_cid(ipfs_cid), "invalid ipfs cid");
+	check(is_account(recipient), "recipient account does not exist");
+	check(total_funds_requested.amount > 0, "must request more than zero funds");
+	check(total_funds_requested.symbol == TLOS_SYM, "can only request TLOS funds");
 
-	action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, make_tuple(
-		_self,
-		d.owner,
-		d.escrow,
-		std::string("return unused deposit")
-	)).send();
-	
-	deposits.erase(d_itr);
-}
+	//initialize
+	uint8_t total_cycles = 1;
+	asset total_fee = asset(0, TLOS_SYM);
+	map<name, string> initial_deliverables;
+	vector<name> initial_options = {"yes"_n, "no"_n, "abstain"_n};
 
-void workerproposal::submit(name proposer, std::string title, uint16_t cycles, std::string ipfs_location, asset amount, name receiver) {
-    require_auth(proposer);
-	
-	print("\nCalculating fee");
-	uint64_t fee_amount = uint64_t(amount.amount) * uint64_t( wp_env_struct.fee_percentage ) / uint64_t(100);
-    fee_amount = fee_amount > wp_env_struct.fee_min ? fee_amount :  wp_env_struct.fee_min;
-	asset fee = asset(fee_amount, symbol("TLOS", 4));
-
-	print("\nFinding deposit");
-	deposits_table deposits(_self, _self.value);
-	auto d_itr = deposits.find(proposer.value);
-	check(d_itr != deposits.end(), "Deposit not found, please transfer your TLOS fee");
-	auto d = *d_itr;
-	check(d.escrow >= fee, "Deposit amount is less than fee, please transfer more TLOS");
-	
-	if(d.escrow > fee) {
-		print("\nModify deposit");
-	    asset outstanding = d.escrow - fee;
-		deposits.modify(d_itr, same_payer, [&](auto& depo) {
-			depo.escrow = outstanding;
-		});
-	} else {
-		print("\ndelete deposit");
-		deposits.erase(d_itr);
+	if (cycles) {
+		total_cycles = *cycles;
 	}
 
-	ballots_table ballots("eosio.trail"_n, "eosio.trail"_n.value);
-	uint32_t begin_time = current_time_point().sec_since_epoch() + wp_env_struct.start_delay;
-	uint32_t end_time = current_time_point().sec_since_epoch() + wp_env_struct.start_delay + wp_env_struct.cycle_duration;
-	uint64_t next_ballot_id = ballots.available_primary_key();
-	action(permission_level{_self, "active"_n}, "eosio.trail"_n, "regballot"_n, make_tuple(
-		_self,
-		uint8_t(0),
-		symbol("VOTE",4),
-		begin_time,
-		end_time,
-		ipfs_location
-	)).send();
+	//emplace new proposal
+	proposals.emplace(get_self(), [&](auto& col) {
+		col.proposal_name = proposal_name;
+		col.proposer = proposer;
+		col.recipient = recipient;
+		col.cycles = total_cycles;
+		col.fee = total_fee;
+		col.approved = false;
+		col.refund = false;
+		col.refunded = false;
+		col.current_cycle = 0;
+		col.current_ballot_name = proposal_name;
+		col.total_funds_requested = total_funds_requested;
+		col.deliverables = initial_deliverables;
+	});
 
-    submissions_table submissions(_self, _self.value);
-    submissions.emplace( proposer, [&]( submission& info ){
-        info.id             = submissions.available_primary_key();
-        info.ballot_id      = next_ballot_id;
-        info.proposer       = proposer;
-        info.receiver       = receiver;
-        info.title          = title;
-        info.ipfs_location  = ipfs_location;
-        info.cycles         = cycles + 1;
-        info.amount         = uint64_t(amount.amount);
-        info.fee            = fee_amount;
-    });
+	//send inline newballot to trailservice
+	action(permission_level{get_self(), "active"_n }, "trailservice"_n, "newballot"_n, make_tuple(
+        proposal_name, //ballot_name
+		name("proposal"), //category
+		get_self(), //publisher
+		VOTE_SYM, //treasury_symbol
+		name("1tokennvote"), //voting_method
+		initial_options //initial_options
+    )).send();
+
+	//send inline editdetails to trailservice
+	action(permission_level{get_self(), "active"_n }, "trailservice"_n, "editdetails"_n, make_tuple(
+        proposal_name, //ballot_name
+		title, //title
+		description, //description
+		ipfs_cid, //content
+    )).send();
+
 }
 
-void workerproposal::openvoting(uint64_t sub_id) {
+ACTION wps::readyprop(name proposal_name) {
+
+	//open proposals table, get proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name, "proposal not found");
+
+	//authenticate
+	require_auth(prop.proposer);
+
+	//validate
+	check(prop.current_cycle == 0, "proposal already started");
+
+	//initialize
+	time_point_sec cycle_end_time = time_point_sec(current_time_point()) + uint32_t(2592000); //now + 30 days
+
+	//send inline readyballot to trailservice
+	action(permission_level{get_self(), "active"_n }, "trailservice"_n, "readyballot"_n, make_tuple(
+        proposal_name, //ballot_name
+		cycle_end_time //end_time
+    )).send();
+
+}
+
+ACTION wps::endcycle(name proposal_name) {
+
+	//open proposals table, get proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name.value, "proposal not found");
+
+	//authenticate
+	require_auth(prop.proposer);
+
+	//validate
+	check(!prop.approved, "cycle was already approved and ended");
+
+	//send inline closeballot to trailservice
+	action(permission_level{get_self(), "active"_n }, "trailservice"_n, "closeballot"_n, make_tuple(
+        prop.current_ballot_name, //ballot_name
+		true //broadcast
+    )).send();
+
+	//NOTE: final vote tally will be determined in catch_broadcast()
+
+	
+
+}
+
+ACTION wps::claimfunds(name proposal_name, name claimant) {
+	//TODO: implement
+
+	//open proposals table, get proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name.value, "proposal not found");
+
+}
+
+ACTION wps::nextcycle(name proposal_name, string deliverable_report, name next_cycle_name) {
+
+	//open proposals table, get proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name.value, "proposal not found");
+
+	//authenticate
+	require_auth(prop.proposer);
+
+	//validate
+	check(prop.approved, "next cycle is not approved");
+	check(prop.current_cycle < prop.cycles, "proposal has no cycles left");
+
+	//initialize
+	auto new_deliverables = prop.deliverables;
+	new_deliverables[next_cycle_name] = deliverable_report;
+
+	//update proposal
+	proposals.modify(prop, same_payer, [&](auto& col) {
+		col.current_cycle += 1;
+		col.current_ballot_name = next_cycle_name;
+		col.deliverables = new_deliverables;
+	});
+
+	//TODO: send inline newballot to trail
+
+}
+
+ACTION wps::cancelprop(name proposal_name, string memo) {
+
+	//open proposals table, get proposal
+	proposals_table propsals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name.value, "proposal not found");
+
+	//authenticate
+	require_auth(prop.proposer);
+
+	//validate
+	check(!prop.approved, "cannot cancel an approved proposal");
+
+	//send inline cancelballot action to trailservice
+	action(permission_level{get_self(), "active"_n }, "trailservice"_n, "cancelballot"_n, make_tuple(
+        prop.current_ballot_name, //ballot_name
+		memo //memo
+    )).send();
+
+}
+
+ACTION wps::deleteprop(name proposal_name) {
+	//TODO: implement
+}
+
+ACTION wps::getrefund(name proposal_name) {
+
+	//open proposals table, get proposal
+	proposals_table proposals(get_self(), get_self().value);
+	auto& prop = proposals.get(proposal_name.value, "proposal not found");
+
+	//authenticate
+	require_auth(prop.proposer);
+
+	//validate
+	check(prop.refund, "refund not approved");
+	check(!prop.refunded, "refund already paid");
+
+	//open deposits table, search for deposit
+	deposits_table deposits(get_self(), get_self().value);
+	auto d_itr = deposits.find(prop.proposer.value);
+
+	if (d_itr == deposits.end()) {
+		//emplace new deposit
+		deposits.emplace(get_self(), [&](auto& col) {
+			col.owner = prop.proposer;
+			col.escrow = prop.fee;
+		});
+	} else {
+		//update existing balance
+		deposits.modify(d_itr, same_payer, [&](auto& col) {
+			col.escrow += prop.fee;
+		});
+	}
+
+	//update proposal
+	proposals.modify(prop, same_payer, [&](auto& col) {
+		col.refunded = true;
+	});
+
+}
+
+ACTION wps::withdraw(name account_owner, asset quantity) {
+
+	//authenticate
+	require_auth(account_owner);
+
+	//open deposits table, get deposit
+	deposits_table deposits(get_self(), get_self().value);
+	auto& dep = deposits.get(accont_owner.value, "deposit not found");
+
+	//validate
+	check(quantity.amount > 0, "must withdraw quantity greater than zero");
+	check(dep.escrow >= quantity, "insufficient funds");
+
+	//send inline to eosio.token
+	action(permission_level{get_self(), name("active")}, name("eosio.token"), name("transfer"), make_tuple(
+		get_self(), //from
+		dep.owner, //to
+		quantity, //quantity
+		std::string("wps withdrawal") //memo
+	)).send();
+
+	//erase deposit row if empty
+	if (dep.escrow == quantity) {
+		deposits.erase(dep);
+	}
+
+}
+
+//========== notification methods ==========
+
+void wps::catch_transfer(name from, name to, asset quantity, string memo) {
+	
+	//authenticate
+	require_auth(from);
+
+	//validate
+	check(quantity.symbol == symbol("TLOS", 4), "WPS only accepts TLOS deposits");
+
+	//skips transfers from self or when memo says "skip"
+	if (to != get_self() || memo == "skip") {
+		return;
+	}
+
+	//open deposits table, search for deposit
+	deposits_table deposits(get_self(), get_self().value);
+	auto d_itr = deposits.find(from.value);
+
+	if (d_itr == deposits.end()) {
+		//emplace new deposit
+		deposits.emplace(get_self(), [&](auto& col) {
+			col.owner = from;
+			col.escrow = quantity;
+		});
+	} else {
+		//update existing balance
+		deposits.modify(d_itr, same_payer, [&](auto& col) {
+			col.escrow += quantity;
+		});
+	}
+
+}
+
+void wps::catch_broadcast(name ballot_name, map<name, asset> final_results, uint32_t total_voters) {
+	//TODO: implement
+
+
+}
+
+//======================== legacy actions ========================
+
+ACTION wps::openvoting(uint64_t sub_id) {
 	print("\n look for sub id");
 	submissions_table submissions(_self, _self.value);
 	auto s = submissions.get(sub_id, "Submission not found");
@@ -145,7 +357,7 @@ void workerproposal::openvoting(uint64_t sub_id) {
     print("\nReady Proposal: SUCCESS");
 }
 
-void workerproposal::cancelsub(uint64_t sub_id) {
+ACTION wps::cancelsub(uint64_t sub_id) {
 	submissions_table submissions(_self, _self.value);
     auto s_itr = submissions.find(sub_id);
     check(s_itr != submissions.end(), "Submission not found");
@@ -169,7 +381,7 @@ void workerproposal::cancelsub(uint64_t sub_id) {
 	submissions.erase(s_itr);
 }
 
-void workerproposal::claim(uint64_t sub_id) {
+ACTION wps::claim(uint64_t sub_id) {
     submissions_table submissions(_self, _self.value);
     const auto& sub = submissions.get(sub_id, "Worker Proposal Not Found");
 
@@ -253,32 +465,4 @@ void workerproposal::claim(uint64_t sub_id) {
     submissions.modify(sub, same_payer, [&]( auto& a ) {
         a.fee = updated_fee;
     });
-}
-
-// note : this gets called when eosio.saving transfers OUT tokens too 
-// => deposits.owner eosio.saving will contain the entire sum of what was paid out , EVER (including fees and everything)
-void workerproposal::transfer_handler(name from, name to, asset quantity, string memo) {
-	require_auth(from);
-
-	if(to != _self) {
-		return;
-	}
-
-	if(quantity.symbol == symbol("TLOS", 4)) {
-		deposits_table deposits(_self, _self.value);
-		auto d = deposits.find(from.value);
-
-		if(d == deposits.end()) {
-			deposits.emplace(get_self(), [&](auto& depo) {
-				depo.owner = from;
-				depo.escrow = quantity;
-			});
-		} else {
-			deposits.modify(d, same_payer, [&](auto& depo) {
-				depo.escrow += quantity;
-			});
-		}
-	}
-
-	print("\nDeposit Complete");
 }
