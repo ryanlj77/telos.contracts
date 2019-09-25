@@ -1,6 +1,6 @@
-# Worker Proposal User/Developer Guide
+# Worker Proposal Developer Guide
 
-The Worker Proposal System contract allows members of the Telos Blockchain to create worker proposals. Through the WPS contract members of the telos blockchain can outline improvements that they believe benefit Telos. Once a proposal is published, members of Telos can use the Trail Service contract to vote for a proposal. If a proposal passes the proposer can claim the Tokens needed to implement the changes described in their proposal.
+The Worker Proposal System contract allows members of the Telos Blockchain to create worker proposals. Through the WPS contract members of the telos blockchain can outline improvements that they believe benefit Telos. Once a proposal is published, members of Telos can use the Trail Service contract to vote for a proposal. If a proposal passes the proposer can claim the Tokens needed to implement the work described in their proposal.
 
 # Contract Setup 
 
@@ -8,63 +8,130 @@ The Worker Proposal System contract should be set to the `eosio.saving` account.
 
 ## Dependencies
 
-The WPS contract requires that the Trail Service contract be set on the `eosio.trail` account. WPS leverages trails extensive voting system in order to track member voting for worker proposals.
+The WPS contract requires that the Trail Service contract be set on the `trailservice` account, and Trail 2 integration complete for `eosio.contracts` (to be completed in upcoming Telos Pine Update). 
 
-## Contract Account Permissions
+## WPS Actions
 
-WPS requires the `active` permission of the account it's published on to include a new actor, `eosio.saving@eosio.code`. This allows WPS to sign inline transactions as `eosio.saving`. An example of this permission is shown below.
+> ACTION `updatewps()`
 
-TODO: show permissions here
+Updates the WPS contract version.
 
-# Actions
+Required Authority: `get_self()`
 
-* `void submit(name proposer, std::string title, uint16_t cycles, std::string ipfs_location, asset amount, name receiver)`
+- string `version`: semver version number.
 
-	The submit action allows members to submit a proposal to the contract. If the proposer has transferred the required `TLOS` fee to `eosio.saving` a `ballot` and `proposal` object will be emplaced in the `eosio.trail` tables.
+> ACTION `newproposal()`
 
-	`proposer` is the account name of the proposer. The person who owns the submission of the proposal discribed in the following arguments.
+Drafts a new worker proposal and creates a new ballot on Trail.
 
-	`title` is the title of the proposal being sent by the `proposer`
+Required Authority: `proposer`
 
-	`cycles` this argument represents the number of voting cycles, the number of payments, and the length of time the work desribed in the proposal will take to finish.
+- name `proposal_name`: the name of the new proposal, will also be the `ballot_name` in Trail.
 
-	`ipfs_location` is the object hash of a document stored on IPFS that describes the proposals goals. The work required, its benefits, costs, schedules, etc.
+- name `category`: the category name the proposal most accurately fits.
 
-	`amount` the token amount to be paid to the `receiver` (explained below) if a cycle passes the threshold of required `YES` votes.
+- string `title`: the title of the proposal.
 
-	`receiver` the account name that will receive the `amount` described above. 
+- string `description`: a description of the proposal.
 
-* `void cancelsub(uint64_t sub_id)`
+- string `ipfs_cid`: an ipfs_cid (or any uri) pointing to more thorough documentation or presentation of the proposal.
 
-	The cancelsub action allows members who have called `submit` previously to cancel their submission before the voting starts. 
+- name `proposer`: the name of the account submitting the proposal (and being charged the submission fee).
 
-	*CAUTION: This action does not refund your fee!*
+- name `recipient`: the name of the account that will receive the funds, if approved.
 
-	`sub_id` the unique id of the submission to be cancelled.
+- asset `total_funds_requested`: the total amount of `TLOS` that will be requested for the entire proposal. This amount will be divided by the number of cycles in the proposal to determine the amount due for each cycle.
 
-* `void openvoting(uint64_t sub_id)`
+- OPTIONAL uint8_t `cycles`: the total number of cycles requested in the proposal. If no value is supplied, the number of cycles will default to 1.
 
-	The openvoting action starts the voting of the initial proposal.
+> ACTION readyprop()
 
-	`sub_id` the unique id of the submisision to be started.
+Completes the draft proposal and calls Trail to open voting on the ballot.
 
-* `void claim(uint64_t sub_id)`
+Required Authority: `proposal.proposer`
 
-	The claim action allows the proposer of the submission with `sub_id` to claim the `amount` of `TLOS` described in the submission.
+- name `proposal_name`: the name of the proposal to open for voting.
 
-# Proposal Lifecycle
+> ACTION endcycle()
 
-`testaccounta` wants to create a proposal for designing a plug
+Ends a cycle of voting for a proposal and calls Trail to close the ballot.
 
-1. `eosio.saving::submit`
+Required Authority: `proposal.proposer`
 
-2. `eosio.saving::openvoting`
+- name `proposal_name`: the name of the proposal to end.
 
-3. `eosio.trail` actions
+> ACTION claimfunds()
 
-	1. `eosio.trail::regvoter`
-	2. `eosio.trail::castvote`
+Claims funds for the current cycle, if approved by a vote.
 
-4. `eosio.saving::claim`
+Required Authority: `proposal.proposer`
 
-5. Repeat steps 3 and 4 until the number of cycles described in `submit` is reached.
+- name `proposal_name`: the name of the proposal to claim funds from.
+
+- name `claimant`: the name of the account claiming the funds.
+
+> ACTION nextcycle()
+
+Moves the proposal to the next cycle if more cycles remain.
+
+- name `proposal_name`: the name of the proposal to move to the next cycle.
+
+- string `deliverable_report`: an ipfs cid or uri pointing to the previous cycle's deliverable report.
+
+- name `next_cycle_name`: the name of the next cycle's ballot.
+
+> ACTION cancelprop()
+
+Cancels a proposal and calls Trail to cancel voting.
+
+Required Authority: `proposal.proposer`
+
+- name `proposal_name`: the name of the proposal to cancel.
+
+- string `memo`: a memo describing the reason for the cancellation.
+
+> ACTION deleteprop()
+
+Deletes a cancelled or completed proposal and calls Trail to delete the ballot.
+
+- name `proposal_name`: the name of the proposal to delete.
+
+> ACTION getrefund()
+
+Retrieves a refund on a proposal, if refund conditions are met.
+
+Required Authority: `proposal.proposer`
+
+- name `proposal_name`: the name of the proposal holding the refund.
+
+> ACTION withdraw()
+
+Withdraws a given quantity of TLOS from the WPS platform.
+
+Required Authority: `deposit.owner`
+
+- name `account_owner`: the name of the account to withdraw TLOS from.
+
+- asset `quantity`: the amount of TLOS to withdraw.
+
+---
+
+## Legacy Actions (available until Trail 2 migration is complete)
+
+>`void cancelsub(uint64_t sub_id)`
+
+The cancelsub action allows members who have called `submit` previously to cancel their submission before the voting starts. 
+
+*CAUTION: This action does not refund your fee!*
+
+`sub_id` the unique id of the submission to be cancelled.
+
+>`void openvoting(uint64_t sub_id)`
+
+The openvoting action starts the voting of the initial proposal.
+
+`sub_id` the unique id of the submisision to be started.
+
+>`void claim(uint64_t sub_id)`
+
+The claim action allows the proposer of the submission with `sub_id` to claim the `amount` of `TLOS` described in the submission.

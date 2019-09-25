@@ -1,7 +1,5 @@
 #include <worker.proposals.hpp>
 
-// #include <eosio/print.hpp>
-
 wps::wps(name self, name code, datastream<const char*> ds) : contract(self, code, ds) {}
 
 wps::~wps() {}
@@ -151,9 +149,7 @@ ACTION wps::endcycle(name proposal_name) {
 		true //broadcast
     )).send();
 
-	//NOTE: final vote tally will be determined in catch_broadcast()
-
-	
+	//NOTE: final vote tally will be rendered in catch_broadcast()
 
 }
 
@@ -318,8 +314,37 @@ void wps::catch_transfer(name from, name to, asset quantity, string memo) {
 }
 
 void wps::catch_broadcast(name ballot_name, map<name, asset> final_results, uint32_t total_voters) {
-	//TODO: implement
 
+	//authenticate
+	// require_auth("trailservice"_n);
+
+	//open proposals table, search for proposal
+	proposals_table proposals(ge_self(), get_self().value);
+	auto p_itr = proposals.find(ballot_name.value);
+
+	//return if no proposal found
+	if (p_itr == proposals.end()) {
+		return;
+	}
+
+	//open wpsconfig singleton
+	wpsconfig_singleton wpsconf(get_self(), get_self().value);
+	auto current_config = wpsconfigs.get();
+
+
+	//initialize
+
+
+	//determine approval
+	if (final_results.at("yes"_n) > ) {
+
+	}
+	
+
+	//update proposal
+	proposals.modify(*p_itr, same_payer, [&](auto& col) {
+        col.approved = true;
+    });
 
 }
 
