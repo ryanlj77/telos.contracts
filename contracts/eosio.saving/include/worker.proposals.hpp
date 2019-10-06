@@ -31,21 +31,33 @@ class[[eosio::contract("eosio.saving")]] wps : public contract {
 	const asset TLOS_SYM = symbol("TLOS", 4);
 	const asset VOTE_SYM = symbol("VOTE", 4);
 
-	//======================== wps actions ========================
+	//======================== admin actions ========================
 
 	//update the wps contract version
-	ACTION updatewps(string version);
+	ACTION newversion(string new_version);
+
+	//update wps manager
+	ACTION newmanager(name new_manager);
+
+	//upsert new fee
+	ACTION upsertfee(name fee_name, asset new_fee);
+
+	//upsert new threshold
+	ACTION upsertthresh(name threshold_name, double new_threshold);
+
+	//add new category
+	ACTION newcategory(name new_category_name);
+
+	//======================== wps actions ========================
+
+	
 
 	ACTION newproposal(name proposal_name, name category, string title, string description, string ipfs_cid, 
 		name proposer, name recipient, asset total_funds_requested, optional<uint8_t> cycles);
 
 	ACTION readyprop(name proposal_name);
 
-	ACTION endcycle(name proposal_name);
-
 	ACTION claimfunds(name proposal_name, name claimant);
-
-	ACTION nextcycle(name proposal_name, string deliverable_report, name next_cycle_name);
 
 	ACTION cancelprop(name proposal_name, string memo);
 
@@ -88,12 +100,12 @@ class[[eosio::contract("eosio.saving")]] wps : public contract {
 	TABLE wps_config {
 		string wps_version;
 		name wps_manager;
-		uint32_t cycle_duration;
-		asset fee_min;
+		map<name, asset> fees;
 		map<name, double> thresholds;
+		vector<name> categories;
 		
 		EOSLIB_SERIALIZE(wpsconfig, (wps_version)(wps_mananger)
-			(cycle_duration)(fee_min)(thresholds))
+			(fees)(thresholds)(categories))
 	}
 	typedef singleton<name("wpsconfig"), wps_config> wpsconfig_singleton;
 
