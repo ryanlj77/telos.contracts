@@ -8,7 +8,7 @@ The Worker Proposal System contract should be set to the `eosio.saving` account.
 
 ## Dependencies
 
-The WPS contract requires that the Trail Service contract be set on the `trailservice` account, and Trail 2 integration complete for `eosio.contracts` (to be completed in upcoming Telos Pine Update). 
+The WPS contract requires that the Trail Service contract be set on the `trailservice` account, and Trail 2 activation complete for `eosio.contracts` (to be completed in upcoming Telos Pine Update). 
 
 ## WPS Actions
 
