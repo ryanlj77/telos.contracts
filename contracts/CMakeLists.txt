@@ -5,7 +5,7 @@ project(contracts)
 set(EOSIO_WASM_OLD_BEHAVIOR "Off")
 find_package(eosio.cdt)
 
-set(ICON_BASE_URL "http://127.0.0.1/ricardian_assets/eosio.contracts/icons")
+set(ICON_BASE_URL "https://github.com/Telos-Foundation/images/raw/master/ricardian_assets/eosio.contracts/icons")
 
 set(ACCOUNT_ICON_URI  "account.png#3d55a2fc3a5c20b456f5657faf666bc25ffd06f4836c5e8256f741149b0b294f")
 set(ADMIN_ICON_URI    "admin.png#9bf1cec664863bd6aaac0f814b235f8799fb02c850e9aa5da34e8a004bd6518e")
