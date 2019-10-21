@@ -13,7 +13,7 @@ set(MULTISIG_ICON_URI "multisig.png#4fb41d3cf02d0dd2d35a29308e93c2d826ec770d6bb5
 set(RESOURCE_ICON_URI "resource.png#3830f1ce8cb07f7757dbcf383b1ec1b11914ac34a1f9d8b065f07600fa9dac19")
 set(REX_ICON_URI      "rex.png#d229837fa62a464b9c71e06060aa86179adf0b3f4e3b8c4f9702f4f4b0c340a8")
 set(TOKEN_ICON_URI    "token.png#5e94f752ae53a979e20973944cc80683c0add1418411e9f45bb7bc1ecb92cddd")
-set(TRANSFER_ICON_URI "transfer.png#5dfad0df72772ee1ccc155e670c1d124f5c5122f1d5027565df38b418042d1dd")
+set(TRANSFER_ICON_URI "transfer.png#fbce3ec9b66813ccf6cae48c02d29fb273ce23b31209110188d76eb8b40ea17b")
 set(VOTING_ICON_URI   "voting.png#db28cd3db6e62d4509af3644ce7d377329482a14bb4bfaca2aa5f1400d8e8a84")
 
 add_subdirectory(eosio.bios)
