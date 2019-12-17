@@ -213,36 +213,41 @@ BOOST_FIXTURE_TEST_CASE( mirror_cast, eosio_trail_tester ) try {
 	create_accounts({N(votedecay)});
 	transfer(N(eosio), N(votedecay), asset::from_string("1000.0000 TLOS"), "Vote decay test");
 	auto levy_info = get_vote_counter_bal(N(votedecay), test_code);
-	REQUIRE_MATCHING_OBJECT(levy_info, mvo()
-			("owner", "votedecay")
-			("decayable_cb", "1000.0000 VOTE")
-			("persistent_cb", "0.0000 VOTE")
-			("last_decay", now())
-		);
-	// std::cout << "counter balance object exists after initial transfer" << std::endl;
+	BOOST_REQUIRE(levy_info.is_null());
 
-	produce_blocks();
-	produce_block(fc::seconds(172798/2));
-	produce_blocks();
+	// NOTE: The ladder part of this test is commented out due to the removal of code in eosio.token,
+	// sense this contract is being deprecated it isn't a concern.
 
-	// regvoter and mirrorstake new account
-	// std::cout << "regvoter for votedecay" << std::endl;
-	regvoter(N(votedecay), test_symbol);
-	// std::cout << "mirrorcast for voter" << std::endl;
-	mirrorcast(N(votedecay), symbol(4, "TLOS"));
+	// REQUIRE_MATCHING_OBJECT(levy_info, mvo()
+	// 	("owner", "votedecay")
+	// 	("decayable_cb", "1000.0000 VOTE")
+	// 	("persistent_cb", "0.0000 VOTE")
+	// 	("last_decay", now())
+	// );
+	// // std::cout << "counter balance object exists after initial transfer" << std::endl;
 
-	//1200 blocks = 5.0000 VOTE or 240 blocks / 1.0000 VOTE
-	string levy_amount_after_decay = "280.0000 VOTE";
+	// produce_blocks();
+	// produce_block(fc::seconds(172798/2));
+	// produce_blocks();
 
-	levy_info = get_vote_counter_bal(N(votedecay), test_code);
-	// std::cout << "now(): " << now() << std::endl;
-	// std::cout << "counter_balance.last_decay: " << levy_info["last_decay"].as_uint64() << std::endl;
-	REQUIRE_MATCHING_OBJECT(levy_info, mvo()
-			("owner", "votedecay")
-			("decayable_cb", levy_amount_after_decay)
-			("persistent_cb", "0.0000 VOTE")
-			("last_decay", now() - 86400) //600 is the NUMBER OF BLOCKS PRODUCED in seconds AFTER TRANFER
-		);
+	// // regvoter and mirrorstake new account
+	// // std::cout << "regvoter for votedecay" << std::endl;
+	// regvoter(N(votedecay), test_symbol);
+	// // std::cout << "mirrorcast for voter" << std::endl;
+	// mirrorcast(N(votedecay), symbol(4, "TLOS"));
+
+	// //1200 blocks = 5.0000 VOTE or 240 blocks / 1.0000 VOTE
+	// string levy_amount_after_decay = "280.0000 VOTE";
+
+	// levy_info = get_vote_counter_bal(N(votedecay), test_code);
+	// // std::cout << "now(): " << now() << std::endl;
+	// // std::cout << "counter_balance.last_decay: " << levy_info["last_decay"].as_uint64() << std::endl;
+	// REQUIRE_MATCHING_OBJECT(levy_info, mvo()
+	// 	("owner", "votedecay")
+	// 	("decayable_cb", levy_amount_after_decay)
+	// 	("persistent_cb", "0.0000 VOTE")
+	// 	("last_decay", now() - 86400) //600 is the NUMBER OF BLOCKS PRODUCED in seconds AFTER TRANFER
+	// );
 } FC_LOG_AND_RETHROW()
 
 //TODO: case for reg and unreg ballot
